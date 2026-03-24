@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { resolveNext } from "./resolve-next";
+
+export { resolveNext } from "./resolve-next";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -10,5 +13,6 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return NextResponse.redirect(`${origin}/tasks`);
+  const next = resolveNext(searchParams.get("next"), origin);
+  return NextResponse.redirect(`${origin}${next}`);
 }

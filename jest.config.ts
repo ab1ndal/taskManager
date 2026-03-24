@@ -9,7 +9,13 @@ const config: Config = {
   transform: {
     "^.+\\.tsx?$": ["ts-jest", { tsconfig: { jsx: "react-jsx" } }],
   },
-  testMatch: ["**/__tests__/**/*.test.tsx", "**/__tests__/**/*.test.ts"],
+  testMatch: [
+    "**/__tests__/**/*.test.tsx",
+    "**/__tests__/**/*.test.ts",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+  ],
+  testPathIgnorePatterns: ["/node_modules/", "/.next/"],
 };
 
 export default config;
