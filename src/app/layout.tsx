@@ -41,7 +41,12 @@ export default async function RootLayout({
           </div>
 
           <div className="ml-auto">
-            {user && <NavUser email={user.email ?? ""} />}
+            {user && (
+              <NavUser
+                name={user.user_metadata?.name ?? ""}
+                email={user.email ?? ""}
+              />
+            )}
           </div>
         </nav>
 
