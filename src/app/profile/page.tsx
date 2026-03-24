@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/toaster";
+import { Avatar } from "@/components/avatar";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -40,16 +41,24 @@ export default function ProfilePage() {
   }
 
   if (fetching) {
-    return <p className="text-sm text-gray-400">Loading…</p>;
+    return <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>;
   }
 
   return (
     <div className="max-w-sm">
-      <h2 className="mb-6 text-lg font-semibold">Profile</h2>
+      <h2 className="mb-6 text-xl font-semibold tracking-tight">Profile</h2>
+
+      <div className="flex items-center gap-4 mb-6">
+        <Avatar name={name} email={email} size="lg" />
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-text-primary)]">{name || "—"}</p>
+          <p className="text-sm text-[var(--color-text-secondary)]">{email}</p>
+        </div>
+      </div>
 
       <form onSubmit={handleSave} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="name" className="text-sm font-medium text-gray-700">
+          <label htmlFor="name" className="text-xs font-medium text-[var(--color-text-secondary)]">
             Name
           </label>
           <input
@@ -58,14 +67,14 @@ export default function ProfilePage() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-500 focus:ring-1 focus:ring-gray-500"
+            className="rounded-[8px] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm outline-none focus:border-[var(--color-accent)] focus:ring-[3px] focus:ring-[var(--color-accent)]/10 focus:bg-white"
             placeholder="Your name"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-gray-700">Email</label>
-          <p className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+          <label className="text-xs font-medium text-[var(--color-text-secondary)]">Email</label>
+          <p className="rounded-[8px] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm text-[var(--color-text-muted)]">
             {email}
           </p>
         </div>
@@ -73,7 +82,7 @@ export default function ProfilePage() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+          className="w-fit rounded-[8px] bg-[var(--color-accent)] px-5 py-[10px] text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50 transition-colors"
         >
           {loading ? "Saving…" : "Save changes"}
         </button>
