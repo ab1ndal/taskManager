@@ -25,20 +25,21 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]`}>
-        <nav className="h-14 border-b border-gray-200 bg-white flex items-center px-6 gap-6">
-          <span className="font-semibold text-base tracking-tight">
-            Task Manager
+        <nav className="h-[52px] border-b border-[var(--color-border)] bg-[var(--color-surface)] flex items-center px-5 gap-4">
+          {/* Wordmark */}
+          <span className="font-semibold text-base tracking-tight flex-shrink-0">
+            hearth<span className="text-[var(--color-accent)]">.</span>
           </span>
 
-          {/* Workspace tabs — placeholder */}
-          <div className="flex items-center gap-1 text-sm">
-            <button className="px-3 py-1.5 rounded-md bg-gray-100 font-medium">
+          {/* Workspace tab pills */}
+          <div className="flex items-center gap-[3px] bg-[var(--color-accent-subtle)] p-[3px] rounded-[9px] text-sm">
+            <button className="px-3 py-[5px] rounded-[7px] bg-white text-[var(--color-accent)] font-medium shadow-sm text-xs">
               All
             </button>
-            <button className="px-3 py-1.5 rounded-md text-gray-500 hover:bg-gray-100">
+            <button className="px-3 py-[5px] rounded-[7px] text-[var(--color-text-secondary)] hover:bg-white/60 font-medium text-xs">
               Household
             </button>
-            <button className="px-3 py-1.5 rounded-md text-gray-500 hover:bg-gray-100">
+            <button className="px-3 py-[5px] rounded-[7px] text-[var(--color-text-secondary)] hover:bg-white/60 font-medium text-xs">
               Work
             </button>
           </div>
