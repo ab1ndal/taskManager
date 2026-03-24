@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 import { createClient } from "@/lib/supabase/server";
 import { NavUser } from "@/components/nav-user";
 import { Toaster } from "@/components/toaster";
@@ -21,7 +24,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50 text-gray-900">
+      <body className={`${inter.className} min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]`}>
         <nav className="h-14 border-b border-gray-200 bg-white flex items-center px-6 gap-6">
           <span className="font-semibold text-base tracking-tight">
             Task Manager
