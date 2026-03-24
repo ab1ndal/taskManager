@@ -6,7 +6,7 @@ export async function proxy(request: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -25,8 +25,28 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // Refresh session if expired
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isAuthRoute =
+    pathname.startsWith("/login") || pathname.startsWith("/auth");
+
+  if (!user && !isAuthRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  const isResetMode =
+    request.nextUrl.searchParams.get("mode") === "reset";
+
+  if (user && pathname === "/login" && !isResetMode) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/tasks";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }
