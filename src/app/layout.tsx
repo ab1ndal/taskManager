@@ -8,8 +8,8 @@ import { NavUser } from "@/components/nav-user";
 import { Toaster } from "@/components/toaster";
 
 export const metadata: Metadata = {
-  title: "Task Manager",
-  description: "Manage household and work tasks",
+  title: "Hearth",
+  description: "Your household and work tasks, in one warm place.",
 };
 
 export default async function RootLayout({
