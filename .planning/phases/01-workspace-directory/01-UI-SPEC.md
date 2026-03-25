@@ -21,9 +21,11 @@ created: 2026-03-25
 | Preset | not applicable |
 | Component library | none |
 | Icon library | inline SVG |
-| Font | system default (sans-serif via Tailwind) |
+| Font | Geist Sans (display/UI) + Geist Mono (code) — via `next/font/google` or local |
 
 **Note:** Project uses manual design system with Tailwind v4 CSS custom properties. No shadcn. Pre-existing tokens in `src/app/globals.css` used throughout.
+
+**Font rationale (frontend-design):** Geist Sans is Vercel's typeface — geometric, clean, purpose-built for UI at small sizes. Replaces generic system-sans. Apply via `next/font/local` (Geist is bundled with Next.js 15+). Set as `--font-sans` CSS variable and wire to `font-sans` Tailwind utility in `globals.css`.
 
 ---
 
@@ -41,7 +43,7 @@ Declared values (multiples of 4):
 | 2xl | 48px | Major section gaps |
 | 3xl | 64px | Page-level spacing |
 
-Exceptions: Card vertical padding preset to `py-3` (12px) from existing pattern `rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3`
+Exceptions: Card vertical padding `py-3` (12px) — this IS on the 4-point grid (12 = 3×4px). Tailwind `py-3` is a standard grid value. No exception to the 4-multiple rule.
 
 ---
 
@@ -50,11 +52,13 @@ Exceptions: Card vertical padding preset to `py-3` (12px) from existing pattern 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px | 400 | 1.5 |
-| Label / Badge | 11px | 500 | 1.2 |
+| Label / Badge | 11px | 600 | 1.2 |
 | Heading 2 (page title) | 20px | 600 | 1.2 |
 | Heading 3 (section heading) | 14px | 600 | 1.2 |
 
-**Rationale:** Body at 14px matches existing task-card.tsx (`text-sm`). Heading 2 (20px, 600) from existing workspaces page.tsx (`text-xl font-semibold`). Badge at 11px, 500 from task-card.tsx deadline/shared badges.
+**Two weights only:** 400 (body, metadata) and 600 (all headings, labels, badges). Eliminates the mid-weight 500 — badges and headings share the same emphatic weight, creating a cleaner two-level contrast.
+
+**Rationale:** Body at 14px matches existing task-card.tsx (`text-sm`). Heading 2 (20px, 600) from existing workspaces page.tsx (`text-xl font-semibold`). Badge at 11px now 600 for sharper legibility at small size.
 
 ---
 
@@ -155,6 +159,22 @@ Exceptions: Card vertical padding preset to `py-3` (12px) from existing pattern 
 ### Error Handling
 - Join fails: inline error toast, button returns to "Join" state
 - Create fails: inline error toast, modal remains open for retry
+
+---
+
+## Motion & Interaction
+
+| Interaction | Treatment |
+|-------------|-----------|
+| Join button → pending | `opacity-50 pointer-events-none` transition (100ms) |
+| Join button → Joined badge | Cross-fade: button fades out (opacity 0, 150ms), badge fades in (opacity 0→1, 200ms) |
+| Modal open | Scale from 0.97→1 + opacity 0→1, 150ms ease-out |
+| Modal close | Reverse: scale 1→0.97 + opacity 1→0, 100ms ease-in |
+| Card hover | `transition-shadow duration-150` — subtle shadow lift on hover |
+| Toast | Slide-in from bottom-right, auto-dismiss after 4s |
+| Directory list load | Staggered reveal: each card fades in with 30ms delay increment |
+
+**Implementation:** CSS transitions via Tailwind `transition-*` utilities. No external animation library needed. Stagger via inline `style={{ animationDelay }}` on mapped cards.
 
 ---
 
