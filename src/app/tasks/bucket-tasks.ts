@@ -25,6 +25,10 @@ export function bucketTasks(tasks: RawTask[], now: Date = new Date()): TaskBucke
   const sorted = [...tasks].sort((a, b) => a.member_sort_key - b.member_sort_key);
   const buckets: TaskBuckets = { overdue: [], today: [], upcoming: [], completed: [] };
 
+  // End of today in local time (start of tomorrow = midnight tonight)
+  const endOfToday = new Date(now);
+  endOfToday.setHours(24, 0, 0, 0);
+
   for (const raw of sorted) {
     const t: BucketedTask = {
       ...raw,
@@ -43,13 +47,14 @@ export function bucketTasks(tasks: RawTask[], now: Date = new Date()): TaskBucke
       continue;
     }
 
-    const msUntilDue = new Date(raw.due_at).getTime() - now.getTime();
+    const due = new Date(raw.due_at);
+    const msUntilDue = due.getTime() - now.getTime();
 
     if (msUntilDue < 0) {
       t.deadlineLabel = "Overdue";
       t.deadlineVariant = "red";
       buckets.overdue.push(t);
-    } else if (msUntilDue < 24 * 60 * 60 * 1000) {
+    } else if (due < endOfToday) {
       const hrs = Math.ceil(msUntilDue / (60 * 60 * 1000));
       t.deadlineLabel = `Due in ${hrs} hr${hrs !== 1 ? "s" : ""}`;
       t.deadlineVariant = "yellow";

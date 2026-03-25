@@ -31,10 +31,18 @@ describe("bucketTasks", () => {
     expect(overdue[0].deadlineVariant).toBe("red");
   });
 
-  it("routes tasks due within 24 h to today with yellow variant", () => {
-    const { today } = bucketTasks([task({ due_at: "2026-01-16T10:00:00Z" })], NOW);
+  it("routes tasks due later today (same calendar day) to today with yellow variant", () => {
+    // NOW is 2026-01-15T12:00:00Z; due at 2026-01-15T22:00:00Z — same day, not yet overdue
+    const { today } = bucketTasks([task({ due_at: "2026-01-15T22:00:00Z" })], NOW);
     expect(today).toHaveLength(1);
     expect(today[0].deadlineVariant).toBe("yellow");
+  });
+
+  it("routes tasks due tomorrow to upcoming, not today", () => {
+    // NOW is 2026-01-15T12:00:00Z; due at 2026-01-16T08:00:00Z — next calendar day
+    const { upcoming, today } = bucketTasks([task({ due_at: "2026-01-16T08:00:00Z" })], NOW);
+    expect(upcoming).toHaveLength(1);
+    expect(today).toHaveLength(0);
   });
 
   it("routes tasks due in 5 days to upcoming with green variant", () => {
