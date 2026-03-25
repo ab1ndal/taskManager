@@ -1,3 +1,8 @@
+jest.mock("@/app/tasks/actions", () => ({
+  completeTask: jest.fn(),
+  deleteTask: jest.fn(),
+}));
+
 import { render, screen } from "@testing-library/react";
 import { TaskCard, DeadlineBadge, EmptyState } from "../task-card";
 
@@ -15,6 +20,7 @@ describe("DeadlineBadge", () => {
 
 describe("TaskCard", () => {
   const baseProps = {
+    taskId: "t-1",
     title: "Buy groceries",
     deadline: "Overdue",
     deadlineVariant: "red" as const,
