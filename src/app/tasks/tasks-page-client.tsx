@@ -145,6 +145,18 @@ export function TasksPageClient({
               label={ws.name}
             />
           ))}
+          <SidebarLink
+            href="/workspaces"
+            icon={
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                <rect x="1.5" y="1.5" width="5" height="5" rx="0.75" />
+                <rect x="8.5" y="1.5" width="5" height="5" rx="0.75" />
+                <rect x="1.5" y="8.5" width="5" height="5" rx="0.75" />
+                <rect x="8.5" y="8.5" width="5" height="5" rx="0.75" />
+              </svg>
+            }
+            label="Workspaces"
+          />
         </aside>
 
         {children}
