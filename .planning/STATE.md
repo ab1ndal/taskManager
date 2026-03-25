@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 Phase: 1 of 4 (Workspace Directory)
 Plan: 0 of 2 in current phase
 Status: Ready to plan
-Last activity: 2026-03-25 — Roadmap created
+Last activity: 2026-03-25 - Completed quick task 260325-g5e: Clean up unused directories
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,12 @@ None yet.
 - PIN system is currently live in DB and server actions — Phase 1 must remove it cleanly (migration + action update)
 - `completeTask()` and `deleteTask()` have silent error handling (no error check after mutation) — carry forward concern
 - Sort key race condition exists in task creation — low risk for single user but worth noting
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260325-g5e | Clean up unused directories | 2026-03-25 | d811f76 | [260325-g5e-clean-up-unused-directories](./quick/260325-g5e-clean-up-unused-directories/) |
 
 ## Session Continuity
 
