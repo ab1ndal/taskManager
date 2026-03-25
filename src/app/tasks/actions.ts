@@ -76,13 +76,14 @@ export async function createTaskWithSubtasks({
   subtasks: { title: string; dueAt?: string }[];
 }): Promise<{ subtaskErrors: number }> {
   const supabase = await createClient();
+  const uniqueMemberIds = [...new Set(memberIds)];
 
   const { data: parent, error: parentError } = await supabase
     .from("tasks")
     .insert({
       title,
       description: description ?? null,
-      due_at: dueAt ?? null,
+      due_at: dueAt ? `${dueAt}T00:00:00Z` : null,
       workspace_id: workspaceId,
     })
     .select()
@@ -90,7 +91,7 @@ export async function createTaskWithSubtasks({
 
   if (parentError || !parent) throw new Error(parentError?.message ?? "Failed to create task");
 
-  for (const memberId of memberIds) {
+  for (const memberId of uniqueMemberIds) {
     const { data: last } = await supabase
       .from("task_assignments")
       .select("member_sort_key")
@@ -124,7 +125,7 @@ export async function createTaskWithSubtasks({
       continue;
     }
 
-    for (const memberId of memberIds) {
+    for (const memberId of uniqueMemberIds) {
       const { data: last } = await supabase
         .from("task_assignments")
         .select("member_sort_key")

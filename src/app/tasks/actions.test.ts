@@ -154,6 +154,8 @@ describe("createTaskWithSubtasks", () => {
       })
     );
     expect(result).toEqual({ subtaskErrors: 0 });
+    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+    expect(revalidatePath).toHaveBeenCalledTimes(1);
   });
 
   it("returns subtaskErrors: 1 when a subtask insert fails", async () => {
