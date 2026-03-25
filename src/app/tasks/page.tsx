@@ -1,37 +1,10 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { TaskCard, EmptyState } from "@/components/task-card";
 import { bucketTasks, type RawTask } from "./bucket-tasks";
 import { CompletedSection } from "./completed-section";
-import { NewTaskModal } from "./new-task-modal";
+import { TasksPageClient } from "./tasks-page-client";
 
 type SearchParams = Promise<{ workspace?: string; view?: string }>;
-
-function SidebarLink({
-  href,
-  icon,
-  label,
-  active,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-2 px-2 py-[7px] rounded-[8px] text-sm font-medium ${
-        active
-          ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
-          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-accent-subtle)]/50"
-      }`}
-    >
-      {icon}
-      {label}
-    </Link>
-  );
-}
 
 export default async function TasksPage({
   searchParams,
@@ -135,62 +108,12 @@ export default async function TasksPage({
   const name = user?.user_metadata?.name || user?.email || "there";
 
   return (
-    <div className="flex min-h-[calc(100vh-52px)] -m-6">
-      {/* Sidebar */}
-      <aside className="hidden md:flex w-[200px] flex-col bg-[var(--color-surface)] border-r border-[var(--color-border)] p-3 flex-shrink-0">
-        <NewTaskModal workspaces={myWorkspaces} currentMemberIds={myMemberIds} />
-
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1">
-          Views
-        </p>
-        <SidebarLink
-          href="/tasks"
-          active={!workspaceFilter && !viewFilter}
-          icon={
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-              <path d="M2 4h11M2 7.5h7M2 11h5" />
-            </svg>
-          }
-          label="My tasks"
-        />
-        <SidebarLink
-          href="/tasks?view=shared"
-          active={viewFilter === "shared"}
-          icon={
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-              <circle cx="5.5" cy="5.5" r="3.5" />
-              <circle cx="9.5" cy="9.5" r="3.5" />
-            </svg>
-          }
-          label="Shared"
-        />
-
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1 mt-4">
-          Spaces
-        </p>
-        {myWorkspaces.map((ws) => (
-          <SidebarLink
-            key={ws.id}
-            href={`/tasks?workspace=${ws.kind}`}
-            active={workspaceFilter === ws.kind}
-            icon={
-              ws.kind === "household" ? (
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  <path d="M1.5 6L7.5 1.5L13.5 6V13.5a.75.75 0 01-.75.75H2.25A.75.75 0 011.5 13.5V6z" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                  <rect x="1.5" y="4" width="12" height="9" rx="1.25" />
-                  <path d="M4.5 4V3a.75.75 0 01.75-.75h4.5A.75.75 0 0110.5 3v1" />
-                </svg>
-              )
-            }
-            label={ws.name}
-          />
-        ))}
-      </aside>
-
-      {/* Main content */}
+    <TasksPageClient
+      workspaces={myWorkspaces}
+      currentMemberIds={myMemberIds}
+      workspaceFilter={workspaceFilter}
+      viewFilter={viewFilter}
+    >
       <main className="flex-1 p-6 overflow-auto">
         <h2 className="text-xl font-semibold tracking-tight mb-1">Hello, {name}</h2>
         <p className="text-sm text-[var(--color-text-secondary)] mb-6">Here are your tasks.</p>
@@ -228,7 +151,6 @@ export default async function TasksPage({
                 </div>
               );
             })}
-
             <CompletedSection
               tasks={completed.map((t) => ({
                 taskId: t.id,
@@ -243,6 +165,6 @@ export default async function TasksPage({
           </>
         )}
       </main>
-    </div>
+    </TasksPageClient>
   );
 }
