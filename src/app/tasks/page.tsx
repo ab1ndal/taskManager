@@ -18,13 +18,24 @@ export default async function TasksPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Query 1: all workspace members visible to current user (RLS: same workspace only)
+  // Query 1a: all workspace members visible to current user (RLS: same workspace only)
   const { data: allMembers } = await supabase
     .from("workspace_members")
-    .select("id, workspace_id, auth_user_id, display_name, workspaces(id, name, kind)");
+    .select("id, workspace_id, auth_user_id, display_name");
+
+  // Query 1b: workspaces the current user belongs to (direct query avoids PostgREST join issues)
+  const { data: workspacesData } = await supabase
+    .from("workspaces")
+    .select("id, name, kind");
 
   const myMembers = (allMembers ?? []).filter((m) => m.auth_user_id === user?.id);
   const myMemberIds = myMembers.map((m) => m.id);
+
+  // Build a lookup from workspace id → workspace row
+  const workspaceById: Record<string, { id: string; name: string; kind: string }> = {};
+  (workspacesData ?? []).forEach((ws) => {
+    workspaceById[ws.id] = ws;
+  });
 
   // Derive workspace map for sidebar + modal
   const workspaceMap: Record<
@@ -32,7 +43,7 @@ export default async function TasksPage({
     { id: string; name: string; kind: string; members: { id: string; display_name: string }[] }
   > = {};
   (allMembers ?? []).forEach((m) => {
-    const ws = m.workspaces as { id: string; name: string; kind: string } | null;
+    const ws = workspaceById[m.workspace_id];
     if (!ws) return;
     if (!workspaceMap[ws.id]) workspaceMap[ws.id] = { ...ws, members: [] };
     workspaceMap[ws.id].members.push({ id: m.id, display_name: m.display_name });
