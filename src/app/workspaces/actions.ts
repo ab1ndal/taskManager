@@ -4,44 +4,35 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
-function generatePin(): string {
-  return Math.floor(Math.random() * 1000000).toString().padStart(6, "0");
-}
-
 export async function createWorkspace(
   name: string,
-  kind: string
-): Promise<{ id: string; name: string; kind: string; join_pin: string }> {
+  kind: "household" | "work"
+): Promise<{ id: string; name: string; kind: string }> {
+  const trimmedName = name.trim();
+  if (!trimmedName) throw new Error("Workspace name is required");
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Try to insert with a unique pin, retry on conflict
-  let workspace: { id: string; name: string; kind: string; join_pin: string } | null = null;
-  for (let i = 0; i < 5; i++) {
-    const pin = generatePin();
-    const { data, error } = await supabase
-      .from("workspaces")
-      .insert({ name: name.trim(), kind, join_pin: pin })
-      .select("id, name, kind, join_pin")
-      .single();
-    if (!error && data) {
-      workspace = data;
-      break;
-    }
-    if (error?.code !== "23505") throw error; // 23505 = unique violation
-  }
-  if (!workspace) throw new Error("Failed to generate unique pin");
+  const { data, error } = await supabase
+    .from("workspaces")
+    .insert({ name: trimmedName, kind })
+    .select("id, name, kind")
+    .single();
 
-  // Add creator as member
+  if (error) throw error;
+  if (!data) throw new Error("Failed to create workspace");
+
   const displayName =
     (user.user_metadata?.name as string | undefined)?.trim() ||
     user.email?.split("@")[0] ||
     "Member";
+
   await supabase.from("workspace_members").insert({
-    workspace_id: workspace.id,
+    workspace_id: data.id,
     auth_user_id: user.id,
     display_name: displayName,
     role: "owner",
@@ -49,12 +40,11 @@ export async function createWorkspace(
 
   revalidatePath("/workspaces");
   revalidatePath("/tasks");
-  return workspace;
+  return data;
 }
 
-export async function joinWorkspaceByPin(
-  pin: string,
-  displayName: string
+export async function joinWorkspaceByDirectory(
+  workspaceId: string
 ): Promise<{ workspaceName: string }> {
   const supabase = await createClient();
   const {
@@ -62,31 +52,37 @@ export async function joinWorkspaceByPin(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Look up workspace using admin client (user is not a member yet, so RLS blocks SELECT)
+  // Admin client bypasses RLS: user is not yet a member, so regular SELECT returns nothing
   const admin = createAdminClient();
   const { data: workspace } = await admin
     .from("workspaces")
     .select("id, name")
-    .eq("join_pin", pin.trim())
+    .eq("id", workspaceId)
     .single();
 
-  if (!workspace) throw new Error("Invalid pin — no workspace found");
+  if (!workspace) throw new Error("Workspace not found");
 
-  // Check already a member
+  // Check for existing membership (regular client — user can see their own member rows)
   const { data: existing } = await supabase
     .from("workspace_members")
     .select("id")
     .eq("workspace_id", workspace.id)
     .eq("auth_user_id", user.id)
     .maybeSingle();
+
   if (existing) throw new Error("You are already a member of this workspace");
 
-  // Insert member record using regular client (workspace_members_insert_self policy)
+  const displayName =
+    (user.user_metadata?.name as string | undefined)?.trim() ||
+    user.email?.split("@")[0] ||
+    "Member";
+
   const { error } = await supabase.from("workspace_members").insert({
     workspace_id: workspace.id,
     auth_user_id: user.id,
-    display_name: displayName.trim(),
+    display_name: displayName,
   });
+
   if (error) throw error;
 
   revalidatePath("/workspaces");
