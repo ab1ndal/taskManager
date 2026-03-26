@@ -1,68 +1,52 @@
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { WorkspaceForms } from "./workspace-forms";
+import { WorkspacesClient } from "./workspaces-client";
 
-type Workspace = {
+type WorkspaceRow = {
   id: string;
   name: string;
   kind: string;
+  member_count: number;
 };
 
 export default async function WorkspacesPage() {
+  const admin = createAdminClient();
   const supabase = await createClient();
-  const { data: workspaces } = await supabase
+
+  // Fetch all workspaces with member count via LEFT JOIN aggregate
+  // Admin client bypasses RLS (user can only SELECT workspaces they belong to)
+  const { data: allWorkspaces } = await admin
     .from("workspaces")
-    .select("id, name, kind")
+    .select("id, name, kind, workspace_members(count)")
     .order("name");
 
-  const list: Workspace[] = workspaces ?? [];
+  const workspaces: WorkspaceRow[] = (allWorkspaces ?? []).map((ws) => ({
+    id: ws.id,
+    name: ws.name,
+    kind: ws.kind,
+    member_count:
+      Array.isArray(ws.workspace_members)
+        ? (ws.workspace_members[0] as { count: number } | undefined)?.count ?? 0
+        : 0,
+  }));
+
+  // Get current user's workspace memberships (regular client, RLS-filtered to own rows)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: userMembers } = user
+    ? await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("auth_user_id", user.id)
+    : { data: [] };
+
+  const joinedIds = new Set((userMembers ?? []).map((m) => m.workspace_id));
 
   return (
     <div className="max-w-lg">
-      <h2 className="mb-6 text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
-        Workspaces
-      </h2>
-
-      {/* Your workspaces */}
-      <section>
-        <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-widest mb-3">
-          Your workspaces
-        </h3>
-
-        {list.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-muted)]">
-            No workspaces yet. Create one below.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {list.map((ws) => (
-              <div
-                key={ws.id}
-                className="rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 flex items-center justify-between gap-4"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex flex-col min-w-0">
-                    <span className="text-sm font-medium text-[var(--color-text-primary)] truncate">
-                      {ws.name}
-                    </span>
-                    <span
-                      className={`mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
-                        ws.kind === "household"
-                          ? "bg-indigo-100 text-indigo-700"
-                          : "bg-sky-100 text-sky-700"
-                      }`}
-                    >
-                      {ws.kind === "household" ? "Household" : "Work"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Create + Join forms */}
-      <WorkspaceForms />
+      <WorkspacesClient workspaces={workspaces} joinedIds={joinedIds} />
     </div>
   );
 }
