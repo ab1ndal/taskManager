@@ -126,6 +126,19 @@ export default async function TasksPage({
       viewFilter={viewFilter}
     >
       <main className="flex-1 p-6 overflow-auto">
+        {myWorkspaces.length === 0 && (
+          <div className="mb-6 rounded-[8px] border border-[var(--color-accent-text)] bg-[var(--color-accent-subtle)] px-4 py-3">
+            <p className="text-sm text-[var(--color-accent-text)]">
+              You&apos;re not in any workspace yet.{" "}
+              <a
+                href="/workspaces"
+                className="font-semibold underline hover:opacity-80 transition-opacity duration-150"
+              >
+                Browse workspaces
+              </a>
+            </p>
+          </div>
+        )}
         <h2 className="text-xl font-semibold tracking-tight mb-1">Hello, {name}</h2>
         <p className="text-sm text-[var(--color-text-secondary)] mb-6">Here are your tasks.</p>
 
