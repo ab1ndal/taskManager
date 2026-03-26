@@ -17,7 +17,10 @@ export async function createWorkspace(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data, error } = await supabase
+  // Admin client avoids triggering workspaces_select RLS on RETURNING,
+  // which causes 42P17 infinite recursion via the self-referential workspace_members_select policy.
+  const admin = createAdminClient();
+  const { data, error } = await admin
     .from("workspaces")
     .insert({ name: trimmedName, kind })
     .select("id, name, kind")
