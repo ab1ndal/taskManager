@@ -1,19 +1,17 @@
 import { createClient } from "@/lib/supabase/server";
 import { WorkspaceForms } from "./workspace-forms";
-import { PinDisplay } from "./pin-display";
 
 type Workspace = {
   id: string;
   name: string;
   kind: string;
-  join_pin: string;
 };
 
 export default async function WorkspacesPage() {
   const supabase = await createClient();
   const { data: workspaces } = await supabase
     .from("workspaces")
-    .select("id, name, kind, join_pin")
+    .select("id, name, kind")
     .order("name");
 
   const list: Workspace[] = workspaces ?? [];
@@ -57,7 +55,6 @@ export default async function WorkspacesPage() {
                     </span>
                   </div>
                 </div>
-                <PinDisplay pin={ws.join_pin} />
               </div>
             ))}
           </div>
