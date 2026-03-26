@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-03-25T18:59:44.458Z"
-last_activity: "2026-03-25 - Completed quick task 260325-g5e: Clean up unused directories"
+status: unknown
+stopped_at: Completed 01-workspace-directory-01-PLAN.md
+last_updated: "2026-03-26T23:47:19.441Z"
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -21,16 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users can create, manage, and complete tasks across household and work workspaces — with frictionless workspace onboarding and full task lifecycle control.
-**Current focus:** Phase 1 — Workspace Directory
+**Current focus:** Phase 01 — workspace-directory
 
 ## Current Position
 
-Phase: 1 of 4 (Workspace Directory)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-03-25 - Completed quick task 260325-g5e: Clean up unused directories
-
-Progress: [░░░░░░░░░░] 0%
+Phase: 01 (workspace-directory) — EXECUTING
+Plan: 1 of 2
 
 ## Performance Metrics
 
@@ -52,6 +46,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-workspace-directory P01 | 5 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -60,6 +55,9 @@ Progress: [░░░░░░░░░░] 0%
 - Public workspace directory (no pin): Simpler UX; pin added friction without real security benefit
 - Instant join (no approval): Low-friction onboarding appropriate for personal/small-team use
 - Display name from profile: Avoids per-workspace name friction; consistent identity
+- [Phase 01-workspace-directory]: joinWorkspaceByDirectory uses admin client for workspace lookup so non-members can find workspaces by ID without RLS blocking
+- [Phase 01-workspace-directory]: workspace_members_insert_self RLS policy preserved from migration 004, not recreated in 005
+- [Phase 01-workspace-directory]: PIN join form removed from workspace-forms.tsx; create form only until Plan 02 directory UI ships
 
 ### Pending Todos
 
@@ -79,6 +77,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T18:59:44.455Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-workspace-directory/01-CONTEXT.md
+Last session: 2026-03-26T23:47:19.432Z
+Stopped at: Completed 01-workspace-directory-01-PLAN.md
+Resume file: None
