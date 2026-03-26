@@ -5,7 +5,7 @@ jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { createWorkspace, joinWorkspaceByPin } from "./actions";
+import { createWorkspace, joinWorkspaceByDirectory } from "./actions";
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -14,8 +14,8 @@ beforeEach(() => jest.clearAllMocks());
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe("createWorkspace", () => {
-  it("inserts workspace + member and returns workspace data", async () => {
-    const workspaceData = { id: "ws-1", name: "Home", kind: "household", join_pin: "123456" };
+  it("inserts workspace (no PIN) + member and returns { id, name, kind }", async () => {
+    const workspaceData = { id: "ws-1", name: "My Home", kind: "household" };
 
     const wsSingle = jest.fn().mockResolvedValue({ data: workspaceData, error: null });
     const wsSelect = jest.fn().mockReturnValue({ single: wsSingle });
@@ -24,7 +24,7 @@ describe("createWorkspace", () => {
     const memberInsert = jest.fn().mockResolvedValue({ error: null });
 
     const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: wsInsert })    // workspaces
+      .mockReturnValueOnce({ insert: wsInsert })     // workspaces
       .mockReturnValueOnce({ insert: memberInsert }); // workspace_members
 
     (createClient as jest.Mock).mockResolvedValue({
@@ -36,10 +36,14 @@ describe("createWorkspace", () => {
       from: mockFrom,
     });
 
-    const result = await createWorkspace("Home", "household");
+    const result = await createWorkspace("My Home", "household");
 
+    // Must NOT include join_pin in the insert
     expect(wsInsert).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Home", kind: "household", join_pin: expect.any(String) })
+      expect.not.objectContaining({ join_pin: expect.anything() })
+    );
+    expect(wsInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "My Home", kind: "household" })
     );
     expect(memberInsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -49,9 +53,36 @@ describe("createWorkspace", () => {
         role: "owner",
       })
     );
-    expect(result).toEqual(workspaceData);
+    // Return value must NOT contain join_pin
+    expect(result).toEqual({ id: "ws-1", name: "My Home", kind: "household" });
     expect(revalidatePath).toHaveBeenCalledWith("/workspaces");
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+  });
+
+  it("throws when workspace name is empty", async () => {
+    (createClient as jest.Mock).mockResolvedValue({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "user-1", email: "alice@example.com", user_metadata: {} } },
+        }),
+      },
+      from: jest.fn(),
+    });
+
+    await expect(createWorkspace("", "work")).rejects.toThrow("Workspace name is required");
+  });
+
+  it("throws when workspace name is only whitespace", async () => {
+    (createClient as jest.Mock).mockResolvedValue({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "user-1", email: "alice@example.com", user_metadata: {} } },
+        }),
+      },
+      from: jest.fn(),
+    });
+
+    await expect(createWorkspace("   ", "work")).rejects.toThrow("Workspace name is required");
   });
 
   it("throws when user is not authenticated", async () => {
@@ -64,17 +95,43 @@ describe("createWorkspace", () => {
 
     await expect(createWorkspace("Home", "household")).rejects.toThrow("Not authenticated");
   });
+
+  it("derives display name from email when user_metadata.name is absent", async () => {
+    const workspaceData = { id: "ws-2", name: "Work", kind: "work" };
+    const wsSingle = jest.fn().mockResolvedValue({ data: workspaceData, error: null });
+    const wsSelect = jest.fn().mockReturnValue({ single: wsSingle });
+    const wsInsert = jest.fn().mockReturnValue({ select: wsSelect });
+    const memberInsert = jest.fn().mockResolvedValue({ error: null });
+    const mockFrom = jest.fn()
+      .mockReturnValueOnce({ insert: wsInsert })
+      .mockReturnValueOnce({ insert: memberInsert });
+
+    (createClient as jest.Mock).mockResolvedValue({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "user-3", email: "charlie@example.com", user_metadata: {} } },
+        }),
+      },
+      from: mockFrom,
+    });
+
+    await createWorkspace("Work", "work");
+
+    expect(memberInsert).toHaveBeenCalledWith(
+      expect.objectContaining({ display_name: "charlie" })
+    );
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// joinWorkspaceByPin — success
+// joinWorkspaceByDirectory
 // ──────────────────────────────────────────────────────────────────────────────
 
-describe("joinWorkspaceByPin", () => {
-  it("looks up workspace by pin and inserts member row", async () => {
+describe("joinWorkspaceByDirectory", () => {
+  it("looks up workspace by ID via admin client and inserts member row", async () => {
     const workspaceData = { id: "ws-1", name: "Home" };
 
-    // Admin client: lookup workspace
+    // Admin client: lookup workspace by ID
     const adminSingle = jest.fn().mockResolvedValue({ data: workspaceData, error: null });
     const adminEq = jest.fn().mockReturnValue({ single: adminSingle });
     const adminSelect = jest.fn().mockReturnValue({ eq: adminEq });
@@ -96,15 +153,16 @@ describe("joinWorkspaceByPin", () => {
     (createClient as jest.Mock).mockResolvedValue({
       auth: {
         getUser: jest.fn().mockResolvedValue({
-          data: { user: { id: "user-2", email: "bob@example.com", user_metadata: {} } },
+          data: { user: { id: "user-2", email: "bob@example.com", user_metadata: { name: "Bob" } } },
         }),
       },
       from: mockFrom,
     });
 
-    const result = await joinWorkspaceByPin("123456", "Bob");
+    const result = await joinWorkspaceByDirectory("ws-1");
 
-    expect(adminEq).toHaveBeenCalledWith("join_pin", "123456");
+    // Admin client must have looked up by ID (not join_pin)
+    expect(adminEq).toHaveBeenCalledWith("id", "ws-1");
     expect(memberInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         workspace_id: "ws-1",
@@ -115,6 +173,27 @@ describe("joinWorkspaceByPin", () => {
     expect(result).toEqual({ workspaceName: "Home" });
     expect(revalidatePath).toHaveBeenCalledWith("/workspaces");
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+  });
+
+  it("throws when workspace not found", async () => {
+    const adminSingle = jest.fn().mockResolvedValue({ data: null, error: null });
+    const adminEq = jest.fn().mockReturnValue({ single: adminSingle });
+    const adminSelect = jest.fn().mockReturnValue({ eq: adminEq });
+    const adminFrom = jest.fn().mockReturnValue({ select: adminSelect });
+    (createAdminClient as jest.Mock).mockReturnValue({ from: adminFrom });
+
+    (createClient as jest.Mock).mockResolvedValue({
+      auth: {
+        getUser: jest.fn().mockResolvedValue({
+          data: { user: { id: "user-2", email: "bob@example.com", user_metadata: {} } },
+        }),
+      },
+      from: jest.fn(),
+    });
+
+    await expect(joinWorkspaceByDirectory("non-existent-id")).rejects.toThrow(
+      "Workspace not found"
+    );
   });
 
   it("throws when user is already a member", async () => {
@@ -141,36 +220,19 @@ describe("joinWorkspaceByPin", () => {
       from: jest.fn().mockReturnValue({ select: existingSelect }),
     });
 
-    await expect(joinWorkspaceByPin("123456", "Bob")).rejects.toThrow(
+    await expect(joinWorkspaceByDirectory("ws-1")).rejects.toThrow(
       "You are already a member of this workspace"
     );
   });
-});
 
-// ──────────────────────────────────────────────────────────────────────────────
-// joinWorkspaceByPin — invalid pin
-// ──────────────────────────────────────────────────────────────────────────────
-
-describe("joinWorkspaceByPin invalid pin", () => {
-  it("throws when workspace not found", async () => {
-    // Admin client returns null (no workspace for that pin)
-    const adminSingle = jest.fn().mockResolvedValue({ data: null, error: null });
-    const adminEq = jest.fn().mockReturnValue({ single: adminSingle });
-    const adminSelect = jest.fn().mockReturnValue({ eq: adminEq });
-    const adminFrom = jest.fn().mockReturnValue({ select: adminSelect });
-    (createAdminClient as jest.Mock).mockReturnValue({ from: adminFrom });
-
+  it("throws when not authenticated", async () => {
     (createClient as jest.Mock).mockResolvedValue({
       auth: {
-        getUser: jest.fn().mockResolvedValue({
-          data: { user: { id: "user-2", email: "bob@example.com", user_metadata: {} } },
-        }),
+        getUser: jest.fn().mockResolvedValue({ data: { user: null } }),
       },
       from: jest.fn(),
     });
 
-    await expect(joinWorkspaceByPin("000000", "Bob")).rejects.toThrow(
-      "Invalid pin — no workspace found"
-    );
+    await expect(joinWorkspaceByDirectory("ws-1")).rejects.toThrow("Not authenticated");
   });
 });
