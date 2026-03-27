@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-workspace-directory-01-PLAN.md
-last_updated: "2026-03-26T23:47:19.441Z"
+stopped_at: Completed 01-workspace-directory-03-PLAN.md
+last_updated: "2026-03-27T02:19:57.871Z"
 progress:
-  total_phases: 4
-  completed_phases: 0
-  total_plans: 2
-  completed_plans: 1
+  total_phases: 5
+  completed_phases: 1
+  total_plans: 3
+  completed_plans: 3
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01 (workspace-directory) — EXECUTING
-Plan: 1 of 2
+Plan: 1 of 3
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Plan: 1 of 2
 
 *Updated after each plan completion*
 | Phase 01-workspace-directory P01 | 5 | 2 tasks | 5 files |
+| Phase 01-workspace-directory P03 | 8 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -58,6 +59,12 @@ Plan: 1 of 2
 - [Phase 01-workspace-directory]: joinWorkspaceByDirectory uses admin client for workspace lookup so non-members can find workspaces by ID without RLS blocking
 - [Phase 01-workspace-directory]: workspace_members_insert_self RLS policy preserved from migration 004, not recreated in 005
 - [Phase 01-workspace-directory]: PIN join form removed from workspace-forms.tsx; create form only until Plan 02 directory UI ships
+- [Phase 01-workspace-directory]: Disabled-but-visible New Task buttons: banner explains context, hiding would be confusing
+- [Phase 01-workspace-directory]: Two-layer defense against task creation without workspace: button disabled + modal early-return
+
+### Roadmap Evolution
+
+- Phase 5 added: Task and workspace lifecycle — delete workspace, edit task, fix delete task, complete task
 
 ### Pending Todos
 
@@ -77,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T23:47:19.432Z
-Stopped at: Completed 01-workspace-directory-01-PLAN.md
+Last session: 2026-03-27T02:19:57.860Z
+Stopped at: Completed 01-workspace-directory-03-PLAN.md
 Resume file: None
