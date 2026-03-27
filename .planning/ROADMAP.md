@@ -42,11 +42,11 @@ Plans:
   1. User can open the new task modal and fill in title, optional description, optional due date, workspace, and one or more assignees
   2. After submitting, the new task appears in the task list without a page reload or manual refresh
   3. Newly created task is assigned to the correct workspace and visible only to selected assignees
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Audit and complete task creation server action (field coverage, assignment, error handling)
-- [ ] 02-02: Update modal UI and optimistic list update for instant appearance
+- [ ] 02-01-PLAN.md — Fix modal feedback (success/warning toasts, warning type in toaster), add onTaskCreated optimistic callback
+- [ ] 02-02-PLAN.md — Refactor TasksPageClient to own task list state with optimistic insert/rollback; update page.tsx to pass initialTasks
 
 ### Phase 3: Task Detail & Editing
 **Goal**: Users can view full task context and make changes after creation
