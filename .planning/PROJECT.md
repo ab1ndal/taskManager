@@ -19,11 +19,14 @@ Users can create, manage, and complete their tasks across household and work wor
 - ✓ User can complete and delete tasks — existing
 - ✓ User can filter tasks by workspace or shared view — existing
 
-### Active
+### Validated
 
-- [ ] User can create a workspace (household or work kind)
-- [ ] User can browse a public directory of all workspaces
-- [ ] User can join any workspace instantly using their profile name (no pin, no approval)
+- ✓ User can create a workspace (household or work kind) — Validated in Phase 01: workspace-directory
+- ✓ User can browse a public directory of all workspaces — Validated in Phase 01: workspace-directory
+- ✓ User can join any workspace instantly using their profile name (no pin, no approval) — Validated in Phase 01: workspace-directory
+- ✓ Task creation is blocked when user has no workspace memberships — Validated in Phase 01: workspace-directory
+
+### Active
 - [ ] User can create tasks with title, description, due date, workspace, and assignees
 - [ ] User can open a task detail view to see full info, subtasks, and updates
 - [ ] User can edit task details (title, description, due date) after creation
@@ -41,7 +44,7 @@ Users can create, manage, and complete their tasks across household and work wor
 - **Stack:** Next.js 16, TypeScript, Tailwind v4, Supabase (PostgreSQL + Auth + RLS), Vercel
 - **Auth:** Supabase Auth with cookie-based sessions via `@supabase/ssr`
 - **Data model:** Tasks are visible only via `task_assignments`; priority is per-user via `member_sort_key`
-- **Current state:** Workspace creation exists with a pin system (to be removed). Task creation UI exists but is gated on workspace membership. No task detail view or editing exists yet.
+- **Current state:** Phase 01 complete — workspace directory, join/leave/create fully functional, task creation guarded behind workspace membership. Phase 02 (task creation) and Phase 05 (task lifecycle: edit/delete/complete) pending.
 - **Codebase map:** `.planning/codebase/` — full analysis available
 
 ## Constraints
@@ -55,9 +58,10 @@ Users can create, manage, and complete their tasks across household and work wor
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Public workspace directory (no pin) | Simpler UX; pin added friction without real security benefit for this use case | — Pending |
-| Display name from profile | Avoids per-workspace name friction; consistent identity | — Pending |
-| Instant join (no approval) | Low-friction onboarding; appropriate for personal/small-team use | — Pending |
+| Public workspace directory (no pin) | Simpler UX; pin added friction without real security benefit for this use case | Shipped in Phase 01 |
+| Display name from profile | Avoids per-workspace name friction; consistent identity | Shipped in Phase 01 |
+| Instant join (no approval) | Low-friction onboarding; appropriate for personal/small-team use | Shipped in Phase 01 |
+| Admin client for workspace operations | RLS recursion on INSERT and filtering on post-join SELECT required admin bypass | Shipped in Phase 01 |
 
 ---
-*Last updated: 2026-03-25 after initialization*
+*Last updated: 2026-03-27 after Phase 01 completion*
