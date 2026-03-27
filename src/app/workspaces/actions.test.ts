@@ -23,9 +23,8 @@ describe("createWorkspace", () => {
 
     const memberInsert = jest.fn().mockResolvedValue({ error: null });
 
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: wsInsert })     // workspaces
-      .mockReturnValueOnce({ insert: memberInsert }); // workspace_members
+    // createWorkspace uses admin client for workspace INSERT, regular client for member INSERT
+    (createAdminClient as jest.Mock).mockReturnValue({ from: jest.fn().mockReturnValue({ insert: wsInsert }) });
 
     (createClient as jest.Mock).mockResolvedValue({
       auth: {
@@ -33,7 +32,7 @@ describe("createWorkspace", () => {
           data: { user: { id: "user-1", email: "alice@example.com", user_metadata: { name: "Alice" } } },
         }),
       },
-      from: mockFrom,
+      from: jest.fn().mockReturnValue({ insert: memberInsert }),
     });
 
     const result = await createWorkspace("My Home", "household");
@@ -98,13 +97,13 @@ describe("createWorkspace", () => {
 
   it("derives display name from email when user_metadata.name is absent", async () => {
     const workspaceData = { id: "ws-2", name: "Work", kind: "work" };
-    const wsSingle = jest.fn().mockResolvedValue({ data: workspaceData, error: null });
+    const workspaceData2 = { id: "ws-2", name: "Work", kind: "work" };
+    const wsSingle = jest.fn().mockResolvedValue({ data: workspaceData2, error: null });
     const wsSelect = jest.fn().mockReturnValue({ single: wsSingle });
     const wsInsert = jest.fn().mockReturnValue({ select: wsSelect });
     const memberInsert = jest.fn().mockResolvedValue({ error: null });
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: wsInsert })
-      .mockReturnValueOnce({ insert: memberInsert });
+
+    (createAdminClient as jest.Mock).mockReturnValue({ from: jest.fn().mockReturnValue({ insert: wsInsert }) });
 
     (createClient as jest.Mock).mockResolvedValue({
       auth: {
@@ -112,7 +111,7 @@ describe("createWorkspace", () => {
           data: { user: { id: "user-3", email: "charlie@example.com", user_metadata: {} } },
         }),
       },
-      from: mockFrom,
+      from: jest.fn().mockReturnValue({ insert: memberInsert }),
     });
 
     await createWorkspace("Work", "work");
