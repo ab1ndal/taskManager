@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { TaskCard, EmptyState } from "@/components/task-card";
 import { bucketTasks, type RawTask } from "./bucket-tasks";
 import { CompletedSection } from "./completed-section";
@@ -14,19 +15,36 @@ export default async function TasksPage({
   const { workspace: workspaceFilter, view: viewFilter } = await searchParams;
 
   const supabase = await createClient();
+  const admin = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Query 1a: all workspace members visible to current user (RLS: same workspace only)
-  const { data: allMembers } = await supabase
-    .from("workspace_members")
-    .select("id, workspace_id, auth_user_id, display_name");
+  // Query 1a: get current user's own member rows first (admin bypasses self-referential RLS)
+  const { data: myOwnMembers } = user
+    ? await admin
+        .from("workspace_members")
+        .select("id, workspace_id")
+        .eq("auth_user_id", user.id)
+    : { data: [] };
 
-  // Query 1b: workspaces the current user belongs to (direct query avoids PostgREST join issues)
-  const { data: workspacesData } = await supabase
-    .from("workspaces")
-    .select("id, name, kind");
+  const myWorkspaceIds = (myOwnMembers ?? []).map((m) => m.workspace_id);
+
+  // Query 1a': all members in the user's workspaces (for shared-task display)
+  const { data: allMembers } = myWorkspaceIds.length
+    ? await admin
+        .from("workspace_members")
+        .select("id, workspace_id, auth_user_id, display_name")
+        .in("workspace_id", myWorkspaceIds)
+    : { data: [] };
+
+  // Query 1b: workspaces the current user belongs to
+  const { data: workspacesData } = myWorkspaceIds.length
+    ? await admin
+        .from("workspaces")
+        .select("id, name, kind")
+        .in("id", myWorkspaceIds)
+    : { data: [] };
 
   const myMembers = (allMembers ?? []).filter((m) => m.auth_user_id === user?.id);
   const myMemberIds = myMembers.map((m) => m.id);

@@ -92,3 +92,25 @@ export async function joinWorkspaceByDirectory(
   revalidatePath("/tasks");
   return { workspaceName: workspace.name };
 }
+
+export async function leaveWorkspace(workspaceId: string): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // Admin client: no DELETE policy exists on workspace_members yet.
+  // Auth is verified above; scope is locked to user.id.
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("workspace_members")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .eq("auth_user_id", user.id);
+
+  if (error) throw error;
+
+  revalidatePath("/workspaces");
+  revalidatePath("/tasks");
+}

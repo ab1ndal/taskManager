@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { joinWorkspaceByDirectory } from "./actions";
+import { joinWorkspaceByDirectory, leaveWorkspace } from "./actions";
 import { toast } from "@/components/toaster";
 
 export interface WorkspaceCardData {
@@ -18,6 +18,7 @@ interface WorkspaceCardProps {
 
 export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) {
   const [joined, setJoined] = useState(initialJoined);
+  const [hoveringJoined, setHoveringJoined] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const handleJoin = () => {
@@ -31,6 +32,22 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
           err instanceof Error
             ? `Failed to join "${workspace.name}". Please try again.`
             : `Failed to join "${workspace.name}". Please try again.`,
+          "error"
+        );
+      }
+    });
+  };
+
+  const handleLeave = () => {
+    startTransition(async () => {
+      try {
+        await leaveWorkspace(workspace.id);
+        setJoined(false);
+        setHoveringJoined(false);
+        toast(`Left "${workspace.name}"`);
+      } catch (err) {
+        toast(
+          err instanceof Error ? err.message : `Failed to leave "${workspace.name}".`,
           "error"
         );
       }
@@ -65,9 +82,15 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
       </div>
 
       {joined ? (
-        <span className="shrink-0 text-[11px] font-semibold px-3 py-1 rounded-full bg-green-100 text-green-700">
-          Joined
-        </span>
+        <button
+          onClick={handleLeave}
+          disabled={isPending}
+          onMouseEnter={() => setHoveringJoined(true)}
+          onMouseLeave={() => setHoveringJoined(false)}
+          className="shrink-0 text-[11px] font-semibold px-3 py-1 rounded-full transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-600"
+        >
+          {isPending ? "Leaving..." : hoveringJoined ? "Leave" : "Joined"}
+        </button>
       ) : (
         <button
           onClick={handleJoin}
