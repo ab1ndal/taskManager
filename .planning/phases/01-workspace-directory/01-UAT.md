@@ -1,5 +1,5 @@
 ---
-status: complete
+status: resolved
 phase: 01-workspace-directory
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md]
 started: 2026-03-26T00:15:00Z
@@ -53,11 +53,18 @@ skipped: 0
 ## Gaps
 
 - truth: "User cannot create tasks when they belong to no workspaces — task creation is blocked with a clear message or disabled UI"
-  status: failed
+  status: resolved
   reason: "User reported: I see the banner, but prevent user from creating any tasks unless they are part of atleast 1 workspace"
   severity: major
   test: 6
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Both 'New task' buttons in tasks-page-client.tsx (lines 56 and 90) render unconditionally without checking workspaces.length. Modal also has no guard for empty workspaces array."
+  artifacts:
+    - path: "src/app/tasks/tasks-page-client.tsx"
+      issue: "Both New Task buttons missing disabled guard when workspaces.length === 0"
+    - path: "src/app/tasks/new-task-modal.tsx"
+      issue: "No early-return guard for empty workspaces; submit handler doesn't check for missing workspaceId"
+  missing:
+    - "Disable both New Task buttons in tasks-page-client.tsx when workspaces.length === 0"
+    - "Add defensive guard in new-task-modal.tsx for workspaces.length === 0"
+    - "Add !workspaceId check to modal submit handler"
   debug_session: ""
