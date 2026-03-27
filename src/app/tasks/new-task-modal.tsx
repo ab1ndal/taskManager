@@ -82,7 +82,7 @@ export function NewTaskModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || selectedMemberIds.length === 0) return;
+    if (!title.trim() || !workspaceId || selectedMemberIds.length === 0) return;
     startTransition(async () => {
       try {
         const { subtaskErrors } = await createTaskWithSubtasks({
@@ -96,7 +96,7 @@ export function NewTaskModal({
             .map((r) => ({ title: r.title.trim(), dueAt: r.dueAt || undefined })),
         });
         if (subtaskErrors > 0) {
-          toast(`Task created, but ${subtaskErrors} subtask(s) could not be saved`, "warning");
+          toast(`Task created, but ${subtaskErrors} subtask(s) could not be saved`, "error");
         }
         resetForm();
         onClose();
@@ -107,6 +107,30 @@ export function NewTaskModal({
   }
 
   if (!open) return null;
+
+  if (workspaces.length === 0) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+        onClick={onClose}
+      >
+        <div
+          className="bg-[var(--color-surface)] rounded-[14px] border border-[var(--color-border)] p-6 w-full max-w-sm mx-4 shadow-xl text-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+            You must join a workspace before creating tasks.
+          </p>
+          <a
+            href="/workspaces"
+            className="text-sm font-medium text-[var(--color-accent)] hover:underline"
+          >
+            Go to Workspaces
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   const disabled = pending;
 
