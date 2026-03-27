@@ -7,14 +7,14 @@
 
 ### Workspace Management
 
-- [ ] **WS-01**: User can create a workspace with a name and kind (household or work)
+- [x] **WS-01**: User can create a workspace with a name and kind (household or work)
 - [ ] **WS-02**: User can browse a public directory listing all workspaces
-- [ ] **WS-03**: User can join any workspace instantly (no pin, no approval) using their profile display name
+- [x] **WS-03**: User can join any workspace instantly (no pin, no approval) using their profile display name
 - [ ] **WS-04**: User can see which workspaces they already belong to (distinguished in the directory)
 
 ### Task Creation
 
-- [ ] **TASK-01**: User can create a task with title, optional description, optional due date, workspace, and one or more assignees
+- [x] **TASK-01**: User can create a task with title, optional description, optional due date, workspace, and one or more assignees
 - [ ] **TASK-02**: Newly created task appears immediately in the task list without page reload
 
 ### Task Detail & Editing
@@ -55,11 +55,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WS-01 | Phase 1 | Pending |
+| WS-01 | Phase 1 | Complete |
 | WS-02 | Phase 1 | Pending |
-| WS-03 | Phase 1 | Pending |
+| WS-03 | Phase 1 | Complete |
 | WS-04 | Phase 1 | Pending |
-| TASK-01 | Phase 2 | Pending |
+| TASK-01 | Phase 2 | Complete |
 | TASK-02 | Phase 2 | Pending |
 | TASK-03 | Phase 3 | Pending |
 | TASK-04 | Phase 3 | Pending |
