@@ -30,13 +30,14 @@ export default async function WorkspacesPage() {
         : 0,
   }));
 
-  // Get current user's workspace memberships (regular client, RLS-filtered to own rows)
+  // Get current user's workspace memberships via admin client — the self-referential
+  // workspace_members_select RLS policy can filter out newly-created memberships.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { data: userMembers } = user
-    ? await supabase
+    ? await admin
         .from("workspace_members")
         .select("workspace_id")
         .eq("auth_user_id", user.id)
