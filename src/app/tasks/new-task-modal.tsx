@@ -3,6 +3,7 @@
 import { useState, useTransition, useRef } from "react";
 import { createTaskWithSubtasks } from "./actions";
 import { toast } from "@/components/toaster";
+import type { RawTask } from "./bucket-tasks";
 
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
@@ -13,11 +14,15 @@ export function NewTaskModal({
   onClose,
   workspaces,
   currentMemberIds,
+  onTaskCreated,
+  onTaskError,
 }: {
   open: boolean;
   onClose: () => void;
   workspaces: Workspace[];
   currentMemberIds: string[];
+  onTaskCreated?: (task: RawTask) => void;
+  onTaskError?: (taskId: string) => void;
 }) {
   const firstWorkspace = workspaces[0];
   const getInitialMembers = (wsId: string) =>
@@ -85,6 +90,7 @@ export function NewTaskModal({
     if (!title.trim() || !workspaceId || selectedMemberIds.length === 0) return;
 
     // Snapshot form values before resetting
+    const tempId = crypto.randomUUID();
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim() || undefined;
     const snapshotDueAt = dueAt || undefined;
@@ -93,8 +99,21 @@ export function NewTaskModal({
     const snapshotSubtasks = subtaskRows
       .filter((r) => r.title.trim())
       .map((r) => ({ title: r.title.trim(), dueAt: r.dueAt || undefined }));
+    const ws = workspaces.find((w) => w.id === workspaceId)!;
 
-    // Optimistic actions: close modal and reset form before server responds
+    // Build optimistic RawTask
+    const optimisticTask: RawTask = {
+      id: tempId,
+      title: trimmedTitle,
+      due_at: snapshotDueAt ? `${snapshotDueAt}:00Z` : null,
+      completed_at: null,
+      workspace: { id: ws.id, name: ws.name, kind: ws.kind },
+      member_sort_key: 0,
+      assignee_count: snapshotMemberIds.length,
+    };
+
+    // Optimistic actions: fire callback, close modal, reset form, toast
+    onTaskCreated?.(optimisticTask);
     resetForm();
     onClose();
     toast("Task created");
@@ -113,6 +132,7 @@ export function NewTaskModal({
           toast(`Task created, but ${subtaskErrors} subtask(s) could not be saved`, "warning");
         }
       } catch {
+        onTaskError?.(tempId);
         toast("Failed to create task", "error");
       }
     });

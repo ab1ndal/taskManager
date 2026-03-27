@@ -349,3 +349,76 @@ describe("NewTaskModal — toast feedback", () => {
     );
   });
 });
+
+// ─── onTaskCreated callback ──────────────────────────────────────────────────
+
+describe("NewTaskModal — onTaskCreated callback", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("calls onTaskCreated immediately on submit before server resolves", async () => {
+    let resolveServer!: (val: { subtaskErrors: number }) => void;
+    (createTaskWithSubtasks as jest.Mock).mockReturnValue(
+      new Promise((res) => { resolveServer = res; })
+    );
+    const onTaskCreated = jest.fn();
+    const onClose = jest.fn();
+    render(
+      <NewTaskModal
+        open={true}
+        onClose={onClose}
+        workspaces={workspaces}
+        currentMemberIds={["m-1"]}
+        onTaskCreated={onTaskCreated}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+    // onTaskCreated must fire immediately, not after resolveServer()
+    expect(onTaskCreated).toHaveBeenCalledTimes(1);
+    expect(onTaskCreated.mock.calls[0][0]).toMatchObject({ title: "Buy milk", completed_at: null });
+    resolveServer({ subtaskErrors: 0 });
+  });
+
+  it("calls onClose immediately on submit before server resolves", async () => {
+    let resolveServer!: (val: { subtaskErrors: number }) => void;
+    (createTaskWithSubtasks as jest.Mock).mockReturnValue(
+      new Promise((res) => { resolveServer = res; })
+    );
+    const onClose = jest.fn();
+    render(
+      <NewTaskModal
+        open={true}
+        onClose={onClose}
+        workspaces={workspaces}
+        currentMemberIds={["m-1"]}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    resolveServer({ subtaskErrors: 0 });
+  });
+
+  it("calls onTaskError with tempId when server throws", async () => {
+    (createTaskWithSubtasks as jest.Mock).mockRejectedValue(new Error("DB error"));
+    const onTaskCreated = jest.fn();
+    const onTaskError = jest.fn();
+    render(
+      <NewTaskModal
+        open={true}
+        onClose={jest.fn()}
+        workspaces={workspaces}
+        currentMemberIds={["m-1"]}
+        onTaskCreated={onTaskCreated}
+        onTaskError={onTaskError}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+    // onTaskCreated fires immediately
+    expect(onTaskCreated).toHaveBeenCalledTimes(1);
+    const tempId = onTaskCreated.mock.calls[0][0].id;
+    // onTaskError fires after server rejects
+    await waitFor(() => expect(onTaskError).toHaveBeenCalledWith(tempId));
+  });
+});
