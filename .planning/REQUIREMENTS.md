@@ -15,7 +15,7 @@
 ### Task Creation
 
 - [x] **TASK-01**: User can create a task with title, optional description, optional due date, workspace, and one or more assignees
-- [ ] **TASK-02**: Newly created task appears immediately in the task list without page reload
+- [x] **TASK-02**: Newly created task appears immediately in the task list without page reload
 
 ### Task Detail & Editing
 
@@ -60,7 +60,7 @@
 | WS-03 | Phase 1 | Complete |
 | WS-04 | Phase 1 | Pending |
 | TASK-01 | Phase 2 | Complete |
-| TASK-02 | Phase 2 | Pending |
+| TASK-02 | Phase 2 | Complete |
 | TASK-03 | Phase 3 | Pending |
 | TASK-04 | Phase 3 | Pending |
 | TASK-05 | Phase 3 | Pending |

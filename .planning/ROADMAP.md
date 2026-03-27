@@ -13,7 +13,7 @@ Hearth already has auth, task display, and basic task creation working. This roa
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Workspace Directory** - Replace pin-based join with public directory and instant join (completed 2026-03-27)
-- [ ] **Phase 2: Task Creation** - Complete task creation with full field support and real-time list update
+- [x] **Phase 2: Task Creation** - Complete task creation with full field support and real-time list update (completed 2026-03-27)
 - [ ] **Phase 3: Task Detail & Editing** - Task detail view with editing, assignee management
 - [ ] **Phase 4: Task Prioritization** - Drag-to-reorder personal task priority
 
@@ -84,7 +84,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Workspace Directory | 3/3 | Complete   | 2026-03-27 |
-| 2. Task Creation | 1/2 | In Progress|  |
+| 2. Task Creation | 2/2 | Complete   | 2026-03-27 |
 | 3. Task Detail & Editing | 0/3 | Not started | - |
 | 4. Task Prioritization | 0/1 | Not started | - |
 
@@ -93,7 +93,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 **Goal:** [To be planned]
 **Requirements**: TBD
 **Depends on:** Phase 4
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 5 to break down)
