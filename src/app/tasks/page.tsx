@@ -1,8 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { TaskCard, EmptyState } from "@/components/task-card";
-import { bucketTasks, type RawTask } from "./bucket-tasks";
-import { CompletedSection } from "./completed-section";
+import type { RawTask } from "./bucket-tasks";
 import { TasksPageClient } from "./tasks-page-client";
 
 type SearchParams = Promise<{ workspace?: string; view?: string }>;
@@ -71,8 +69,10 @@ export default async function TasksPage({
   );
 
   // Query 2: task assignments for current user (sort key + task IDs)
+  // Admin client: task_assignments_select policy is self-referential (42P17 recursion).
+  // App-level security: filtered to myMemberIds (the current user's own member rows).
   const { data: myAssignments } = myMemberIds.length
-    ? await supabase
+    ? await admin
         .from("task_assignments")
         .select("task_id, member_sort_key")
         .in("member_id", myMemberIds)
@@ -85,9 +85,11 @@ export default async function TasksPage({
     sortKeyByTaskId[a.task_id] = a.member_sort_key as number;
   });
 
-  // Query 3a: full task data (RLS-filtered)
+  // Query 3a: full task data
+  // Admin client: tasks_select policy queries task_assignments + workspace_members (both recursive).
+  // App-level security: filtered to myTaskIds derived from user's own assignments above.
   const { data: tasksData } = myTaskIds.length
-    ? await supabase
+    ? await admin
         .from("tasks")
         .select("id, title, due_at, completed_at, parent_task_id, workspace_id")
         .in("id", myTaskIds)
@@ -96,7 +98,7 @@ export default async function TasksPage({
 
   // Query 3b: all assignments for these tasks (for assignee count / shared detection)
   const { data: allAssignments } = myTaskIds.length
-    ? await supabase
+    ? await admin
         .from("task_assignments")
         .select("task_id")
         .in("task_id", myTaskIds)
@@ -125,15 +127,6 @@ export default async function TasksPage({
     };
   });
 
-  // Apply URL filters
-  const filtered = rawTasks.filter((t) => {
-    if (workspaceFilter && t.workspace.kind !== workspaceFilter) return false;
-    if (viewFilter === "shared" && t.assignee_count <= 1) return false;
-    return true;
-  });
-
-  const { overdue, today, upcoming, completed } = bucketTasks(filtered);
-  const hasAnyTasks = overdue.length + today.length + upcoming.length + completed.length > 0;
   const name = user?.user_metadata?.name || user?.email || "there";
 
   return (
@@ -142,71 +135,8 @@ export default async function TasksPage({
       currentMemberIds={myMemberIds}
       workspaceFilter={workspaceFilter}
       viewFilter={viewFilter}
-    >
-      <main className="flex-1 p-6 overflow-auto">
-        {myWorkspaces.length === 0 && (
-          <div className="mb-6 rounded-[8px] border border-[var(--color-accent-text)] bg-[var(--color-accent-subtle)] px-4 py-3">
-            <p className="text-sm text-[var(--color-accent-text)]">
-              You&apos;re not in any workspace yet.{" "}
-              <a
-                href="/workspaces"
-                className="font-semibold underline hover:opacity-80 transition-opacity duration-150"
-              >
-                Browse workspaces
-              </a>
-            </p>
-          </div>
-        )}
-        <h2 className="text-xl font-semibold tracking-tight mb-1">Hello, {name}</h2>
-        <p className="text-sm text-[var(--color-text-secondary)] mb-6">Here are your tasks.</p>
-
-        {!hasAnyTasks ? (
-          <EmptyState />
-        ) : (
-          <>
-            {(
-              [
-                { key: "Overdue", tasks: overdue },
-                { key: "Today", tasks: today },
-                { key: "Upcoming", tasks: upcoming },
-              ] as const
-            ).map(({ key, tasks: sectionTasks }) => {
-              if (!sectionTasks.length) return null;
-              return (
-                <div key={key} className="mb-6">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
-                    {key}
-                  </p>
-                  <div className="flex flex-col gap-1.5">
-                    {sectionTasks.map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        taskId={task.id}
-                        title={task.title}
-                        deadline={task.deadlineLabel}
-                        deadlineVariant={task.deadlineVariant}
-                        workspace={task.workspace.name}
-                        shared={task.shared}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-            <CompletedSection
-              tasks={completed.map((t) => ({
-                taskId: t.id,
-                title: t.title,
-                deadline: t.deadlineLabel,
-                deadlineVariant: t.deadlineVariant,
-                workspace: t.workspace.name,
-                shared: t.shared,
-                completed: true as const,
-              }))}
-            />
-          </>
-        )}
-      </main>
-    </TasksPageClient>
+      initialTasks={rawTasks}
+      userName={name}
+    />
   );
 }
