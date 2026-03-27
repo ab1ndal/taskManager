@@ -26,8 +26,12 @@ Users can create, manage, and complete their tasks across household and work wor
 - ✓ User can join any workspace instantly using their profile name (no pin, no approval) — Validated in Phase 01: workspace-directory
 - ✓ Task creation is blocked when user has no workspace memberships — Validated in Phase 01: workspace-directory
 
+### Validated
+
+- ✓ User can create tasks with title, description, due date, workspace, and assignees — Validated in Phase 02: task-creation
+- ✓ Newly created task appears immediately in task list (optimistic insert, no reload) — Validated in Phase 02: task-creation
+
 ### Active
-- [ ] User can create tasks with title, description, due date, workspace, and assignees
 - [ ] User can open a task detail view to see full info, subtasks, and updates
 - [ ] User can edit task details (title, description, due date) after creation
 - [ ] User can reassign or add members to an existing task
@@ -44,7 +48,7 @@ Users can create, manage, and complete their tasks across household and work wor
 - **Stack:** Next.js 16, TypeScript, Tailwind v4, Supabase (PostgreSQL + Auth + RLS), Vercel
 - **Auth:** Supabase Auth with cookie-based sessions via `@supabase/ssr`
 - **Data model:** Tasks are visible only via `task_assignments`; priority is per-user via `member_sort_key`
-- **Current state:** Phase 01 complete — workspace directory, join/leave/create fully functional, task creation guarded behind workspace membership. Phase 02 (task creation) and Phase 05 (task lifecycle: edit/delete/complete) pending.
+- **Current state:** Phase 02 complete — task creation with optimistic inserts, immediate modal close, success/warning/error toast feedback, and opacity-40 pending state. Phase 05 (task lifecycle: edit/delete/complete) next.
 - **Codebase map:** `.planning/codebase/` — full analysis available
 
 ## Constraints
@@ -64,4 +68,4 @@ Users can create, manage, and complete their tasks across household and work wor
 | Admin client for workspace operations | RLS recursion on INSERT and filtering on post-join SELECT required admin bypass | Shipped in Phase 01 |
 
 ---
-*Last updated: 2026-03-27 after Phase 01 completion*
+*Last updated: 2026-03-26 after Phase 02 completion*
