@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { NewTaskModal } from "./new-task-modal";
 
 import { createTaskWithSubtasks } from "./actions";
+import { toast } from "@/components/toaster";
 
 jest.mock("./actions", () => ({
   createTask: jest.fn().mockResolvedValue(undefined),
@@ -9,6 +10,8 @@ jest.mock("./actions", () => ({
 }));
 
 jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSearchParams()) }));
+
+jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 const workspaces = [
   {
@@ -294,17 +297,55 @@ describe("NewTaskModal — error handling", () => {
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
-    // Form resets — title input is back to empty
-    expect(screen.getByPlaceholderText(/task title/i)).toHaveValue("");
   });
 
-  it("does not close modal when action throws", async () => {
-    (createTaskWithSubtasks as jest.Mock).mockRejectedValueOnce(new Error("Server error"));
+  it("closes modal immediately on submit (optimistic close)", async () => {
+    let resolveServer!: (val: { subtaskErrors: number }) => void;
+    (createTaskWithSubtasks as jest.Mock).mockReturnValue(
+      new Promise((res) => { resolveServer = res; })
+    );
     const { onClose } = renderModal();
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Bad task" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
 
-    await waitFor(() => expect(createTaskWithSubtasks).toHaveBeenCalled());
-    expect(onClose).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+    resolveServer({ subtaskErrors: 0 });
+  });
+});
+
+// ─── Toast feedback ──────────────────────────────────────────────────────────
+
+describe("NewTaskModal — toast feedback", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("fires 'Task created' toast on successful submit", async () => {
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ subtaskErrors: 0 });
+    renderModal();
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Task created"));
+  });
+
+  it("fires warning toast when subtaskErrors > 0", async () => {
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ subtaskErrors: 2 });
+    renderModal();
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        "Task created, but 2 subtask(s) could not be saved",
+        "warning"
+      )
+    );
+  });
+
+  it("fires error toast when server throws", async () => {
+    (createTaskWithSubtasks as jest.Mock).mockRejectedValue(new Error("DB error"));
+    renderModal();
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith("Failed to create task", "error")
+    );
   });
 });

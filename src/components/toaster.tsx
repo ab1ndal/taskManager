@@ -5,11 +5,11 @@ import { useEffect, useState } from "react";
 type Toast = {
   id: number;
   message: string;
-  type: "success" | "error";
+  type: "success" | "warning" | "error";
 };
 
-// Call from any client component: toast("message") or toast("message", "error")
-export function toast(message: string, type: "success" | "error" = "success") {
+// Call from any client component: toast("message") or toast("message", "error") or toast("message", "warning")
+export function toast(message: string, type: "success" | "warning" | "error" = "success") {
   if (typeof window === "undefined") return;
   window.dispatchEvent(
     new CustomEvent("app:toast", { detail: { message, type } })
@@ -41,7 +41,7 @@ export function Toaster() {
         <div
           key={t.id}
           className={`max-w-xs rounded-lg px-4 py-2.5 text-sm text-white shadow-lg transition-all ${
-            t.type === "error" ? "bg-red-600" : "bg-gray-900"
+            t.type === "error" ? "bg-red-600" : t.type === "warning" ? "bg-amber-500" : "bg-gray-900"
           }`}
         >
           {t.message}

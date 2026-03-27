@@ -83,23 +83,35 @@ export function NewTaskModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim() || !workspaceId || selectedMemberIds.length === 0) return;
+
+    // Snapshot form values before resetting
+    const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim() || undefined;
+    const snapshotDueAt = dueAt || undefined;
+    const snapshotWorkspaceId = workspaceId;
+    const snapshotMemberIds = [...selectedMemberIds];
+    const snapshotSubtasks = subtaskRows
+      .filter((r) => r.title.trim())
+      .map((r) => ({ title: r.title.trim(), dueAt: r.dueAt || undefined }));
+
+    // Optimistic actions: close modal and reset form before server responds
+    resetForm();
+    onClose();
+    toast("Task created");
+
     startTransition(async () => {
       try {
         const { subtaskErrors } = await createTaskWithSubtasks({
-          title: title.trim(),
-          description: description.trim() || undefined,
-          dueAt: dueAt || undefined,
-          workspaceId,
-          memberIds: selectedMemberIds,
-          subtasks: subtaskRows
-            .filter((r) => r.title.trim())
-            .map((r) => ({ title: r.title.trim(), dueAt: r.dueAt || undefined })),
+          title: trimmedTitle,
+          description: trimmedDescription,
+          dueAt: snapshotDueAt,
+          workspaceId: snapshotWorkspaceId,
+          memberIds: snapshotMemberIds,
+          subtasks: snapshotSubtasks,
         });
         if (subtaskErrors > 0) {
-          toast(`Task created, but ${subtaskErrors} subtask(s) could not be saved`, "error");
+          toast(`Task created, but ${subtaskErrors} subtask(s) could not be saved`, "warning");
         }
-        resetForm();
-        onClose();
       } catch {
         toast("Failed to create task", "error");
       }
