@@ -33,6 +33,9 @@ export default async function RootLayout({
           </Link>
 
           {/* Nav links */}
+          <Link href="/tasks" className="text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150 flex-shrink-0">
+            Tasks
+          </Link>
           <Link href="/workspaces" className="text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150 flex-shrink-0">
             Workspaces
           </Link>
