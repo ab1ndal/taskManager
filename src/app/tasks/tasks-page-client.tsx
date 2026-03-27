@@ -4,6 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { NewTaskModal } from "./new-task-modal";
 import { TabPill } from "./tab-pill";
+import { TaskCard, EmptyState } from "@/components/task-card";
+import { CompletedSection } from "./completed-section";
+import { bucketTasks, type RawTask } from "./bucket-tasks";
 
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
@@ -39,16 +42,44 @@ export function TasksPageClient({
   currentMemberIds,
   workspaceFilter,
   viewFilter,
-  children,
+  initialTasks,
+  userName,
 }: {
   workspaces: Workspace[];
   currentMemberIds: string[];
   workspaceFilter?: string;
   viewFilter?: string;
-  children: React.ReactNode;
+  initialTasks: RawTask[];
+  userName?: string;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [localTasks, setLocalTasks] = useState<RawTask[]>(initialTasks);
+  const [optimisticTaskIds, setOptimisticTaskIds] = useState<Set<string>>(new Set());
+
   const hasWorkspace = workspaces.length > 0;
+
+  function handleTaskCreated(task: RawTask) {
+    setLocalTasks((prev) => [...prev, task]);
+    setOptimisticTaskIds((prev) => new Set([...prev, task.id]));
+  }
+
+  function handleTaskError(taskId: string) {
+    setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setOptimisticTaskIds((prev) => {
+      const next = new Set(prev);
+      next.delete(taskId);
+      return next;
+    });
+  }
+
+  const filtered = localTasks.filter((t) => {
+    if (workspaceFilter && t.workspace.kind !== workspaceFilter) return false;
+    if (viewFilter === "shared" && t.assignee_count <= 1) return false;
+    return true;
+  });
+
+  const { overdue, today, upcoming, completed } = bucketTasks(filtered);
+  const hasAnyTasks = overdue.length + today.length + upcoming.length + completed.length > 0;
 
   return (
     <>
@@ -83,6 +114,8 @@ export function TasksPageClient({
         onClose={() => setModalOpen(false)}
         workspaces={workspaces}
         currentMemberIds={currentMemberIds}
+        onTaskCreated={handleTaskCreated}
+        onTaskError={handleTaskError}
       />
 
       {/* Main layout */}
@@ -162,7 +195,79 @@ export function TasksPageClient({
           />
         </aside>
 
-        {children}
+        <main className="flex-1 p-6 overflow-auto">
+          {workspaces.length === 0 && (
+            <div className="mb-6 rounded-[8px] border border-[var(--color-accent-text)] bg-[var(--color-accent-subtle)] px-4 py-3">
+              <p className="text-sm text-[var(--color-accent-text)]">
+                You&apos;re not in any workspace yet.{" "}
+                <a
+                  href="/workspaces"
+                  className="font-semibold underline hover:opacity-80 transition-opacity duration-150"
+                >
+                  Browse workspaces
+                </a>
+              </p>
+            </div>
+          )}
+
+          {userName && (
+            <>
+              <h2 className="text-xl font-semibold tracking-tight mb-1">Hello, {userName}</h2>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-6">Here are your tasks.</p>
+            </>
+          )}
+
+          {!hasAnyTasks ? (
+            <EmptyState />
+          ) : (
+            <>
+              {(
+                [
+                  { key: "Overdue", tasks: overdue },
+                  { key: "Today", tasks: today },
+                  { key: "Upcoming", tasks: upcoming },
+                ] as const
+              ).map(({ key, tasks: sectionTasks }) => {
+                if (!sectionTasks.length) return null;
+                return (
+                  <div key={key} className="mb-6">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
+                      {key}
+                    </p>
+                    <div className="flex flex-col gap-1.5">
+                      {sectionTasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className={optimisticTaskIds.has(task.id) ? "opacity-40" : undefined}
+                        >
+                          <TaskCard
+                            taskId={task.id}
+                            title={task.title}
+                            deadline={task.deadlineLabel}
+                            deadlineVariant={task.deadlineVariant}
+                            workspace={task.workspace.name}
+                            shared={task.shared}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              <CompletedSection
+                tasks={completed.map((t) => ({
+                  taskId: t.id,
+                  title: t.title,
+                  deadline: t.deadlineLabel,
+                  deadlineVariant: t.deadlineVariant,
+                  workspace: t.workspace.name,
+                  shared: t.shared,
+                  completed: true as const,
+                }))}
+              />
+            </>
+          )}
+        </main>
       </div>
     </>
   );
