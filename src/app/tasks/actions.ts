@@ -151,3 +151,56 @@ export async function createTaskWithSubtasks({
   revalidatePath("/tasks");
   return { subtaskErrors };
 }
+
+export async function updateTask({
+  taskId,
+  title,
+  description,
+  dueAt,
+  memberIds,
+}: {
+  taskId: string;
+  title: string;
+  description?: string;
+  dueAt?: string;
+  memberIds: string[];
+}) {
+  const admin = createAdminClient();
+
+  await admin
+    .from("tasks")
+    .update({
+      title,
+      description: description ?? null,
+      due_at: dueAt ? `${dueAt}T00:00:00Z` : null,
+    })
+    .eq("id", taskId);
+
+  const { data: currentAssignments } = await admin
+    .from("task_assignments")
+    .select("member_id")
+    .eq("task_id", taskId);
+
+  const currentIds = (currentAssignments ?? []).map((a) => a.member_id as string);
+  const uniqueNewIds = [...new Set(memberIds)];
+
+  // Remove dropped members
+  for (const memberId of currentIds.filter((id) => !uniqueNewIds.includes(id))) {
+    await admin.from("task_assignments").delete().eq("task_id", taskId).eq("member_id", memberId);
+  }
+
+  // Add new members
+  for (const memberId of uniqueNewIds.filter((id) => !currentIds.includes(id))) {
+    const { data: last } = await admin
+      .from("task_assignments")
+      .select("member_sort_key")
+      .eq("member_id", memberId)
+      .order("member_sort_key", { ascending: false })
+      .limit(1)
+      .single();
+    const sortKey = last ? (last.member_sort_key as number) + 1000 : 1000;
+    await admin.from("task_assignments").insert({ task_id: taskId, member_id: memberId, member_sort_key: sortKey });
+  }
+
+  revalidatePath("/tasks");
+}

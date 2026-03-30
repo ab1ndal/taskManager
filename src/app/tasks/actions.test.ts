@@ -5,7 +5,7 @@ jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { completeTask, deleteTask, createTask, createTaskWithSubtasks } from "./actions";
+import { completeTask, deleteTask, createTask, createTaskWithSubtasks, updateTask } from "./actions";
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -478,6 +478,70 @@ describe("createTaskWithSubtasks — multiple subtasks all succeed", () => {
 
     expect(result).toEqual({ subtaskErrors: 0 });
     expect(revalidatePath).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("updateTask", () => {
+  it("updates task fields and revalidates", async () => {
+    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+
+    // current assignments query
+    const currentEq = jest.fn().mockResolvedValue({ data: [{ member_id: "m-1" }], error: null });
+    const currentSelect = jest.fn().mockReturnValue({ eq: currentEq });
+
+    const mockFrom = jest.fn()
+      .mockReturnValueOnce({ update })           // tasks UPDATE
+      .mockReturnValueOnce({ select: currentSelect }); // task_assignments SELECT
+
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+
+    await updateTask({ taskId: "t-1", title: "Updated title", memberIds: ["m-1"], workspaceId: "ws-1" });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Updated title" })
+    );
+    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+  });
+
+  it("adds new assignees and removes dropped ones", async () => {
+    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+
+    // current: m-1 assigned, m-2 not
+    const currentEq = jest.fn().mockResolvedValue({ data: [{ member_id: "m-1" }], error: null });
+    const currentSelect = jest.fn().mockReturnValue({ eq: currentEq });
+
+    // delete m-1
+    const deleteEq2 = jest.fn().mockResolvedValue({ error: null });
+    const deleteEq1 = jest.fn().mockReturnValue({ eq: deleteEq2 });
+    const del = jest.fn().mockReturnValue({ eq: deleteEq1 });
+
+    // sort key for m-2
+    const sortSingle = jest.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
+    const sortLimit = jest.fn().mockReturnValue({ single: sortSingle });
+    const sortOrder = jest.fn().mockReturnValue({ limit: sortLimit });
+    const sortEq = jest.fn().mockReturnValue({ order: sortOrder });
+    const sortSelect = jest.fn().mockReturnValue({ eq: sortEq });
+
+    // insert m-2
+    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
+
+    const mockFrom = jest.fn()
+      .mockReturnValueOnce({ update })
+      .mockReturnValueOnce({ select: currentSelect })
+      .mockReturnValueOnce({ delete: del })      // remove m-1
+      .mockReturnValueOnce({ select: sortSelect }) // sort key for m-2
+      .mockReturnValueOnce({ insert: insertAsgn }); // add m-2
+
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+
+    await updateTask({ taskId: "t-1", title: "T", memberIds: ["m-2"], workspaceId: "ws-1" });
+
+    expect(del).toHaveBeenCalled();
+    expect(insertAsgn).toHaveBeenCalledWith(
+      expect.objectContaining({ member_id: "m-2" })
+    );
   });
 });
 
