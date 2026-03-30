@@ -204,7 +204,7 @@ export function NewTaskModal({
               Due date (optional)
             </label>
             <input
-              type="datetime-local"
+              type="date"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
               disabled={disabled}

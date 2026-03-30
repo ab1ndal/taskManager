@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 export async function completeTask(taskId: string) {
@@ -33,7 +34,7 @@ export async function createTask({
 
   const { data: task, error } = await supabase
     .from("tasks")
-    .insert({ title, due_at: dueAt ?? null, workspace_id: workspaceId })
+    .insert({ title, due_at: dueAt ? `${dueAt}T00:00:00Z` : null, workspace_id: workspaceId })
     .select()
     .single();
 
@@ -76,9 +77,12 @@ export async function createTaskWithSubtasks({
   subtasks: { title: string; dueAt?: string }[];
 }): Promise<{ subtaskErrors: number }> {
   const supabase = await createClient();
+  const admin = createAdminClient();
   const uniqueMemberIds = [...new Set(memberIds)];
 
-  const { data: parent, error: parentError } = await supabase
+  // Use admin client for tasks INSERT — tasks_insert RLS queries workspace_members,
+  // triggering the self-referential workspace_members_select policy (42P17 recursion).
+  const { data: parent, error: parentError } = await admin
     .from("tasks")
     .insert({
       title,
@@ -92,7 +96,9 @@ export async function createTaskWithSubtasks({
   if (parentError || !parent) throw new Error(parentError?.message ?? "Failed to create task");
 
   for (const memberId of uniqueMemberIds) {
-    const { data: last } = await supabase
+    // Use admin client for task_assignments — task_assignments_select is also recursive,
+    // and task_assignments_insert WITH CHECK queries workspace_members + tasks (42P17).
+    const { data: last } = await admin
       .from("task_assignments")
       .select("member_sort_key")
       .eq("member_id", memberId)
@@ -100,7 +106,7 @@ export async function createTaskWithSubtasks({
       .limit(1)
       .single();
     const sortKey = last ? (last.member_sort_key as number) + 1000 : 1000;
-    await supabase.from("task_assignments").insert({
+    await admin.from("task_assignments").insert({
       task_id: parent.id,
       member_id: memberId,
       member_sort_key: sortKey,
@@ -109,7 +115,7 @@ export async function createTaskWithSubtasks({
 
   let subtaskErrors = 0;
   for (const sub of subtasks) {
-    const { data: subtask, error: subError } = await supabase
+    const { data: subtask, error: subError } = await admin
       .from("tasks")
       .insert({
         title: sub.title,
@@ -126,7 +132,7 @@ export async function createTaskWithSubtasks({
     }
 
     for (const memberId of uniqueMemberIds) {
-      const { data: last } = await supabase
+      const { data: last } = await admin
         .from("task_assignments")
         .select("member_sort_key")
         .eq("member_id", memberId)
@@ -134,7 +140,7 @@ export async function createTaskWithSubtasks({
         .limit(1)
         .single();
       const sortKey = last ? (last.member_sort_key as number) + 1000 : 1000;
-      await supabase.from("task_assignments").insert({
+      await admin.from("task_assignments").insert({
         task_id: subtask.id,
         member_id: memberId,
         member_sort_key: sortKey,

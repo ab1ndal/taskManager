@@ -1,7 +1,9 @@
 jest.mock("@/lib/supabase/server", () => ({ createClient: jest.fn() }));
+jest.mock("@/lib/supabase/admin", () => ({ createAdminClient: jest.fn() }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { completeTask, deleteTask, createTask, createTaskWithSubtasks } from "./actions";
 
@@ -104,7 +106,8 @@ describe("createTaskWithSubtasks", () => {
       .mockReturnValueOnce({ select: sortKeySelect })
       .mockReturnValueOnce({ insert: insertAssignment });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     const result = await createTaskWithSubtasks({
       title: "Parent task",
@@ -152,7 +155,8 @@ describe("createTaskWithSubtasks", () => {
       .mockReturnValueOnce({ select: skSelect2 })
       .mockReturnValueOnce({ insert: insertAsgn2 });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     const result = await createTaskWithSubtasks({
       title: "Parent",
@@ -195,7 +199,8 @@ describe("createTaskWithSubtasks", () => {
       .mockReturnValueOnce({ insert: insertAsgn })
       .mockReturnValueOnce({ insert: insertSubtask });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     const result = await createTaskWithSubtasks({
       title: "Parent",
@@ -213,7 +218,7 @@ describe("createTaskWithSubtasks", () => {
 // ─── createTask: additional coverage ────────────────────────────────────────
 
 describe("createTask — due date encoding", () => {
-  it("appends :00Z to datetime-local value when dueAt is provided", async () => {
+  it("stores date as UTC midnight when dueAt is provided", async () => {
     const single = jest.fn().mockResolvedValue({ data: { id: "t-1" }, error: null });
     const select = jest.fn().mockReturnValue({ single });
     const insertTask = jest.fn().mockReturnValue({ select });
@@ -226,10 +231,10 @@ describe("createTask — due date encoding", () => {
 
     (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
 
-    await createTask({ title: "Meeting", dueAt: "2026-06-15T09:30", workspaceId: "ws-1", memberIds: ["m-1"] });
+    await createTask({ title: "Meeting", dueAt: "2026-06-15", workspaceId: "ws-1", memberIds: ["m-1"] });
 
     expect(insertTask).toHaveBeenCalledWith(
-      expect.objectContaining({ due_at: "2026-06-15T09:30:00Z" })
+      expect.objectContaining({ due_at: "2026-06-15T00:00:00Z" })
     );
   });
 
@@ -326,7 +331,8 @@ describe("createTaskWithSubtasks — description", () => {
       .mockReturnValueOnce({ select: makeSortKeyMock(null) })
       .mockReturnValueOnce({ insert: insertAsgn });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     await createTaskWithSubtasks({
       title: "Plan event",
@@ -352,7 +358,8 @@ describe("createTaskWithSubtasks — description", () => {
       .mockReturnValueOnce({ select: makeSortKeyMock(null) })
       .mockReturnValueOnce({ insert: insertAsgn });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     await createTaskWithSubtasks({
       title: "Quick task",
@@ -379,7 +386,8 @@ describe("createTaskWithSubtasks — deduplicates memberIds", () => {
       .mockReturnValueOnce({ select: makeSortKeyMock(null) })
       .mockReturnValueOnce({ insert: insertAsgn });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     await createTaskWithSubtasks({
       title: "Dedup test",
@@ -414,7 +422,8 @@ describe("createTaskWithSubtasks — subtask with no due date", () => {
       .mockReturnValueOnce({ select: makeSortKeyMock(null) })
       .mockReturnValueOnce({ insert: insertAsgn2 });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     await createTaskWithSubtasks({
       title: "Parent",
@@ -454,7 +463,8 @@ describe("createTaskWithSubtasks — multiple subtasks all succeed", () => {
       .mockReturnValueOnce({ select: makeSortKeyMock(null) })
       .mockReturnValueOnce({ insert: insertAsgn });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     const result = await createTaskWithSubtasks({
       title: "Multi-subtask parent",
@@ -477,7 +487,8 @@ describe("createTaskWithSubtasks — parent insert failure", () => {
     const select = jest.fn().mockReturnValue({ single });
     const insertParent = jest.fn().mockReturnValue({ select });
 
-    (createClient as jest.Mock).mockResolvedValue({ from: jest.fn().mockReturnValue({ insert: insertParent }) });
+    (createClient as jest.Mock).mockResolvedValue({});
+    (createAdminClient as jest.Mock).mockReturnValue({ from: jest.fn().mockReturnValue({ insert: insertParent }) });
 
     await expect(
       createTaskWithSubtasks({
