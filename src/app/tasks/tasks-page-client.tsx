@@ -48,7 +48,7 @@ export function TasksPageClient({
 }: {
   workspaces: Workspace[];
   currentMemberIds: string[];
-  memberIdByWorkspaceId: Record<string, string>;
+  memberIdByWorkspaceId: Record<string, string>; // used by drag-to-reorder (Task 15)
   workspaceFilter?: string;
   viewFilter?: string;
   initialTasks: RawTask[];
