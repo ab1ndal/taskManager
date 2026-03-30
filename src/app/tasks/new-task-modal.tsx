@@ -105,11 +105,13 @@ export function NewTaskModal({
     const optimisticTask: RawTask = {
       id: tempId,
       title: trimmedTitle,
-      due_at: snapshotDueAt ? `${snapshotDueAt}:00Z` : null,
+      due_at: snapshotDueAt ? `${snapshotDueAt}T00:00:00Z` : null,
       completed_at: null,
       workspace: { id: ws.id, name: ws.name, kind: ws.kind },
       member_sort_key: 0,
       assignee_count: snapshotMemberIds.length,
+      member_ids: snapshotMemberIds,
+      subtasks: [],
     };
 
     // Optimistic actions: fire callback, close modal, reset form, toast

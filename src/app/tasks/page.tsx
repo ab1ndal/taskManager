@@ -68,6 +68,9 @@ export default async function TasksPage({
     myMembers.some((m) => m.workspace_id === ws.id)
   );
 
+  const memberIdByWorkspaceId: Record<string, string> = {};
+  myMembers.forEach((m) => { memberIdByWorkspaceId[m.workspace_id] = m.id; });
+
   // Query 2: task assignments for current user (sort key + task IDs)
   // Admin client: task_assignments_select policy is self-referential (42P17 recursion).
   // App-level security: filtered to myMemberIds (the current user's own member rows).
@@ -124,6 +127,8 @@ export default async function TasksPage({
       workspace: { id: ws.id, name: ws.name, kind: ws.kind },
       member_sort_key: sortKeyByTaskId[t.id] ?? 0,
       assignee_count: assigneeCounts[t.id] ?? 1,
+      member_ids: [],   // populated in Task 4
+      subtasks: [],     // populated in Task 4
     };
   });
 
@@ -133,6 +138,7 @@ export default async function TasksPage({
     <TasksPageClient
       workspaces={myWorkspaces}
       currentMemberIds={myMemberIds}
+      memberIdByWorkspaceId={memberIdByWorkspaceId}
       workspaceFilter={workspaceFilter}
       viewFilter={viewFilter}
       initialTasks={rawTasks}

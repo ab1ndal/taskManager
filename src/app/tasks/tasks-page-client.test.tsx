@@ -43,6 +43,8 @@ function makeTask(overrides: Partial<RawTask> = {}): RawTask {
     workspace: { id: "ws-1", name: "Home", kind: "household" },
     member_sort_key: 1000,
     assignee_count: 1,
+    member_ids: [],
+    subtasks: [],
     ...overrides,
   };
 }
@@ -53,6 +55,7 @@ describe("TasksPageClient — initial render", () => {
       <TasksPageClient
         workspaces={workspaces}
         currentMemberIds={["m-1"]}
+        memberIdByWorkspaceId={{}}
         initialTasks={[makeTask({ title: "Buy milk" }), makeTask({ id: "t-2", title: "Walk dog" })]}
       />
     );
@@ -64,6 +67,7 @@ describe("TasksPageClient — initial render", () => {
       <TasksPageClient
         workspaces={workspaces}
         currentMemberIds={["m-1"]}
+        memberIdByWorkspaceId={{}}
         initialTasks={[]}
       />
     );
@@ -77,6 +81,7 @@ describe("TasksPageClient — optimistic insert (handleTaskCreated)", () => {
       <TasksPageClient
         workspaces={workspaces}
         currentMemberIds={["m-1"]}
+        memberIdByWorkspaceId={{}}
         initialTasks={[]}
       />
     );
@@ -88,6 +93,7 @@ describe("TasksPageClient — optimistic insert (handleTaskCreated)", () => {
       <TasksPageClient
         workspaces={workspaces}
         currentMemberIds={["m-1"]}
+        memberIdByWorkspaceId={{}}
         initialTasks={[]}
       />
     );
@@ -104,10 +110,87 @@ describe("TasksPageClient — optimistic task opacity", () => {
       <TasksPageClient
         workspaces={workspaces}
         currentMemberIds={["m-1"]}
+        memberIdByWorkspaceId={{}}
         initialTasks={[makeTask()]}
       />
     );
     // Component renders without error when initialTasks provided
     expect(screen.getByTestId("task-card")).toBeInTheDocument();
+  });
+});
+
+describe("TasksPageClient — initialTasks sync", () => {
+  it("updates localTasks when initialTasks prop changes", () => {
+    const task1: RawTask = {
+      id: "t-1", title: "Task 1", due_at: null, completed_at: null,
+      workspace: { id: "ws-1", name: "Home", kind: "household" },
+      member_sort_key: 1000, assignee_count: 1,
+      member_ids: [], subtasks: [],
+    };
+    const task2: RawTask = {
+      id: "t-2", title: "Task 2", due_at: null, completed_at: null,
+      workspace: { id: "ws-1", name: "Home", kind: "household" },
+      member_sort_key: 2000, assignee_count: 1,
+      member_ids: [], subtasks: [],
+    };
+
+    const { rerender, getByText, queryByText } = render(
+      <TasksPageClient
+        workspaces={[{ id: "ws-1", name: "Home", kind: "household", members: [] }]}
+        currentMemberIds={[]}
+        memberIdByWorkspaceId={{}}
+        initialTasks={[task1]}
+        userName="Alice"
+      />
+    );
+
+    expect(getByText("Task 1")).toBeInTheDocument();
+    expect(queryByText("Task 2")).not.toBeInTheDocument();
+
+    rerender(
+      <TasksPageClient
+        workspaces={[{ id: "ws-1", name: "Home", kind: "household", members: [] }]}
+        currentMemberIds={[]}
+        memberIdByWorkspaceId={{}}
+        initialTasks={[task2]}
+        userName="Alice"
+      />
+    );
+
+    expect(queryByText("Task 1")).not.toBeInTheDocument();
+    expect(getByText("Task 2")).toBeInTheDocument();
+  });
+
+  it("clears optimisticTaskIds when initialTasks changes", () => {
+    const task: RawTask = {
+      id: "t-opt", title: "Optimistic Task", due_at: null, completed_at: null,
+      workspace: { id: "ws-1", name: "Home", kind: "household" },
+      member_sort_key: 1000, assignee_count: 1,
+      member_ids: [], subtasks: [],
+    };
+
+    const { rerender, getByText } = render(
+      <TasksPageClient
+        workspaces={[{ id: "ws-1", name: "Home", kind: "household", members: [] }]}
+        currentMemberIds={[]}
+        memberIdByWorkspaceId={{}}
+        initialTasks={[task]}
+        userName="Alice"
+      />
+    );
+
+    // After rerender with server-confirmed tasks, card should not be dimmed
+    rerender(
+      <TasksPageClient
+        workspaces={[{ id: "ws-1", name: "Home", kind: "household", members: [] }]}
+        currentMemberIds={[]}
+        memberIdByWorkspaceId={{}}
+        initialTasks={[{ ...task, id: "t-real" }]}
+        userName="Alice"
+      />
+    );
+
+    const card = getByText("Optimistic Task").closest('[class*="opacity"]');
+    expect(card).toBeNull();
   });
 });

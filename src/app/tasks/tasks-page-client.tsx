@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { NewTaskModal } from "./new-task-modal";
 import { TabPill } from "./tab-pill";
@@ -40,6 +40,7 @@ function SidebarLink({
 export function TasksPageClient({
   workspaces,
   currentMemberIds,
+  memberIdByWorkspaceId,
   workspaceFilter,
   viewFilter,
   initialTasks,
@@ -47,6 +48,7 @@ export function TasksPageClient({
 }: {
   workspaces: Workspace[];
   currentMemberIds: string[];
+  memberIdByWorkspaceId: Record<string, string>;
   workspaceFilter?: string;
   viewFilter?: string;
   initialTasks: RawTask[];
@@ -55,6 +57,11 @@ export function TasksPageClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [localTasks, setLocalTasks] = useState<RawTask[]>(initialTasks);
   const [optimisticTaskIds, setOptimisticTaskIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLocalTasks(initialTasks);
+    setOptimisticTaskIds(new Set());
+  }, [initialTasks]);
 
   const hasWorkspace = workspaces.length > 0;
 

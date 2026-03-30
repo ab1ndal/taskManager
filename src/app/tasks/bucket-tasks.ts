@@ -1,11 +1,15 @@
 export type RawTask = {
   id: string;
   title: string;
+  description?: string | null;
   due_at: string | null;
   completed_at: string | null;
   workspace: { id: string; name: string; kind: string };
   member_sort_key: number;
   assignee_count: number;
+  member_ids: string[];
+  subtasks: { id: string; title: string; completed_at: string | null }[];
+  rule_id?: string | null;
 };
 
 export type BucketedTask = RawTask & {
