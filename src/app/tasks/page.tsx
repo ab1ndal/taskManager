@@ -94,7 +94,7 @@ export default async function TasksPage({
   const { data: tasksData } = myTaskIds.length
     ? await admin
         .from("tasks")
-        .select("id, title, due_at, completed_at, parent_task_id, workspace_id")
+        .select("id, title, description, due_at, completed_at, parent_task_id, workspace_id, rule_id")
         .in("id", myTaskIds)
         .is("parent_task_id", null)
     : { data: [] };
@@ -103,13 +103,32 @@ export default async function TasksPage({
   const { data: allAssignments } = myTaskIds.length
     ? await admin
         .from("task_assignments")
-        .select("task_id")
+        .select("task_id, member_id")
         .in("task_id", myTaskIds)
     : { data: [] };
 
   const assigneeCounts: Record<string, number> = {};
+  const memberIdsByTaskId: Record<string, string[]> = {};
   (allAssignments ?? []).forEach((a) => {
     assigneeCounts[a.task_id] = (assigneeCounts[a.task_id] ?? 0) + 1;
+    if (!memberIdsByTaskId[a.task_id]) memberIdsByTaskId[a.task_id] = [];
+    memberIdsByTaskId[a.task_id].push(a.member_id as string);
+  });
+
+  // Query 4: subtasks for all parent tasks
+  const parentTaskIds = (tasksData ?? []).map((t) => t.id);
+  const { data: subtasksData } = parentTaskIds.length
+    ? await admin
+        .from("tasks")
+        .select("id, title, completed_at, parent_task_id")
+        .in("parent_task_id", parentTaskIds)
+    : { data: [] };
+
+  const subtasksByParentId: Record<string, { id: string; title: string; completed_at: string | null }[]> = {};
+  (subtasksData ?? []).forEach((s) => {
+    const pid = s.parent_task_id as string;
+    if (!subtasksByParentId[pid]) subtasksByParentId[pid] = [];
+    subtasksByParentId[pid].push({ id: s.id, title: s.title, completed_at: s.completed_at });
   });
 
   // Shape into RawTask[]
@@ -122,13 +141,15 @@ export default async function TasksPage({
     return {
       id: t.id,
       title: t.title,
+      description: t.description ?? null,
       due_at: t.due_at,
       completed_at: t.completed_at,
       workspace: { id: ws.id, name: ws.name, kind: ws.kind },
       member_sort_key: sortKeyByTaskId[t.id] ?? 0,
       assignee_count: assigneeCounts[t.id] ?? 1,
-      member_ids: [],   // populated in Task 4
-      subtasks: [],     // populated in Task 4
+      member_ids: memberIdsByTaskId[t.id] ?? [],
+      subtasks: subtasksByParentId[t.id] ?? [],
+      rule_id: (t.rule_id as string | null) ?? null,
     };
   });
 
