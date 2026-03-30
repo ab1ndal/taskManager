@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef } from "react";
 import { createTaskWithSubtasks } from "./actions";
-import { toast } from "@/components/toaster";
+import { toast } from "../../components/toaster";
 import type { RawTask } from "./bucket-tasks";
 
 type WorkspaceMember = { id: string; display_name: string };
