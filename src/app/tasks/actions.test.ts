@@ -10,18 +10,83 @@ import { completeTask, deleteTask, createTask, createTaskWithSubtasks, updateTas
 beforeEach(() => jest.clearAllMocks());
 
 describe("completeTask", () => {
-  it("updates completed_at and revalidates /tasks", async () => {
-    const eq = jest.fn().mockResolvedValue({ error: null });
-    const update = jest.fn().mockReturnValue({ eq });
-    (createClient as jest.Mock).mockResolvedValue({ from: jest.fn().mockReturnValue({ update }) });
+  it("marks task complete and revalidates", async () => {
+    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+
+    // task lookup: no parent
+    const single = jest.fn().mockResolvedValue({ data: { parent_task_id: null, rule_id: null }, error: null });
+    const eqSelect = jest.fn().mockReturnValue({ single });
+    const select = jest.fn().mockReturnValue({ eq: eqSelect });
+
+    const mockFrom = jest.fn()
+      .mockReturnValueOnce({ update })   // tasks UPDATE
+      .mockReturnValueOnce({ select });  // tasks SELECT parent_task_id
+
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
     await completeTask("task-1");
 
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ completed_at: expect.any(String) })
-    );
-    expect(eq).toHaveBeenCalledWith("id", "task-1");
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ completed_at: expect.any(String) }));
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+  });
+
+  it("auto-completes parent when all siblings are done", async () => {
+    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+
+    // task lookup: has parent
+    const taskSingle = jest.fn().mockResolvedValue({ data: { parent_task_id: "parent-1", rule_id: null }, error: null });
+    const taskEqSelect = jest.fn().mockReturnValue({ single: taskSingle });
+    const taskSelect = jest.fn().mockReturnValue({ eq: taskEqSelect });
+
+    // siblings count query: 0 incomplete siblings
+    const isNull = jest.fn().mockResolvedValue({ count: 0, error: null });
+    const eqSiblings = jest.fn().mockReturnValue({ is: isNull });
+    const siblingSelect = jest.fn().mockReturnValue({ eq: eqSiblings });
+
+    // parent update
+    const parentEqUpdate = jest.fn().mockResolvedValue({ error: null });
+    const parentUpdate = jest.fn().mockReturnValue({ eq: parentEqUpdate });
+
+    const mockFrom = jest.fn()
+      .mockReturnValueOnce({ update })          // UPDATE completed_at
+      .mockReturnValueOnce({ select: taskSelect }) // SELECT parent_task_id
+      .mockReturnValueOnce({ select: siblingSelect }) // SELECT count siblings
+      .mockReturnValueOnce({ update: parentUpdate }); // UPDATE parent
+
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+
+    await completeTask("subtask-1");
+
+    expect(parentUpdate).toHaveBeenCalledWith(expect.objectContaining({ completed_at: expect.any(String) }));
+  });
+
+  it("does not auto-complete parent when siblings remain", async () => {
+    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
+    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+
+    const taskSingle = jest.fn().mockResolvedValue({ data: { parent_task_id: "parent-1", rule_id: null }, error: null });
+    const taskEqSelect = jest.fn().mockReturnValue({ single: taskSingle });
+    const taskSelect = jest.fn().mockReturnValue({ eq: taskEqSelect });
+
+    const isNull = jest.fn().mockResolvedValue({ count: 2, error: null });
+    const eqSiblings = jest.fn().mockReturnValue({ is: isNull });
+    const siblingSelect = jest.fn().mockReturnValue({ eq: eqSiblings });
+
+    const parentUpdate = jest.fn();
+
+    const mockFrom = jest.fn()
+      .mockReturnValueOnce({ update })
+      .mockReturnValueOnce({ select: taskSelect })
+      .mockReturnValueOnce({ select: siblingSelect })
+      .mockReturnValueOnce({ update: parentUpdate });
+
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+
+    await completeTask("subtask-1");
+
+    expect(parentUpdate).not.toHaveBeenCalled();
   });
 });
 

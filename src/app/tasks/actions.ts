@@ -5,11 +5,34 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 export async function completeTask(taskId: string) {
-  const supabase = await createClient();
-  await supabase
+  const admin = createAdminClient();
+
+  await admin
     .from("tasks")
     .update({ completed_at: new Date().toISOString() })
     .eq("id", taskId);
+
+  const { data: task } = await admin
+    .from("tasks")
+    .select("parent_task_id, rule_id")
+    .eq("id", taskId)
+    .single();
+
+  if (task?.parent_task_id) {
+    const { count } = await admin
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("parent_task_id", task.parent_task_id)
+      .is("completed_at", null);
+
+    if (count === 0) {
+      await admin
+        .from("tasks")
+        .update({ completed_at: new Date().toISOString() })
+        .eq("id", task.parent_task_id);
+    }
+  }
+
   revalidatePath("/tasks");
 }
 
