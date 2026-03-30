@@ -7,7 +7,7 @@ import type { RawTask } from "./bucket-tasks";
 
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
-type SubtaskRow = { title: string; dueAt: string };
+type SubtaskRow = { title: string; dueAt: string; description: string };
 
 export function NewTaskModal({
   open,
@@ -55,7 +55,7 @@ export function NewTaskModal({
   }
 
   function addSubtaskRow() {
-    setSubtaskRows((prev) => [...prev, { title: "", dueAt: "" }]);
+    setSubtaskRows((prev) => [...prev, { title: "", dueAt: "", description: "" }]);
     setTimeout(() => lastSubtaskRef.current?.focus(), 0);
   }
 
@@ -98,7 +98,7 @@ export function NewTaskModal({
     const snapshotMemberIds = [...selectedMemberIds];
     const snapshotSubtasks = subtaskRows
       .filter((r) => r.title.trim())
-      .map((r) => ({ title: r.title.trim(), dueAt: r.dueAt || undefined }));
+      .map((r) => ({ title: r.title.trim(), dueAt: r.dueAt || undefined, description: r.description.trim() || undefined }));
     const ws = workspaces.find((w) => w.id === workspaceId)!;
 
     // Build optimistic RawTask
@@ -269,6 +269,14 @@ export function NewTaskModal({
                     disabled={disabled}
                     ref={i === subtaskRows.length - 1 ? lastSubtaskRef : undefined}
                     className="flex-1 border border-[var(--color-border)] rounded-[8px] px-2 py-1 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+                  />
+                  <textarea
+                    placeholder="Details…"
+                    value={row.description}
+                    onChange={(e) => updateSubtask(i, "description", e.target.value)}
+                    disabled={disabled}
+                    rows={1}
+                    className="flex-1 border border-[var(--color-border)] rounded-[8px] px-2 py-1 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none disabled:opacity-50"
                   />
                   <input
                     type="date"

@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { NewTaskModal } from "./new-task-modal";
 
 import { createTaskWithSubtasks } from "./actions";
@@ -12,6 +13,16 @@ jest.mock("./actions", () => ({
 jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSearchParams()) }));
 
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
+
+const mockWs = {
+  id: "ws-1",
+  name: "Home",
+  kind: "household",
+  members: [
+    { id: "m-1", display_name: "Alice" },
+    { id: "m-2", display_name: "Bob" },
+  ],
+};
 
 const workspaces = [
   {
@@ -420,5 +431,34 @@ describe("NewTaskModal — onTaskCreated callback", () => {
     const tempId = onTaskCreated.mock.calls[0][0].id;
     // onTaskError fires after server rejects
     await waitFor(() => expect(onTaskError).toHaveBeenCalledWith(tempId));
+  });
+});
+
+// ─── Subtask description ──────────────────────────────────────────────────────
+
+describe("NewTaskModal — subtask description", () => {
+  it("renders description textarea for each subtask row", async () => {
+    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["m-1"]} onClose={() => {}} />);
+    await userEvent.click(screen.getByText("+ Add subtask"));
+    expect(screen.getByPlaceholderText("Details…")).toBeInTheDocument();
+  });
+
+  it("passes subtask description to createTaskWithSubtasks", async () => {
+    const mock = jest.mocked(createTaskWithSubtasks);
+    mock.mockResolvedValue({ subtaskErrors: 0 });
+
+    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["m-1"]} onClose={() => {}} />);
+
+    await userEvent.type(screen.getByPlaceholderText("Task title"), "Parent");
+    await userEvent.click(screen.getByText("+ Add subtask"));
+    await userEvent.type(screen.getByPlaceholderText("Subtask title"), "Sub 1");
+    await userEvent.type(screen.getByPlaceholderText("Details…"), "Sub details");
+    await userEvent.click(screen.getByRole("button", { name: /add task/i }));
+
+    expect(mock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtasks: [expect.objectContaining({ title: "Sub 1", description: "Sub details" })],
+      })
+    );
   });
 });

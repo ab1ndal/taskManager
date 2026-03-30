@@ -74,7 +74,7 @@ export async function createTaskWithSubtasks({
   dueAt?: string;
   workspaceId: string;
   memberIds: string[];
-  subtasks: { title: string; dueAt?: string }[];
+  subtasks: { title: string; dueAt?: string; description?: string }[];
 }): Promise<{ subtaskErrors: number }> {
   const supabase = await createClient();
   const admin = createAdminClient();
@@ -119,6 +119,7 @@ export async function createTaskWithSubtasks({
       .from("tasks")
       .insert({
         title: sub.title,
+        description: sub.description ?? null,
         due_at: sub.dueAt ? `${sub.dueAt}T00:00:00Z` : null,
         workspace_id: workspaceId,
         parent_task_id: parent.id,
