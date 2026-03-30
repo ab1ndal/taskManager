@@ -25,21 +25,20 @@ export type TaskBuckets = {
   completed: BucketedTask[];
 };
 
+function toDateStr(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function bucketTasks(tasks: RawTask[], now: Date = new Date()): TaskBuckets {
   const sorted = [...tasks].sort((a, b) => a.member_sort_key - b.member_sort_key);
   const buckets: TaskBuckets = { overdue: [], today: [], upcoming: [], completed: [] };
-
-  // End of today in local time (start of tomorrow = midnight tonight)
-  const endOfToday = new Date(now);
-  endOfToday.setHours(24, 0, 0, 0);
+  const todayStr = toDateStr(now);
 
   for (const raw of sorted) {
-    const t: BucketedTask = {
-      ...raw,
-      shared: raw.assignee_count > 1,
-      deadlineLabel: null,
-      deadlineVariant: null,
-    };
+    const t: BucketedTask = { ...raw, shared: raw.assignee_count > 1, deadlineLabel: null, deadlineVariant: null };
 
     if (raw.completed_at) {
       buckets.completed.push(t);
@@ -51,20 +50,20 @@ export function bucketTasks(tasks: RawTask[], now: Date = new Date()): TaskBucke
       continue;
     }
 
-    const due = new Date(raw.due_at);
-    const msUntilDue = due.getTime() - now.getTime();
+    const dueStr = toDateStr(new Date(raw.due_at));
 
-    if (msUntilDue < 0) {
+    if (dueStr < todayStr) {
       t.deadlineLabel = "Overdue";
       t.deadlineVariant = "red";
       buckets.overdue.push(t);
-    } else if (due < endOfToday) {
-      const hrs = Math.ceil(msUntilDue / (60 * 60 * 1000));
-      t.deadlineLabel = `Due in ${hrs} hr${hrs !== 1 ? "s" : ""}`;
+    } else if (dueStr === todayStr) {
+      t.deadlineLabel = "Due today";
       t.deadlineVariant = "yellow";
       buckets.today.push(t);
     } else {
-      const days = Math.ceil(msUntilDue / (24 * 60 * 60 * 1000));
+      const todayMidnight = new Date(`${todayStr}T00:00:00Z`);
+      const dueMidnight = new Date(`${dueStr}T00:00:00Z`);
+      const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / (24 * 60 * 60 * 1000));
       t.deadlineLabel = `Due in ${days} day${days !== 1 ? "s" : ""}`;
       t.deadlineVariant = "green";
       buckets.upcoming.push(t);
