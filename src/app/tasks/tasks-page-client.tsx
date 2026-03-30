@@ -7,6 +7,7 @@ import { TabPill } from "./tab-pill";
 import { TaskCard, EmptyState } from "@/components/task-card";
 import { CompletedSection } from "./completed-section";
 import { bucketTasks, type RawTask } from "./bucket-tasks";
+import { EditTaskModal } from "./edit-task-modal";
 
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
@@ -57,6 +58,7 @@ export function TasksPageClient({
   const [modalOpen, setModalOpen] = useState(false);
   const [localTasks, setLocalTasks] = useState<RawTask[]>(initialTasks);
   const [optimisticTaskIds, setOptimisticTaskIds] = useState<Set<string>>(new Set());
+  const [editingTask, setEditingTask] = useState<RawTask | null>(null);
 
   useEffect(() => {
     setLocalTasks(initialTasks);
@@ -124,6 +126,16 @@ export function TasksPageClient({
         onTaskCreated={handleTaskCreated}
         onTaskError={handleTaskError}
       />
+
+      {editingTask && (
+        <EditTaskModal
+          open={!!editingTask}
+          task={editingTask}
+          workspaces={workspaces}
+          currentMemberIds={currentMemberIds}
+          onClose={() => setEditingTask(null)}
+        />
+      )}
 
       {/* Main layout */}
       <div className="flex min-h-[calc(100vh-52px)] -m-6">
@@ -254,6 +266,8 @@ export function TasksPageClient({
                             deadlineVariant={task.deadlineVariant}
                             workspace={task.workspace.name}
                             shared={task.shared}
+                            subtasks={task.subtasks}
+                            onEdit={() => setEditingTask(task)}
                           />
                         </div>
                       ))}

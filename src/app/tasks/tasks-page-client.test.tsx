@@ -2,6 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { TasksPageClient } from "./tasks-page-client";
 import type { RawTask } from "./bucket-tasks";
 
+// Mock EditTaskModal — not under test here
+jest.mock("./edit-task-modal", () => ({
+  EditTaskModal: () => <div data-testid="mock-edit-modal" />,
+}));
+
 // Mock NewTaskModal — not under test here
 jest.mock("./new-task-modal", () => ({
   NewTaskModal: ({ onTaskCreated, onTaskError }: {
