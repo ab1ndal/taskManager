@@ -561,7 +561,7 @@ describe("updateTask", () => {
 
     (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
-    await updateTask({ taskId: "t-1", title: "Updated title", memberIds: ["m-1"], workspaceId: "ws-1" });
+    await updateTask({ taskId: "t-1", title: "Updated title", memberIds: ["m-1"] });
 
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Updated title" })
@@ -601,7 +601,7 @@ describe("updateTask", () => {
 
     (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
 
-    await updateTask({ taskId: "t-1", title: "T", memberIds: ["m-2"], workspaceId: "ws-1" });
+    await updateTask({ taskId: "t-1", title: "T", memberIds: ["m-2"] });
 
     expect(del).toHaveBeenCalled();
     expect(insertAsgn).toHaveBeenCalledWith(
