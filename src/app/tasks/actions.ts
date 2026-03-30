@@ -228,3 +228,30 @@ export async function updateTask({
 
   revalidatePath("/tasks");
 }
+
+export async function reorderTask({
+  taskId,
+  memberId,
+  prevKey,
+  nextKey,
+}: {
+  taskId: string;
+  memberId: string;
+  prevKey: number | null;
+  nextKey: number | null;
+}) {
+  let newKey: number;
+  if (prevKey === null && nextKey === null) return;
+  if (prevKey === null) newKey = nextKey! - 1000;
+  else if (nextKey === null) newKey = prevKey + 1000;
+  else newKey = (prevKey + nextKey) / 2;
+
+  const admin = createAdminClient();
+  await admin
+    .from("task_assignments")
+    .update({ member_sort_key: newKey })
+    .eq("task_id", taskId)
+    .eq("member_id", memberId);
+
+  revalidatePath("/tasks");
+}

@@ -5,7 +5,7 @@ jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { completeTask, deleteTask, createTask, createTaskWithSubtasks, updateTask } from "./actions";
+import { completeTask, deleteTask, createTask, createTaskWithSubtasks, updateTask, reorderTask } from "./actions";
 
 beforeEach(() => jest.clearAllMocks());
 
@@ -607,6 +607,36 @@ describe("updateTask", () => {
     expect(insertAsgn).toHaveBeenCalledWith(
       expect.objectContaining({ member_id: "m-2" })
     );
+  });
+});
+
+describe("reorderTask", () => {
+  function makeReorderMocks() {
+    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
+    const eqMember = jest.fn().mockReturnValue({ eq: eqUpdate });
+    const update = jest.fn().mockReturnValue({ eq: eqMember });
+    const mockFrom = jest.fn().mockReturnValue({ update });
+    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+    return { update, eqMember, eqUpdate };
+  }
+
+  it("computes midpoint key between prev and next", async () => {
+    const { update } = makeReorderMocks();
+    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: 1000, nextKey: 3000 });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ member_sort_key: 2000 }));
+    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+  });
+
+  it("uses prevKey + 1000 when dropped at end", async () => {
+    const { update } = makeReorderMocks();
+    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: 5000, nextKey: null });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ member_sort_key: 6000 }));
+  });
+
+  it("uses nextKey - 1000 when dropped at start", async () => {
+    const { update } = makeReorderMocks();
+    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: null, nextKey: 3000 });
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ member_sort_key: 2000 }));
   });
 });
 
