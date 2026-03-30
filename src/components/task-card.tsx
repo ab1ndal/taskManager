@@ -35,6 +35,8 @@ export function TaskCard({
   workspace,
   shared,
   completed,
+  subtasks,
+  onEdit,
 }: {
   taskId: string;
   title: string;
@@ -43,76 +45,106 @@ export function TaskCard({
   workspace: string;
   shared?: boolean;
   completed?: boolean;
+  subtasks?: { id: string; title: string; completed_at: string | null }[];
+  onEdit?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
 
   return (
     <div
-      className={`bg-[var(--color-surface)] rounded-[11px] border border-[var(--color-border)] px-4 py-3 flex items-center gap-3 transition-opacity ${pending ? "opacity-40" : ""}`}
+      className={`bg-[var(--color-surface)] rounded-[11px] border border-[var(--color-border)] px-4 py-3 transition-opacity ${pending ? "opacity-40" : ""}`}
       style={{ boxShadow: "var(--shadow-card)" }}
     >
-      {/* Complete / checkmark button */}
-      <button
-        onClick={() => {
-          if (!completed) startTransition(() => completeTask(taskId));
-        }}
-        aria-label={completed ? "Completed" : "Mark complete"}
-        disabled={completed}
-        className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
-      >
-        {completed ? (
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-text-muted)]" />
-            <path d="M5.5 9.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)]" />
-          </svg>
-        ) : (
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.8" />
-          </svg>
-        )}
-      </button>
-
-      <div className="flex-1 min-w-0">
-        <p
-          className={`text-sm font-medium truncate ${
-            completed
-              ? "line-through text-[var(--color-text-muted)]"
-              : "text-[var(--color-text-primary)]"
-          }`}
-        >
-          {title}
-        </p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {deadline && deadlineVariant && (
-            <DeadlineBadge variant={deadlineVariant} label={deadline} />
-          )}
-          {shared && <SharedBadge />}
-          <span className="text-[11px] text-[var(--color-text-muted)]">{workspace}</span>
-        </div>
-      </div>
-
-      {/* Delete button — active tasks only */}
-      {!completed && (
+      <div className="flex items-center gap-3">
+        {/* Complete button */}
         <button
           onClick={() => {
-            if (!window.confirm(`Delete "${title}"?`)) return;
-            startTransition(() => deleteTask(taskId));
+            const hasIncomplete = (subtasks ?? []).some((s) => !s.completed_at);
+            if (!completed && !hasIncomplete) startTransition(() => completeTask(taskId));
           }}
-          aria-label="Delete task"
-          className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+          aria-label={completed ? "Completed" : "Mark complete"}
+          disabled={completed || (subtasks ?? []).some((s) => !s.completed_at)}
+          className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          >
-            <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4M3 3.5l.5 8a.5.5 0 00.5.5h6a.5.5 0 00.5-.5l.5-8" />
-          </svg>
+          {completed ? (
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-text-muted)]" />
+              <path d="M5.5 9.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)]" />
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          )}
         </button>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium truncate ${completed ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
+            {title}
+          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {deadline && deadlineVariant && <DeadlineBadge variant={deadlineVariant} label={deadline} />}
+            {shared && <SharedBadge />}
+            <span className="text-[11px] text-[var(--color-text-muted)]">{workspace}</span>
+          </div>
+        </div>
+
+        {!completed && onEdit && (
+          <button
+            onClick={onEdit}
+            aria-label="Edit task"
+            className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" />
+            </svg>
+          </button>
+        )}
+
+        {!completed && (
+          <button
+            onClick={() => {
+              if (!window.confirm(`Delete "${title}"?`)) return;
+              startTransition(() => deleteTask(taskId));
+            }}
+            aria-label="Delete task"
+            className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4M3 3.5l.5 8a.5.5 0 00.5.5h6a.5.5 0 00.5-.5l.5-8" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Subtasks */}
+      {(subtasks ?? []).length > 0 && (
+        <div className="mt-2 ml-7 flex flex-col gap-1">
+          {(subtasks ?? []).map((sub) => (
+            <div key={sub.id} className="flex items-center gap-2">
+              <button
+                onClick={() => { if (!sub.completed_at) startTransition(() => completeTask(sub.id)); }}
+                disabled={!!sub.completed_at}
+                aria-label={sub.completed_at ? "Subtask completed" : "Complete subtask"}
+                className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
+              >
+                {sub.completed_at ? (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-text-muted)]" />
+                    <path d="M4 7.5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)]" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
+                  </svg>
+                )}
+              </button>
+              <span className={`text-xs ${sub.completed_at ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-secondary)]"}`}>
+                {sub.title}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
