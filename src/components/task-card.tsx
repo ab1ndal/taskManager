@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { completeTask, deleteTask } from "@/app/tasks/actions";
+import { toast } from "@/components/toaster";
 
 export type DeadlineVariant = "red" | "yellow" | "green";
 
@@ -50,6 +51,14 @@ export function TaskCard({
 }) {
   const [pending, startTransition] = useTransition();
 
+  /** Mutations return a result rather than throwing, so a failure has to be read off `ok`. */
+  function runAction(action: () => Promise<{ ok: boolean; error?: string }>, fallback: string) {
+    startTransition(async () => {
+      const result = await action();
+      if (!result.ok) toast(result.error ?? fallback, "error");
+    });
+  }
+
   return (
     <div
       className={`bg-[var(--color-surface)] rounded-[11px] border border-[var(--color-border)] px-4 py-3 transition-opacity ${pending ? "opacity-40" : ""}`}
@@ -59,11 +68,12 @@ export function TaskCard({
         {/* Complete button */}
         <button
           onClick={() => {
-            const hasIncomplete = (subtasks ?? []).some((s) => !s.completed_at);
-            if (!completed && !hasIncomplete) startTransition(() => completeTask(taskId));
+            // Completing a parent completes its open subtasks server-side, so an open subtask is no
+            // longer a reason to block the button.
+            if (!completed) runAction(() => completeTask(taskId), "Failed to complete task");
           }}
           aria-label={completed ? "Completed" : "Mark complete"}
-          disabled={completed || (subtasks ?? []).some((s) => !s.completed_at)}
+          disabled={completed}
           className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
           {completed ? (
@@ -105,7 +115,7 @@ export function TaskCard({
           <button
             onClick={() => {
               if (!window.confirm(`Delete "${title}"?`)) return;
-              startTransition(() => deleteTask(taskId));
+              runAction(() => deleteTask(taskId), "Failed to delete task");
             }}
             aria-label="Delete task"
             className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
@@ -123,7 +133,9 @@ export function TaskCard({
           {(subtasks ?? []).map((sub) => (
             <div key={sub.id} className="flex items-center gap-2">
               <button
-                onClick={() => { if (!sub.completed_at) startTransition(() => completeTask(sub.id)); }}
+                onClick={() => {
+                  if (!sub.completed_at) runAction(() => completeTask(sub.id), "Failed to complete subtask");
+                }}
                 disabled={!!sub.completed_at}
                 aria-label={sub.completed_at ? "Subtask completed" : "Complete subtask"}
                 className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"

@@ -6,8 +6,8 @@ import { createTaskWithSubtasks } from "./actions";
 import { toast } from "@/components/toaster";
 
 jest.mock("./actions", () => ({
-  createTask: jest.fn().mockResolvedValue(undefined),
-  createTaskWithSubtasks: jest.fn().mockResolvedValue({ subtaskErrors: 0 }),
+  createTask: jest.fn().mockResolvedValue({ ok: true }),
+  createTaskWithSubtasks: jest.fn().mockResolvedValue({ ok: true, subtaskErrors: 0 }),
 }));
 
 jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSearchParams()) }));
@@ -15,30 +15,30 @@ jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSear
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 const mockWs = {
-  id: "ws-1",
+  id: "a0000000-0000-4000-8000-000000000001",
   name: "Home",
   kind: "household",
   members: [
-    { id: "m-1", display_name: "Alice" },
-    { id: "m-2", display_name: "Bob" },
+    { id: "b0000000-0000-4000-8000-000000000001", display_name: "Alice" },
+    { id: "b0000000-0000-4000-8000-000000000002", display_name: "Bob" },
   ],
 };
 
 const workspaces = [
   {
-    id: "ws-1",
+    id: "a0000000-0000-4000-8000-000000000001",
     name: "Home",
     kind: "household",
     members: [
-      { id: "m-1", display_name: "Alice" },
-      { id: "m-2", display_name: "Bob" },
+      { id: "b0000000-0000-4000-8000-000000000001", display_name: "Alice" },
+      { id: "b0000000-0000-4000-8000-000000000002", display_name: "Bob" },
     ],
   },
   {
-    id: "ws-2",
+    id: "a0000000-0000-4000-8000-000000000002",
     name: "Acme Corp",
     kind: "work",
-    members: [{ id: "m-3", display_name: "Carol" }],
+    members: [{ id: "b0000000-0000-4000-8000-000000000003", display_name: "Carol" }],
   },
 ];
 
@@ -49,7 +49,7 @@ function renderModal(open = true) {
       open={open}
       onClose={onClose}
       workspaces={workspaces}
-      currentMemberIds={["m-1"]}
+      currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
     />
   );
   return { onClose };
@@ -185,7 +185,7 @@ describe("NewTaskModal — member selection", () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(createTaskWithSubtasks).toHaveBeenCalledWith(
-      expect.objectContaining({ memberIds: ["m-2"] })
+      expect.objectContaining({ memberIds: ["b0000000-0000-4000-8000-000000000002"] })
     );
   });
 
@@ -197,7 +197,7 @@ describe("NewTaskModal — member selection", () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(createTaskWithSubtasks).toHaveBeenCalledWith(
-      expect.objectContaining({ memberIds: expect.arrayContaining(["m-1", "m-2"]) })
+      expect.objectContaining({ memberIds: expect.arrayContaining(["b0000000-0000-4000-8000-000000000001", "b0000000-0000-4000-8000-000000000002"]) })
     );
   });
 });
@@ -209,7 +209,7 @@ describe("NewTaskModal — workspace switching", () => {
 
   it("switches workspace and shows new workspace members", () => {
     renderModal();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "ws-2" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "a0000000-0000-4000-8000-000000000002" } });
     expect(screen.getByRole("checkbox", { name: /carol/i })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /alice/i })).not.toBeInTheDocument();
   });
@@ -219,7 +219,7 @@ describe("NewTaskModal — workspace switching", () => {
     // Check Bob first in ws-1
     fireEvent.click(screen.getByRole("checkbox", { name: /bob/i }));
     // Switch to ws-2 — Carol is not in currentMemberIds so she should be unchecked
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "ws-2" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "a0000000-0000-4000-8000-000000000002" } });
     expect(screen.getByRole("checkbox", { name: /carol/i })).not.toBeChecked();
   });
 });
@@ -311,7 +311,7 @@ describe("NewTaskModal — error handling", () => {
   });
 
   it("closes modal immediately on submit (optimistic close)", async () => {
-    let resolveServer!: (val: { subtaskErrors: number }) => void;
+    let resolveServer!: (val: { ok: true; subtaskErrors: number }) => void;
     (createTaskWithSubtasks as jest.Mock).mockReturnValue(
       new Promise((res) => { resolveServer = res; })
     );
@@ -320,7 +320,7 @@ describe("NewTaskModal — error handling", () => {
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
 
     expect(onClose).toHaveBeenCalled();
-    resolveServer({ subtaskErrors: 0 });
+    resolveServer({ ok: true, subtaskErrors: 0 });
   });
 });
 
@@ -330,7 +330,7 @@ describe("NewTaskModal — toast feedback", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("fires 'Task created' toast on successful submit", async () => {
-    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ subtaskErrors: 0 });
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: true, subtaskErrors: 0 });
     renderModal();
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
@@ -338,7 +338,7 @@ describe("NewTaskModal — toast feedback", () => {
   });
 
   it("fires warning toast when subtaskErrors > 0", async () => {
-    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ subtaskErrors: 2 });
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: true, subtaskErrors: 2 });
     renderModal();
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
@@ -351,12 +351,12 @@ describe("NewTaskModal — toast feedback", () => {
   });
 
   it("fires error toast when server throws", async () => {
-    (createTaskWithSubtasks as jest.Mock).mockRejectedValue(new Error("DB error"));
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: false, error: "Something went wrong. Please try again." });
     renderModal();
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
     await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith("Failed to create task", "error")
+      expect(toast).toHaveBeenCalledWith("Something went wrong. Please try again.", "error")
     );
   });
 });
@@ -367,7 +367,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("calls onTaskCreated immediately on submit before server resolves", async () => {
-    let resolveServer!: (val: { subtaskErrors: number }) => void;
+    let resolveServer!: (val: { ok: true; subtaskErrors: number }) => void;
     (createTaskWithSubtasks as jest.Mock).mockReturnValue(
       new Promise((res) => { resolveServer = res; })
     );
@@ -378,7 +378,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
         open={true}
         onClose={onClose}
         workspaces={workspaces}
-        currentMemberIds={["m-1"]}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
         onTaskCreated={onTaskCreated}
       />
     );
@@ -387,11 +387,11 @@ describe("NewTaskModal — onTaskCreated callback", () => {
     // onTaskCreated must fire immediately, not after resolveServer()
     expect(onTaskCreated).toHaveBeenCalledTimes(1);
     expect(onTaskCreated.mock.calls[0][0]).toMatchObject({ title: "Buy milk", completed_at: null });
-    resolveServer({ subtaskErrors: 0 });
+    resolveServer({ ok: true, subtaskErrors: 0 });
   });
 
   it("calls onClose immediately on submit before server resolves", async () => {
-    let resolveServer!: (val: { subtaskErrors: number }) => void;
+    let resolveServer!: (val: { ok: true; subtaskErrors: number }) => void;
     (createTaskWithSubtasks as jest.Mock).mockReturnValue(
       new Promise((res) => { resolveServer = res; })
     );
@@ -401,17 +401,17 @@ describe("NewTaskModal — onTaskCreated callback", () => {
         open={true}
         onClose={onClose}
         workspaces={workspaces}
-        currentMemberIds={["m-1"]}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
       />
     );
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    resolveServer({ subtaskErrors: 0 });
+    resolveServer({ ok: true, subtaskErrors: 0 });
   });
 
   it("calls onTaskError with tempId when server throws", async () => {
-    (createTaskWithSubtasks as jest.Mock).mockRejectedValue(new Error("DB error"));
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: false, error: "Something went wrong. Please try again." });
     const onTaskCreated = jest.fn();
     const onTaskError = jest.fn();
     render(
@@ -419,7 +419,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
         open={true}
         onClose={jest.fn()}
         workspaces={workspaces}
-        currentMemberIds={["m-1"]}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
         onTaskCreated={onTaskCreated}
         onTaskError={onTaskError}
       />
@@ -438,16 +438,16 @@ describe("NewTaskModal — onTaskCreated callback", () => {
 
 describe("NewTaskModal — subtask description", () => {
   it("renders description textarea for each subtask row", async () => {
-    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["m-1"]} onClose={() => {}} />);
+    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />);
     await userEvent.click(screen.getByText("+ Add subtask"));
     expect(screen.getByPlaceholderText("Details…")).toBeInTheDocument();
   });
 
   it("passes subtask description to createTaskWithSubtasks", async () => {
     const mock = jest.mocked(createTaskWithSubtasks);
-    mock.mockResolvedValue({ subtaskErrors: 0 });
+    mock.mockResolvedValue({ ok: true, subtaskErrors: 0 });
 
-    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["m-1"]} onClose={() => {}} />);
+    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />);
 
     await userEvent.type(screen.getByPlaceholderText("Task title"), "Parent");
     await userEvent.click(screen.getByText("+ Add subtask"));

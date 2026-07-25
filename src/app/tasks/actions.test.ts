@@ -5,659 +5,607 @@ jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { completeTask, deleteTask, createTask, createTaskWithSubtasks, updateTask, reorderTask } from "./actions";
+import { createFakeSupabase, type FailureHook, type Row, type Tables } from "@/test/supabase-fake";
+import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask } from "./actions";
+import { GENERIC_ERROR } from "./action-result";
 
 beforeEach(() => jest.clearAllMocks());
 
+// Ids must be real UUIDs — the actions validate them against the schemas in ./schemas.
+const WS1 = "a0000000-0000-4000-8000-000000000001";
+const WS2 = "a0000000-0000-4000-8000-000000000002";
+const M1 = "b0000000-0000-4000-8000-000000000001";
+const M2 = "b0000000-0000-4000-8000-000000000002";
+const M_OUTSIDER = "b0000000-0000-4000-8000-000000000003";
+const T1 = "c0000000-0000-4000-8000-000000000001";
+const T_OTHER = "c0000000-0000-4000-8000-000000000002";
+const P1 = "d0000000-0000-4000-8000-000000000001";
+const S1 = "d0000000-0000-4000-8000-000000000002";
+const S2 = "d0000000-0000-4000-8000-000000000003";
+
+/**
+ * Default fixture: two members of WS1 (M1 is the signed-in user, M2 a colleague), one outsider in
+ * WS2, and one task T1 assigned to M1.
+ */
+function seed(): Tables {
+  return {
+    workspace_members: [
+      { id: M1, workspace_id: WS1, auth_user_id: "auth-user-1" },
+      { id: M2, workspace_id: WS1, auth_user_id: "auth-user-2" },
+      { id: M_OUTSIDER, workspace_id: WS2, auth_user_id: "auth-user-3" },
+    ],
+    tasks: [
+      { id: T1, workspace_id: WS1, parent_task_id: null, completed_at: null, title: "Task 1" },
+    ],
+    task_assignments: [{ task_id: T1, member_id: M1, member_sort_key: 1000 }],
+  };
+}
+
+function setup(options: { tables?: Tables; user?: { id: string } | null; failOn?: FailureHook } = {}) {
+  const fake = createFakeSupabase({
+    tables: options.tables ?? seed(),
+    user: options.user === undefined ? { id: "auth-user-1" } : options.user,
+    failOn: options.failOn,
+  });
+
+  (createClient as jest.Mock).mockResolvedValue(fake);
+  (createAdminClient as jest.Mock).mockReturnValue(fake);
+
+  return fake;
+}
+
+/**
+ * Actions return { ok: false, error } instead of throwing, so failures are asserted on the
+ * resolved value. `expected` is matched as a substring of the message.
+ */
+async function expectFailure(promise: Promise<{ ok: boolean }>, expected: string) {
+  const result = await promise;
+  expect(result).toEqual({ ok: false, error: expect.stringContaining(expected) });
+}
+
+const tasksIn = (t: Tables) => t.tasks as Row[];
+const assignmentsIn = (t: Tables) => t.task_assignments as Row[];
+
+// ─── completeTask ────────────────────────────────────────────────────────────
+
 describe("completeTask", () => {
   it("marks task complete and revalidates", async () => {
-    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
-    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+    const { tables } = setup();
 
-    // task lookup: no parent
-    const single = jest.fn().mockResolvedValue({ data: { parent_task_id: null, rule_id: null }, error: null });
-    const eqSelect = jest.fn().mockReturnValue({ single });
-    const select = jest.fn().mockReturnValue({ eq: eqSelect });
+    await completeTask(T1);
 
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ update })   // tasks UPDATE
-      .mockReturnValueOnce({ select });  // tasks SELECT parent_task_id
-
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    await completeTask("task-1");
-
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ completed_at: expect.any(String) }));
+    expect(tasksIn(tables)[0].completed_at).toEqual(expect.any(String));
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
   });
 
   it("auto-completes parent when all siblings are done", async () => {
-    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
-    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+    const tables = seed();
+    tables.tasks.push(
+      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null },
+      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null },
+      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: "2026-01-01T00:00:00Z" }
+    );
+    tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
+    setup({ tables });
 
-    // task lookup: has parent
-    const taskSingle = jest.fn().mockResolvedValue({ data: { parent_task_id: "parent-1", rule_id: null }, error: null });
-    const taskEqSelect = jest.fn().mockReturnValue({ single: taskSingle });
-    const taskSelect = jest.fn().mockReturnValue({ eq: taskEqSelect });
+    await completeTask(S1);
 
-    // siblings count query: 0 incomplete siblings
-    const isNull = jest.fn().mockResolvedValue({ count: 0, error: null });
-    const eqSiblings = jest.fn().mockReturnValue({ is: isNull });
-    const siblingSelect = jest.fn().mockReturnValue({ eq: eqSiblings });
-
-    // parent update
-    const parentEqUpdate = jest.fn().mockResolvedValue({ error: null });
-    const parentUpdate = jest.fn().mockReturnValue({ eq: parentEqUpdate });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ update })          // UPDATE completed_at
-      .mockReturnValueOnce({ select: taskSelect }) // SELECT parent_task_id
-      .mockReturnValueOnce({ select: siblingSelect }) // SELECT count siblings
-      .mockReturnValueOnce({ update: parentUpdate }); // UPDATE parent
-
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    await completeTask("subtask-1");
-
-    expect(parentUpdate).toHaveBeenCalledWith(expect.objectContaining({ completed_at: expect.any(String) }));
+    const parent = tasksIn(tables).find((t) => t.id === P1);
+    expect(parent?.completed_at).toEqual(expect.any(String));
   });
 
   it("does not auto-complete parent when siblings remain", async () => {
-    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
-    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+    const tables = seed();
+    tables.tasks.push(
+      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null },
+      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null },
+      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: null }
+    );
+    tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
+    setup({ tables });
 
-    const taskSingle = jest.fn().mockResolvedValue({ data: { parent_task_id: "parent-1", rule_id: null }, error: null });
-    const taskEqSelect = jest.fn().mockReturnValue({ single: taskSingle });
-    const taskSelect = jest.fn().mockReturnValue({ eq: taskEqSelect });
+    await completeTask(S1);
 
-    const isNull = jest.fn().mockResolvedValue({ count: 2, error: null });
-    const eqSiblings = jest.fn().mockReturnValue({ is: isNull });
-    const siblingSelect = jest.fn().mockReturnValue({ eq: eqSiblings });
+    const parent = tasksIn(tables).find((t) => t.id === P1);
+    expect(parent?.completed_at).toBeNull();
+  });
 
-    const parentUpdate = jest.fn();
+  it("rejects an unauthenticated caller", async () => {
+    const { tables } = setup({ user: null });
 
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ update })
-      .mockReturnValueOnce({ select: taskSelect })
-      .mockReturnValueOnce({ select: siblingSelect })
-      .mockReturnValueOnce({ update: parentUpdate });
+    await expectFailure(completeTask(T1), "Unauthorized");
 
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+    expect(tasksIn(tables)[0].completed_at).toBeNull();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
 
-    await completeTask("subtask-1");
+  it("rejects a caller who is not assigned to the task", async () => {
+    const tables = seed();
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, parent_task_id: null, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
+    setup({ tables });
 
-    expect(parentUpdate).not.toHaveBeenCalled();
+    await expectFailure(completeTask(T_OTHER), "Forbidden");
+
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)?.completed_at).toBeNull();
   });
 });
+
+// ─── deleteTask ──────────────────────────────────────────────────────────────
 
 describe("deleteTask", () => {
   it("deletes task and revalidates /tasks", async () => {
-    const eq = jest.fn().mockResolvedValue({ error: null });
-    const del = jest.fn().mockReturnValue({ eq });
-    (createClient as jest.Mock).mockResolvedValue({ from: jest.fn().mockReturnValue({ delete: del }) });
+    const { tables } = setup();
 
-    await deleteTask("task-1");
+    await deleteTask(T1);
 
-    expect(del).toHaveBeenCalled();
-    expect(eq).toHaveBeenCalledWith("id", "task-1");
+    expect(tasksIn(tables)).toHaveLength(0);
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+  });
+
+  it("rejects an unauthenticated caller", async () => {
+    const { tables } = setup({ user: null });
+
+    await expectFailure(deleteTask(T1), "Unauthorized");
+
+    expect(tasksIn(tables)).toHaveLength(1);
+  });
+
+  it("rejects a caller who is not assigned to the task", async () => {
+    const tables = seed();
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, parent_task_id: null, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
+    setup({ tables });
+
+    await expectFailure(deleteTask(T_OTHER), "Forbidden");
+
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)).toBeDefined();
   });
 });
 
-// Helper: builds the mock chain for the sort-key lookup query
-function makeSortKeyMock(lastKey: number | null) {
-  const single = jest.fn().mockResolvedValue(
-    lastKey === null
-      ? { data: null, error: { code: "PGRST116" } }
-      : { data: { member_sort_key: lastKey }, error: null }
-  );
-  const limit = jest.fn().mockReturnValue({ single });
-  const order = jest.fn().mockReturnValue({ limit });
-  const eq = jest.fn().mockReturnValue({ order });
-  const select = jest.fn().mockReturnValue({ eq });
-  return select;
-}
-
-describe("createTask", () => {
-  it("inserts task + assignment and revalidates", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "new-id" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-
-    // Sort key query: return no existing row (PGRST116 = no rows)
-
-    const sortKeySingle = jest.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
-    const sortKeyLimit = jest.fn().mockReturnValue({ single: sortKeySingle });
-    const sortKeyOrder = jest.fn().mockReturnValue({ limit: sortKeyLimit });
-    const sortKeyEq = jest.fn().mockReturnValue({ order: sortKeyOrder });
-    const sortKeySelect = jest.fn().mockReturnValue({ eq: sortKeyEq });
-
-    const insertAssignment = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })        // tasks
-      .mockReturnValueOnce({ select: sortKeySelect })     // task_assignments (max sort key)
-      .mockReturnValueOnce({ insert: insertAssignment }); // task_assignments (insert)
-
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
-
-    await createTask({ title: "Buy milk", workspaceId: "ws-1", memberIds: ["m-1"] });
-
-    expect(insertTask).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Buy milk", workspace_id: "ws-1" })
-    );
-    expect(insertAssignment).toHaveBeenCalledWith(
-      expect.objectContaining({ task_id: "new-id", member_id: "m-1", member_sort_key: 1000 })
-    );
-    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
-  });
-});
+// ─── createTaskWithSubtasks ──────────────────────────────────────────────────
 
 describe("createTaskWithSubtasks", () => {
-  it("inserts parent task + assignments and returns subtaskErrors: 0 when no subtasks", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "parent-id" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-
-    const sortKeySingle = jest.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
-    const sortKeyLimit = jest.fn().mockReturnValue({ single: sortKeySingle });
-    const sortKeyOrder = jest.fn().mockReturnValue({ limit: sortKeyLimit });
-    const sortKeyEq = jest.fn().mockReturnValue({ order: sortKeyOrder });
-    const sortKeySelect = jest.fn().mockReturnValue({ eq: sortKeyEq });
-    const insertAssignment = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: sortKeySelect })
-      .mockReturnValueOnce({ insert: insertAssignment });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+  it("inserts parent task + assignment and returns subtaskErrors: 0 when no subtasks", async () => {
+    const { tables } = setup();
 
     const result = await createTaskWithSubtasks({
       title: "Parent task",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
+      workspaceId: WS1,
+      memberIds: [M1],
       subtasks: [],
     });
 
-    expect(insertTask).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Parent task", workspace_id: "ws-1" })
+    const parent = tasksIn(tables).find((t) => t.title === "Parent task");
+    expect(parent).toMatchObject({ workspace_id: WS1, description: null, due_at: null });
+    expect(assignmentsIn(tables)).toContainEqual(
+      expect.objectContaining({ task_id: parent!.id, member_id: M1 })
     );
-    expect(result).toEqual({ subtaskErrors: 0 });
-    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+    expect(result).toEqual({ ok: true, subtaskErrors: 0 });
     expect(revalidatePath).toHaveBeenCalledTimes(1);
   });
 
   it("inserts subtasks with parent_task_id and converts bare date to UTC midnight", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "parent-id" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-
-    const skSingle1 = jest.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
-    const skLimit1 = jest.fn().mockReturnValue({ single: skSingle1 });
-    const skOrder1 = jest.fn().mockReturnValue({ limit: skLimit1 });
-    const skEq1 = jest.fn().mockReturnValue({ order: skOrder1 });
-    const skSelect1 = jest.fn().mockReturnValue({ eq: skEq1 });
-    const insertAsgn1 = jest.fn().mockResolvedValue({ error: null });
-
-    const subSingle = jest.fn().mockResolvedValue({ data: { id: "sub-id" }, error: null });
-    const subSelect = jest.fn().mockReturnValue({ single: subSingle });
-    const insertSubtask = jest.fn().mockReturnValue({ select: subSelect });
-
-    const skSingle2 = jest.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
-    const skLimit2 = jest.fn().mockReturnValue({ single: skSingle2 });
-    const skOrder2 = jest.fn().mockReturnValue({ limit: skLimit2 });
-    const skEq2 = jest.fn().mockReturnValue({ order: skOrder2 });
-    const skSelect2 = jest.fn().mockReturnValue({ eq: skEq2 });
-    const insertAsgn2 = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: skSelect1 })
-      .mockReturnValueOnce({ insert: insertAsgn1 })
-      .mockReturnValueOnce({ insert: insertSubtask })
-      .mockReturnValueOnce({ select: skSelect2 })
-      .mockReturnValueOnce({ insert: insertAsgn2 });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+    const { tables } = setup();
 
     const result = await createTaskWithSubtasks({
       title: "Parent",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
+      description: "Arrange catering and venue",
+      workspaceId: WS1,
+      memberIds: [M1],
       subtasks: [{ title: "Subtask A", dueAt: "2026-03-25" }],
     });
 
-    expect(insertSubtask).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Subtask A",
-        parent_task_id: "parent-id",
-        due_at: "2026-03-25T00:00:00Z",
-      })
-    );
-    expect(result).toEqual({ subtaskErrors: 0 });
-    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
-    expect(revalidatePath).toHaveBeenCalledTimes(1);
-  });
+    const parent = tasksIn(tables).find((t) => t.title === "Parent");
+    const subtask = tasksIn(tables).find((t) => t.title === "Subtask A");
 
-  it("returns subtaskErrors: 1 when a subtask insert fails", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "parent-id" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-
-    const skSingle = jest.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
-    const skLimit = jest.fn().mockReturnValue({ single: skSingle });
-    const skOrder = jest.fn().mockReturnValue({ limit: skLimit });
-    const skEq = jest.fn().mockReturnValue({ order: skOrder });
-    const skSelect = jest.fn().mockReturnValue({ eq: skEq });
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const subSingle = jest.fn().mockResolvedValue({ data: null, error: { message: "DB error" } });
-    const subSelect = jest.fn().mockReturnValue({ single: subSingle });
-    const insertSubtask = jest.fn().mockReturnValue({ select: subSelect });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: skSelect })
-      .mockReturnValueOnce({ insert: insertAsgn })
-      .mockReturnValueOnce({ insert: insertSubtask });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    const result = await createTaskWithSubtasks({
-      title: "Parent",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
-      subtasks: [{ title: "Bad subtask" }],
+    expect(parent).toMatchObject({ description: "Arrange catering and venue" });
+    expect(subtask).toMatchObject({
+      parent_task_id: parent!.id,
+      due_at: "2026-03-25T00:00:00Z",
     });
-
-    expect(result).toEqual({ subtaskErrors: 1 });
-    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
-    expect(revalidatePath).toHaveBeenCalledTimes(1);
-  });
-});
-
-// ─── createTask: additional coverage ────────────────────────────────────────
-
-describe("createTask — due date encoding", () => {
-  it("stores date as UTC midnight when dueAt is provided", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "t-1" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn });
-
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
-
-    await createTask({ title: "Meeting", dueAt: "2026-06-15", workspaceId: "ws-1", memberIds: ["m-1"] });
-
-    expect(insertTask).toHaveBeenCalledWith(
-      expect.objectContaining({ due_at: "2026-06-15T00:00:00Z" })
+    expect(assignmentsIn(tables)).toContainEqual(
+      expect.objectContaining({ task_id: subtask!.id, member_id: M1 })
     );
+    expect(result).toEqual({ ok: true, subtaskErrors: 0 });
   });
 
-  it("stores null when dueAt is omitted", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "t-1" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn });
-
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
-
-    await createTask({ title: "No deadline", workspaceId: "ws-1", memberIds: ["m-1"] });
-
-    expect(insertTask).toHaveBeenCalledWith(
-      expect.objectContaining({ due_at: null })
-    );
-  });
-});
-
-describe("createTask — sort key chaining", () => {
-  it("uses last sort key + 1000 when a prior assignment exists", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "t-2" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: makeSortKeyMock(3000) })
-      .mockReturnValueOnce({ insert: insertAsgn });
-
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
-
-    await createTask({ title: "Follow-up", workspaceId: "ws-1", memberIds: ["m-1"] });
-
-    expect(insertAsgn).toHaveBeenCalledWith(
-      expect.objectContaining({ member_sort_key: 4000 })
-    );
-  });
-
-  it("assigns each member their own sort key independently", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "t-3" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-    const insertAsgn1 = jest.fn().mockResolvedValue({ error: null });
-    const insertAsgn2 = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })   // m-1: no prior
-      .mockReturnValueOnce({ insert: insertAsgn1 })
-      .mockReturnValueOnce({ select: makeSortKeyMock(2000) })  // m-2: prior = 2000
-      .mockReturnValueOnce({ insert: insertAsgn2 });
-
-    (createClient as jest.Mock).mockResolvedValue({ from: mockFrom });
-
-    await createTask({ title: "Shared", workspaceId: "ws-1", memberIds: ["m-1", "m-2"] });
-
-    expect(insertAsgn1).toHaveBeenCalledWith(expect.objectContaining({ member_id: "m-1", member_sort_key: 1000 }));
-    expect(insertAsgn2).toHaveBeenCalledWith(expect.objectContaining({ member_id: "m-2", member_sort_key: 3000 }));
-  });
-});
-
-describe("createTask — error handling", () => {
-  it("throws when task insert returns an error", async () => {
-    const single = jest.fn().mockResolvedValue({ data: null, error: { message: "DB failure" } });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-
-    (createClient as jest.Mock).mockResolvedValue({ from: jest.fn().mockReturnValue({ insert: insertTask }) });
-
-    await expect(
-      createTask({ title: "Broken", workspaceId: "ws-1", memberIds: ["m-1"] })
-    ).rejects.toThrow("DB failure");
-  });
-});
-
-// ─── createTaskWithSubtasks: additional coverage ─────────────────────────────
-
-describe("createTaskWithSubtasks — description", () => {
-  it("passes description to task insert when provided", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "p-1" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+  it("stores the parent due date as UTC midnight and null when omitted", async () => {
+    const { tables } = setup();
 
     await createTaskWithSubtasks({
-      title: "Plan event",
-      description: "Arrange catering and venue",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
-      subtasks: [],
-    });
-
-    expect(insertTask).toHaveBeenCalledWith(
-      expect.objectContaining({ description: "Arrange catering and venue" })
-    );
-  });
-
-  it("stores null description when omitted", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "p-2" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    await createTaskWithSubtasks({
-      title: "Quick task",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
-      subtasks: [],
-    });
-
-    expect(insertTask).toHaveBeenCalledWith(
-      expect.objectContaining({ description: null })
-    );
-  });
-});
-
-describe("createTaskWithSubtasks — deduplicates memberIds", () => {
-  it("creates only one assignment per member even if memberIds has duplicates", async () => {
-    const single = jest.fn().mockResolvedValue({ data: { id: "p-3" }, error: null });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertTask = jest.fn().mockReturnValue({ select });
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertTask })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    await createTaskWithSubtasks({
-      title: "Dedup test",
-      workspaceId: "ws-1",
-      memberIds: ["m-1", "m-1", "m-1"],
-      subtasks: [],
-    });
-
-    // Only one assignment insert for the deduplicated m-1
-    expect(insertAsgn).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("createTaskWithSubtasks — subtask with no due date", () => {
-  it("stores null for subtask due_at when dueAt is omitted", async () => {
-    const parentSingle = jest.fn().mockResolvedValue({ data: { id: "p-4" }, error: null });
-    const parentSelect = jest.fn().mockReturnValue({ single: parentSingle });
-    const insertParent = jest.fn().mockReturnValue({ select: parentSelect });
-
-    const subSingle = jest.fn().mockResolvedValue({ data: { id: "sub-1" }, error: null });
-    const subSelect = jest.fn().mockReturnValue({ single: subSingle });
-    const insertSub = jest.fn().mockReturnValue({ select: subSelect });
-
-    const insertAsgn1 = jest.fn().mockResolvedValue({ error: null });
-    const insertAsgn2 = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertParent })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn1 })
-      .mockReturnValueOnce({ insert: insertSub })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn2 });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    await createTaskWithSubtasks({
-      title: "Parent",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
+      title: "Meeting",
+      dueAt: "2026-06-15",
+      workspaceId: WS1,
+      memberIds: [M1],
       subtasks: [{ title: "No-date subtask" }],
     });
 
-    expect(insertSub).toHaveBeenCalledWith(
-      expect.objectContaining({ due_at: null, title: "No-date subtask" })
-    );
+    expect(tasksIn(tables).find((t) => t.title === "Meeting")).toMatchObject({
+      due_at: "2026-06-15T00:00:00Z",
+    });
+    expect(tasksIn(tables).find((t) => t.title === "No-date subtask")).toMatchObject({ due_at: null });
   });
-});
 
-describe("createTaskWithSubtasks — multiple subtasks all succeed", () => {
-  it("returns subtaskErrors: 0 and calls revalidatePath once when all subtasks succeed", async () => {
-    const parentSingle = jest.fn().mockResolvedValue({ data: { id: "p-5" }, error: null });
-    const parentSelect = jest.fn().mockReturnValue({ single: parentSingle });
-    const insertParent = jest.fn().mockReturnValue({ select: parentSelect });
+  it("gives each member their own sort key, continuing from their existing tasks", async () => {
+    const tables = seed();
+    // m-1 already has a task at 1000; m-2 has none.
+    setup({ tables });
 
-    function makeSubMock(id: string) {
-      const s = jest.fn().mockResolvedValue({ data: { id }, error: null });
-      const sel = jest.fn().mockReturnValue({ single: s });
-      return jest.fn().mockReturnValue({ select: sel });
-    }
-
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
-
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ insert: insertParent })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })  // parent asgn sort key
-      .mockReturnValueOnce({ insert: insertAsgn })             // parent asgn insert
-      .mockReturnValueOnce({ insert: makeSubMock("sub-a") })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn })
-      .mockReturnValueOnce({ insert: makeSubMock("sub-b") })
-      .mockReturnValueOnce({ select: makeSortKeyMock(null) })
-      .mockReturnValueOnce({ insert: insertAsgn });
-
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    const result = await createTaskWithSubtasks({
-      title: "Multi-subtask parent",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
-      subtasks: [
-        { title: "Step 1", dueAt: "2026-04-01" },
-        { title: "Step 2" },
-      ],
+    await createTaskWithSubtasks({
+      title: "Shared",
+      workspaceId: WS1,
+      memberIds: [M1, M2],
+      subtasks: [],
     });
 
-    expect(result).toEqual({ subtaskErrors: 0 });
+    const shared = tasksIn(tables).find((t) => t.title === "Shared");
+    const forShared = assignmentsIn(tables).filter((a) => a.task_id === shared!.id);
+
+    expect(forShared).toContainEqual(
+      expect.objectContaining({ member_id: M1, member_sort_key: 2000 })
+    );
+    expect(forShared).toContainEqual(
+      expect.objectContaining({ member_id: M2, member_sort_key: 1000 })
+    );
+  });
+
+  it("creates only one assignment per member when memberIds has duplicates", async () => {
+    const { tables } = setup();
+
+    await createTaskWithSubtasks({
+      title: "Dedup test",
+      workspaceId: WS1,
+      memberIds: [M1, M1, M1],
+      subtasks: [],
+    });
+
+    const task = tasksIn(tables).find((t) => t.title === "Dedup test");
+    expect(assignmentsIn(tables).filter((a) => a.task_id === task!.id)).toHaveLength(1);
+  });
+
+  it("returns subtaskErrors: 1 when a subtask insert fails", async () => {
+    const tables = seed();
+    let taskInserts = 0;
+    setup({
+      tables,
+      failOn: (table, op) => {
+        if (table !== "tasks" || op !== "insert") return null;
+        // First insert is the parent; fail the subtask that follows it.
+        return ++taskInserts === 2 ? { message: "DB error" } : null;
+      },
+    });
+
+    const result = await createTaskWithSubtasks({
+      title: "Parent",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [{ title: "Bad subtask" }],
+    });
+
+    expect(result).toEqual({ ok: true, subtaskErrors: 1 });
+    expect(tasksIn(tables).find((t) => t.title === "Bad subtask")).toBeUndefined();
     expect(revalidatePath).toHaveBeenCalledTimes(1);
   });
+
+  it("returns a generic failure and logs the cause when the parent task insert fails", async () => {
+    setup({
+      failOn: (table, op) =>
+        table === "tasks" && op === "insert" ? { message: "constraint violation" } : null,
+    });
+    const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    // The database message is logged, never returned — it carries schema detail.
+    await expectFailure(createTaskWithSubtasks({
+        title: "Failing parent",
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: [],
+      }), GENERIC_ERROR);
+
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("constraint violation"));
+    expect(revalidatePath).not.toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it("rejects an unauthenticated caller", async () => {
+    const { tables } = setup({ user: null });
+
+    await expectFailure(createTaskWithSubtasks({ title: "X", workspaceId: WS1, memberIds: [M1], subtasks: [] }), "Unauthorized");
+
+    expect(tasksIn(tables)).toHaveLength(1);
+  });
+
+  it("rejects a caller who is not a member of the target workspace", async () => {
+    const { tables } = setup();
+
+    await expectFailure(createTaskWithSubtasks({ title: "X", workspaceId: WS2, memberIds: [M1], subtasks: [] }), `not a member of workspace ${WS2}`);
+
+    expect(tasksIn(tables)).toHaveLength(1);
+  });
+
+  it("rejects a memberId belonging to another workspace", async () => {
+    const { tables } = setup();
+
+    await expectFailure(createTaskWithSubtasks({
+        title: "X",
+        workspaceId: WS1,
+        memberIds: [M1, M_OUTSIDER],
+        subtasks: [],
+      }), `members not in workspace ${WS1}: ${M_OUTSIDER}`);
+
+    expect(tasksIn(tables)).toHaveLength(1);
+  });
 });
+
+// ─── updateTask ──────────────────────────────────────────────────────────────
 
 describe("updateTask", () => {
   it("updates task fields and revalidates", async () => {
-    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
-    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+    const { tables } = setup();
 
-    // current assignments query
-    const currentEq = jest.fn().mockResolvedValue({ data: [{ member_id: "m-1" }], error: null });
-    const currentSelect = jest.fn().mockReturnValue({ eq: currentEq });
+    await updateTask({ taskId: T1, title: "Updated title", dueAt: "2026-05-01", memberIds: [M1] });
 
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ update })           // tasks UPDATE
-      .mockReturnValueOnce({ select: currentSelect }); // task_assignments SELECT
-
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-
-    await updateTask({ taskId: "t-1", title: "Updated title", memberIds: ["m-1"] });
-
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Updated title" })
-    );
+    expect(tasksIn(tables)[0]).toMatchObject({
+      title: "Updated title",
+      description: null,
+      due_at: "2026-05-01T00:00:00Z",
+    });
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
   });
 
   it("adds new assignees and removes dropped ones", async () => {
-    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
-    const update = jest.fn().mockReturnValue({ eq: eqUpdate });
+    const { tables } = setup();
 
-    // current: m-1 assigned, m-2 not
-    const currentEq = jest.fn().mockResolvedValue({ data: [{ member_id: "m-1" }], error: null });
-    const currentSelect = jest.fn().mockReturnValue({ eq: currentEq });
+    await updateTask({ taskId: T1, title: "T", memberIds: [M2] });
 
-    // delete m-1
-    const deleteEq2 = jest.fn().mockResolvedValue({ error: null });
-    const deleteEq1 = jest.fn().mockReturnValue({ eq: deleteEq2 });
-    const del = jest.fn().mockReturnValue({ eq: deleteEq1 });
+    const forTask = assignmentsIn(tables).filter((a) => a.task_id === T1);
+    expect(forTask).toHaveLength(1);
+    expect(forTask[0]).toMatchObject({ member_id: M2, member_sort_key: 1000 });
+  });
 
-    // sort key for m-2
-    const sortSingle = jest.fn().mockResolvedValue({ data: null, error: { code: "PGRST116" } });
-    const sortLimit = jest.fn().mockReturnValue({ single: sortSingle });
-    const sortOrder = jest.fn().mockReturnValue({ limit: sortLimit });
-    const sortEq = jest.fn().mockReturnValue({ order: sortOrder });
-    const sortSelect = jest.fn().mockReturnValue({ eq: sortEq });
+  it("rejects an unauthenticated caller", async () => {
+    const { tables } = setup({ user: null });
 
-    // insert m-2
-    const insertAsgn = jest.fn().mockResolvedValue({ error: null });
+    await expectFailure(updateTask({ taskId: T1, title: "Hacked", memberIds: [M1] }), "Unauthorized");
 
-    const mockFrom = jest.fn()
-      .mockReturnValueOnce({ update })
-      .mockReturnValueOnce({ select: currentSelect })
-      .mockReturnValueOnce({ delete: del })      // remove m-1
-      .mockReturnValueOnce({ select: sortSelect }) // sort key for m-2
-      .mockReturnValueOnce({ insert: insertAsgn }); // add m-2
+    expect(tasksIn(tables)[0].title).toBe("Task 1");
+  });
 
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
+  it("rejects a caller who is not assigned to the task", async () => {
+    const tables = seed();
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, title: "Theirs", completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
+    setup({ tables });
 
-    await updateTask({ taskId: "t-1", title: "T", memberIds: ["m-2"] });
+    await expectFailure(updateTask({ taskId: T_OTHER, title: "Hacked", memberIds: [M1] }), "Forbidden");
 
-    expect(del).toHaveBeenCalled();
-    expect(insertAsgn).toHaveBeenCalledWith(
-      expect.objectContaining({ member_id: "m-2" })
-    );
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)?.title).toBe("Theirs");
+  });
+
+  it("rejects reassignment to a member of another workspace", async () => {
+    const { tables } = setup();
+
+    await expectFailure(updateTask({ taskId: T1, title: "T", memberIds: [M_OUTSIDER] }), `members not in workspace ${WS1}: ${M_OUTSIDER}`);
+
+    expect(assignmentsIn(tables)).toHaveLength(1);
+    expect(assignmentsIn(tables)[0].member_id).toBe(M1);
   });
 });
 
+// ─── reorderTask ─────────────────────────────────────────────────────────────
+
 describe("reorderTask", () => {
-  function makeReorderMocks() {
-    const eqUpdate = jest.fn().mockResolvedValue({ error: null });
-    const eqMember = jest.fn().mockReturnValue({ eq: eqUpdate });
-    const update = jest.fn().mockReturnValue({ eq: eqMember });
-    const mockFrom = jest.fn().mockReturnValue({ update });
-    (createAdminClient as jest.Mock).mockReturnValue({ from: mockFrom });
-    return { update, eqMember, eqUpdate };
-  }
+  const keyOf = (tables: Tables) =>
+    assignmentsIn(tables).find((a) => a.task_id === T1)?.member_sort_key;
 
   it("computes midpoint key between prev and next", async () => {
-    const { update } = makeReorderMocks();
-    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: 1000, nextKey: 3000 });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ member_sort_key: 2000 }));
+    const { tables } = setup();
+
+    await reorderTask({ taskId: T1, memberId: M1, prevKey: 1000, nextKey: 3000 });
+
+    expect(keyOf(tables)).toBe(2000);
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
   });
 
   it("uses prevKey + 1000 when dropped at end", async () => {
-    const { update } = makeReorderMocks();
-    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: 5000, nextKey: null });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ member_sort_key: 6000 }));
+    const { tables } = setup();
+
+    await reorderTask({ taskId: T1, memberId: M1, prevKey: 5000, nextKey: null });
+
+    expect(keyOf(tables)).toBe(6000);
   });
 
   it("uses nextKey - 1000 when dropped at start", async () => {
-    const { update } = makeReorderMocks();
-    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: null, nextKey: 3000 });
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ member_sort_key: 2000 }));
+    const { tables } = setup();
+
+    await reorderTask({ taskId: T1, memberId: M1, prevKey: null, nextKey: 3000 });
+
+    expect(keyOf(tables)).toBe(2000);
+  });
+
+  it("rejects an unauthenticated caller", async () => {
+    const { tables } = setup({ user: null });
+
+    await expectFailure(reorderTask({ taskId: T1, memberId: M1, prevKey: 1000, nextKey: 3000 }), "Unauthorized");
+
+    expect(keyOf(tables)).toBe(1000);
+  });
+
+  it("rejects reordering another member's list", async () => {
+    const tables = seed();
+    tables.task_assignments.push({ task_id: T1, member_id: M2, member_sort_key: 5000 });
+    setup({ tables });
+
+    await expectFailure(reorderTask({ taskId: T1, memberId: M2, prevKey: 1000, nextKey: 3000 }), `member ${M2} does not belong to the current user`);
+
+    expect(assignmentsIn(tables).find((a) => a.member_id === M2)?.member_sort_key).toBe(5000);
+  });
+
+  it("rejects a caller who is not assigned to the task", async () => {
+    const tables = seed();
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
+    setup({ tables });
+
+    await expectFailure(reorderTask({ taskId: T_OTHER, memberId: M1, prevKey: 1000, nextKey: 3000 }), "Forbidden");
   });
 });
 
-describe("createTaskWithSubtasks — parent insert failure", () => {
-  it("throws and does not revalidate when parent task insert fails", async () => {
-    const single = jest.fn().mockResolvedValue({ data: null, error: { message: "constraint violation" } });
-    const select = jest.fn().mockReturnValue({ single });
-    const insertParent = jest.fn().mockReturnValue({ select });
+// ─── input validation ────────────────────────────────────────────────────────
 
-    (createClient as jest.Mock).mockResolvedValue({});
-    (createAdminClient as jest.Mock).mockReturnValue({ from: jest.fn().mockReturnValue({ insert: insertParent }) });
+describe("input validation", () => {
+  it("rejects a malformed task id before touching the database", async () => {
+    const { tables } = setup();
 
-    await expect(
-      createTaskWithSubtasks({
-        title: "Failing parent",
-        workspaceId: "ws-1",
-        memberIds: ["m-1"],
+    await expectFailure(completeTask("not-a-uuid"), "Expected a UUID");
+
+    expect(tasksIn(tables)[0].completed_at).toBeNull();
+  });
+
+  it("rejects an oversized title", async () => {
+    const { tables } = setup();
+
+    await expectFailure(createTaskWithSubtasks({
+        title: "x".repeat(201),
+        workspaceId: WS1,
+        memberIds: [M1],
         subtasks: [],
-      })
-    ).rejects.toThrow("constraint violation");
+      }), "Title must be 200 characters or fewer");
 
-    expect(revalidatePath).not.toHaveBeenCalled();
+    expect(tasksIn(tables)).toHaveLength(1);
+  });
+
+  it("rejects a blank title", async () => {
+    setup();
+
+    await expectFailure(createTaskWithSubtasks({ title: "   ", workspaceId: WS1, memberIds: [M1], subtasks: [] }), "Title is required");
+  });
+
+  it("trims the title before storing it", async () => {
+    const { tables } = setup();
+
+    await createTaskWithSubtasks({
+      title: "  Padded  ",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+    });
+
+    expect(tasksIn(tables).some((t) => t.title === "Padded")).toBe(true);
+  });
+
+  it("rejects an oversized description", async () => {
+    setup();
+
+    await expectFailure(createTaskWithSubtasks({
+        title: "Fine",
+        description: "x".repeat(2001),
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: [],
+      }), "Description must be 2000 characters or fewer");
+  });
+
+  it("rejects a due date that is not YYYY-MM-DD", async () => {
+    setup();
+
+    await expectFailure(createTaskWithSubtasks({
+        title: "Fine",
+        dueAt: "15/06/2026",
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: [],
+      }), "Due date must be in YYYY-MM-DD format");
+  });
+
+  it("rejects more than 50 subtasks", async () => {
+    setup();
+
+    await expectFailure(createTaskWithSubtasks({
+        title: "Fine",
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: Array.from({ length: 51 }, (_, i) => ({ title: `Step ${i}` })),
+      }), "A task cannot have more than 50 subtasks");
+  });
+
+  it("rejects an update that would leave the task with no assignees", async () => {
+    const { tables } = setup();
+
+    await expectFailure(updateTask({ taskId: T1, title: "T", memberIds: [] }), "Assign the task to at least one person");
+
+    expect(assignmentsIn(tables)).toHaveLength(1);
+  });
+
+  it("rejects a reorder whose keys are out of order", async () => {
+    const { tables } = setup();
+
+    await expectFailure(reorderTask({ taskId: T1, memberId: M1, prevKey: 3000, nextKey: 1000 }), "prevKey must be less than nextKey");
+
+    expect(assignmentsIn(tables)[0].member_sort_key).toBe(1000);
+  });
+});
+
+// ─── parent/subtask completion rule ──────────────────────────────────────────
+
+describe("completeTask — parent and subtasks complete together", () => {
+  function seedFamily() {
+    const tables = seed();
+    tables.tasks.push(
+      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null, title: "Parent" },
+      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null, title: "Sub 1" },
+      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: null, title: "Sub 2" }
+    );
+    tables.task_assignments.push(
+      { task_id: P1, member_id: M1, member_sort_key: 2000 },
+      { task_id: S1, member_id: M1, member_sort_key: 3000 },
+      { task_id: S2, member_id: M1, member_sort_key: 4000 }
+    );
+    return tables;
+  }
+
+  it("completing a parent completes its open subtasks", async () => {
+    const tables = seedFamily();
+    setup({ tables });
+
+    await completeTask(P1);
+
+    const byId = (id: string) => tasksIn(tables).find((t) => t.id === id);
+    expect(byId(P1)?.completed_at).toEqual(expect.any(String));
+    expect(byId(S1)?.completed_at).toEqual(expect.any(String));
+    expect(byId(S2)?.completed_at).toEqual(expect.any(String));
+  });
+
+  it("leaves an already-completed subtask's timestamp untouched", async () => {
+    const tables = seedFamily();
+    const earlier = "2026-01-01T00:00:00Z";
+    tasksIn(tables).find((t) => t.id === S1)!.completed_at = earlier;
+    setup({ tables });
+
+    await completeTask(P1);
+
+    expect(tasksIn(tables).find((t) => t.id === S1)?.completed_at).toBe(earlier);
+  });
+
+  it("completing the last open subtask still completes the parent", async () => {
+    const tables = seedFamily();
+    tasksIn(tables).find((t) => t.id === S1)!.completed_at = "2026-01-01T00:00:00Z";
+    setup({ tables });
+
+    await completeTask(S2);
+
+    expect(tasksIn(tables).find((t) => t.id === P1)?.completed_at).toEqual(expect.any(String));
+  });
+
+  it("does not complete a task that is not this task's subtask", async () => {
+    const tables = seedFamily();
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, parent_task_id: null, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M1, member_sort_key: 5000 });
+    setup({ tables });
+
+    await completeTask(P1);
+
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)?.completed_at).toBeNull();
   });
 });

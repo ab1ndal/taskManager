@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type { RawTask } from "./bucket-tasks";
 import { TasksPageClient } from "./tasks-page-client";
 
@@ -13,14 +12,19 @@ export default async function TasksPage({
   const { workspace: workspaceFilter, view: viewFilter } = await searchParams;
 
   const supabase = await createClient();
-  const admin = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Query 1a: get current user's own member rows first (admin bypasses self-referential RLS)
+  // Every query below runs on the user-scoped client, so RLS is what decides what comes back. The
+  // explicit id filters are for shaping the result, not for access control — migration 007 made the
+  // policies non-recursive, which is what allowed the service-role client to be dropped from this
+  // read path. Signed out, these return nothing rather than everything.
+
+  // Query 1a: the current user's own member rows
+
   const { data: myOwnMembers } = user
-    ? await admin
+    ? await supabase
         .from("workspace_members")
         .select("id, workspace_id")
         .eq("auth_user_id", user.id)
@@ -30,7 +34,7 @@ export default async function TasksPage({
 
   // Query 1a': all members in the user's workspaces (for shared-task display)
   const { data: allMembers } = myWorkspaceIds.length
-    ? await admin
+    ? await supabase
         .from("workspace_members")
         .select("id, workspace_id, auth_user_id, display_name")
         .in("workspace_id", myWorkspaceIds)
@@ -38,7 +42,7 @@ export default async function TasksPage({
 
   // Query 1b: workspaces the current user belongs to
   const { data: workspacesData } = myWorkspaceIds.length
-    ? await admin
+    ? await supabase
         .from("workspaces")
         .select("id, name, kind")
         .in("id", myWorkspaceIds)
@@ -72,10 +76,8 @@ export default async function TasksPage({
   myMembers.forEach((m) => { memberIdByWorkspaceId[m.workspace_id] = m.id; });
 
   // Query 2: task assignments for current user (sort key + task IDs)
-  // Admin client: task_assignments_select policy is self-referential (42P17 recursion).
-  // App-level security: filtered to myMemberIds (the current user's own member rows).
   const { data: myAssignments } = myMemberIds.length
-    ? await admin
+    ? await supabase
         .from("task_assignments")
         .select("task_id, member_sort_key")
         .in("member_id", myMemberIds)
@@ -89,10 +91,8 @@ export default async function TasksPage({
   });
 
   // Query 3a: full task data
-  // Admin client: tasks_select policy queries task_assignments + workspace_members (both recursive).
-  // App-level security: filtered to myTaskIds derived from user's own assignments above.
   const { data: tasksData } = myTaskIds.length
-    ? await admin
+    ? await supabase
         .from("tasks")
         .select("id, title, description, due_at, completed_at, parent_task_id, workspace_id, rule_id")
         .in("id", myTaskIds)
@@ -101,7 +101,7 @@ export default async function TasksPage({
 
   // Query 3b: all assignments for these tasks (for assignee count / shared detection)
   const { data: allAssignments } = myTaskIds.length
-    ? await admin
+    ? await supabase
         .from("task_assignments")
         .select("task_id, member_id")
         .in("task_id", myTaskIds)
@@ -118,7 +118,7 @@ export default async function TasksPage({
   // Query 4: subtasks for all parent tasks
   const parentTaskIds = (tasksData ?? []).map((t) => t.id);
   const { data: subtasksData } = parentTaskIds.length
-    ? await admin
+    ? await supabase
         .from("tasks")
         .select("id, title, completed_at, parent_task_id")
         .in("parent_task_id", parentTaskIds)

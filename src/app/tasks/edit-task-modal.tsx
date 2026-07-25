@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateTask } from "./actions";
+import { updateTaskSchema } from "./schemas";
 import { toast } from "@/components/toaster";
 import type { RawTask } from "./bucket-tasks";
 
@@ -37,23 +38,30 @@ export function EditTaskModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || selectedMemberIds.length === 0) return;
+
+    // Same schema the action parses, so the modal cannot close optimistically on input the server
+    // is about to reject.
+    const parsed = updateTaskSchema.safeParse({
+      taskId: task.id,
+      title,
+      description: description.trim() || undefined,
+      dueAt: dueAt || undefined,
+      memberIds: selectedMemberIds,
+    });
+
+    if (!parsed.success) {
+      toast(parsed.error.issues[0].message, "error");
+      return;
+    }
 
     onClose();
-    toast("Task updated");
 
+    // No optimistic update happens here — the list only changes once the server revalidates — so
+    // the success toast waits for the result rather than announcing an edit that may not land.
     startTransition(async () => {
-      try {
-        await updateTask({
-          taskId: task.id,
-          title: title.trim(),
-          description: description.trim() || undefined,
-          dueAt: dueAt || undefined,
-          memberIds: selectedMemberIds,
-        });
-      } catch {
-        toast("Failed to update task", "error");
-      }
+      const result = await updateTask(parsed.data);
+      if (result.ok) toast("Task updated");
+      else toast(result.error, "error");
     });
   }
 

@@ -14,8 +14,16 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Workspace Directory** - Replace pin-based join with public directory and instant join (completed 2026-03-27)
 - [x] **Phase 2: Task Creation** - Complete task creation with full field support and real-time list update (completed 2026-03-27)
-- [ ] **Phase 3: Task Detail & Editing** - Task detail view with editing, assignee management
-- [ ] **Phase 4: Task Prioritization** - Drag-to-reorder personal task priority
+- [x] **Phase 3: Security Hardening & Failure Visibility** - Non-recursive RLS, authorized server actions, validated input, visible failures (completed 2026-07-25)
+- [ ] **Phase 4: Accessibility & Mobile** - Touch targets, focus management, dialog semantics, live regions
+- [ ] **Phase 5: Task Prioritization** - Drag-to-reorder personal task priority
+- [ ] **Phase 6: Task Updates & Speech-to-Text** - Text updates on a task; speech only at the input layer
+- [ ] **Phase 7: Recurring Tasks** - Rule-driven task generation
+- [ ] **Phase 8: Design Polish** - Dark mode, semantic tokens, icon consolidation, reduced motion
+
+**Task Detail & Editing** was the original Phase 3. It was largely built outside the planning loop
+(`edit-task-modal.tsx`, `updateTask`, assignee management), so it is not carried as a separate phase.
+What remains of it — a full detail view rather than a modal — is unscheduled.
 
 ## Phase Details
 
@@ -48,24 +56,35 @@ Plans:
 - [ ] 02-01-PLAN.md — Fix modal feedback (success/warning toasts, warning type in toaster), add onTaskCreated optimistic callback
 - [ ] 02-02-PLAN.md — Refactor TasksPageClient to own task list state with optimistic insert/rollback; update page.tsx to pass initialTasks
 
-### Phase 3: Task Detail & Editing
-**Goal**: Users can view full task context and make changes after creation
+### Phase 3: Security Hardening & Failure Visibility
+**Goal**: The database and the application both enforce access control, and a failed mutation is visible to the user
 **Depends on**: Phase 2
-**Requirements**: TASK-03, TASK-04, TASK-05
+**Requirements**: derived from `.planning/AUDIT-2026-07-25.md` (S1-S4, C1-C6)
 **Success Criteria** (what must be TRUE):
-  1. User can click a task and open a detail view showing title, description, due date, assignees, and subtasks
-  2. User can edit a task's title, description, or due date from the detail view and see changes saved
-  3. User can add or change assignees on an existing task from the detail view
-**Plans**: TBD
+  1. RLS policies are non-recursive and actually restrictive — a user sees only tasks assigned to them, enforced by the database
+  2. Every task server action authenticates the caller and authorizes them for the specific row named
+  3. Action input is validated at the boundary, with the same schemas used by the modals
+  4. A failed mutation surfaces to the user and is logged, instead of silently leaving optimistic state on screen
+  5. The service-role client is gone from the read paths
+**Plans**: 1 plan (8 tasks)
 
 Plans:
-- [ ] 03-01: Build task detail view (route or slide-over) with full field display
-- [ ] 03-02: Add inline editing for title, description, due date with server action
-- [ ] 03-03: Add assignee management (add/reassign) from detail view
+- [x] 03-PLAN.md — Tasks 1-8, executed 2026-07-25
 
-### Phase 4: Task Prioritization
-**Goal**: Users can control the personal order of their tasks via drag-and-drop
+### Phase 4: Accessibility & Mobile
+**Goal**: The app is usable on a phone and with a keyboard or screen reader
 **Depends on**: Phase 3
+**Requirements**: audit U1-U5, U7
+**Success Criteria** (what must be TRUE):
+  1. Interactive controls meet the 44px touch target minimum on the task list
+  2. Every focusable control has a visible focus indicator
+  3. Modals are dialogs: role, focus trap, Escape to close, focus restored on close
+  4. Toasts announce through a live region
+**Plans**: TBD
+
+### Phase 5: Task Prioritization
+**Goal**: Users can control the personal order of their tasks via drag-and-drop
+**Depends on**: Phase 4
 **Requirements**: TASK-06
 **Success Criteria** (what must be TRUE):
   1. User can drag a task card up or down to reorder it within a bucket
@@ -74,26 +93,57 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 04-01: Integrate drag-and-drop library and wire sort key update server action
+- [ ] 05-01: Integrate drag-and-drop library and wire sort key update server action.
+      `reorderTask()` already exists, is authorized, and is tested — it has no UI caller yet.
+      Fix the racy global `max + 1000` sort keys (audit C3) before wiring the UI, and ship a
+      keyboard alternative alongside the drag interaction.
+
+### Phase 6: Task Updates & Speech-to-Text
+**Goal**: Users can add text updates to a task, dictated if they prefer
+**Depends on**: Phase 5
+**Requirements**: TASK-07 (docs/product.md)
+**Success Criteria** (what must be TRUE):
+  1. A task shows its updates in chronological order
+  2. Speech-to-text is available at the input layer only — audio is never stored
+**Plans**: TBD
+
+### Phase 7: Recurring Tasks
+**Goal**: A recurrence rule generates task instances without duplicates
+**Depends on**: Phase 6
+**Requirements**: TASK-08 (docs/product.md)
+**Success Criteria** (what must be TRUE):
+  1. A rule produces the next instance on schedule
+  2. The generator is idempotent for a repeated `next_run_at` — a retry cannot double-create
+**Plans**: TBD
+
+### Phase 8: Design Polish
+**Goal**: One coherent visual system across light and dark
+**Depends on**: Phase 7
+**Requirements**: audit U6, U8-U12
+**Success Criteria** (what must be TRUE):
+  1. Dark mode works throughout, driven by semantic tokens rather than raw palette classes
+  2. Icons come from one source at consistent sizes
+  3. Animation respects `prefers-reduced-motion`
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Workspace Directory | 3/3 | Complete   | 2026-03-27 |
-| 2. Task Creation | 2/2 | Complete    | 2026-03-27 |
-| 3. Task Detail & Editing | 0/3 | Not started | - |
-| 4. Task Prioritization | 0/1 | Not started | - |
+| 1. Workspace Directory | 3/3 | Complete | 2026-03-27 |
+| 2. Task Creation | 2/2 | Complete | 2026-03-27 |
+| 3. Security Hardening & Failure Visibility | 1/1 | Complete | 2026-07-25 |
+| 4. Accessibility & Mobile | 0/? | Not started | - |
+| 5. Task Prioritization | 0/1 | Not started | - |
+| 6. Task Updates & Speech-to-Text | 0/? | Not started | - |
+| 7. Recurring Tasks | 0/? | Not started | - |
+| 8. Design Polish | 0/? | Not started | - |
 
-### Phase 5: Task and workspace lifecycle — delete workspace, edit task, fix delete task (button exists but task not actually deleted), complete task
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 4
-**Plans:** 2/2 plans complete
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 5 to break down)
+**Superseded:** the old "Phase 5: Task and workspace lifecycle" entry. Task deletion, editing, and
+completion all landed — deletion and completion were fixed properly in Phase 3, which also found
+that the complete button could never be used on a parent with an open subtask. Workspace deletion is
+the only piece left and needs an ownership rule first; migration 007 deliberately grants no DELETE
+policy on `workspaces`.
