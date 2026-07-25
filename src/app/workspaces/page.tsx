@@ -10,37 +10,41 @@ type WorkspaceRow = {
 };
 
 export default async function WorkspacesPage() {
-  const admin = createAdminClient();
   const supabase = await createClient();
 
-  // Fetch all workspaces with member count via LEFT JOIN aggregate
-  // Admin client bypasses RLS (user can only SELECT workspaces they belong to)
-  const { data: allWorkspaces } = await admin
+  // The directory is deliberately visible to every signed-in user — that is what workspaces_select
+  // (migration 007) allows, and it is how someone finds a workspace to join.
+  const { data: allWorkspaces } = await supabase
     .from("workspaces")
-    .select("id, name, kind, workspace_members(count)")
+    .select("id, name, kind")
     .order("name");
+
+  // Member counts are the one thing RLS cannot provide here: workspace_members_select only exposes
+  // rows in workspaces you already belong to, so the count would read 0 for exactly the workspaces
+  // a user is trying to discover. This query is scoped to a single non-identifying column and is
+  // the only remaining service-role read on this page.
+  const admin = createAdminClient();
+  const { data: memberRows } = await admin.from("workspace_members").select("workspace_id");
+
+  const memberCounts = new Map<string, number>();
+  (memberRows ?? []).forEach((m) => {
+    const id = m.workspace_id as string;
+    memberCounts.set(id, (memberCounts.get(id) ?? 0) + 1);
+  });
 
   const workspaces: WorkspaceRow[] = (allWorkspaces ?? []).map((ws) => ({
     id: ws.id,
     name: ws.name,
     kind: ws.kind,
-    member_count:
-      Array.isArray(ws.workspace_members)
-        ? (ws.workspace_members[0] as { count: number } | undefined)?.count ?? 0
-        : 0,
+    member_count: memberCounts.get(ws.id) ?? 0,
   }));
 
-  // Get current user's workspace memberships via admin client — the self-referential
-  // workspace_members_select RLS policy can filter out newly-created memberships.
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { data: userMembers } = user
-    ? await admin
-        .from("workspace_members")
-        .select("workspace_id")
-        .eq("auth_user_id", user.id)
+    ? await supabase.from("workspace_members").select("workspace_id").eq("auth_user_id", user.id)
     : { data: [] };
 
   const joinedIds = new Set((userMembers ?? []).map((m) => m.workspace_id));

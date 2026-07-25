@@ -1,7 +1,6 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 export async function createWorkspace(
@@ -17,10 +16,9 @@ export async function createWorkspace(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Admin client avoids triggering workspaces_select RLS on RETURNING,
-  // which causes 42P17 infinite recursion via the self-referential workspace_members_select policy.
-  const admin = createAdminClient();
-  const { data, error } = await admin
+  // Runs as the user: under migration 007 workspaces_select is `true`, so INSERT ... RETURNING
+  // works and workspaces_insert is what authorizes the write.
+  const { data, error } = await supabase
     .from("workspaces")
     .insert({ name: trimmedName, kind })
     .select("id, name, kind")
@@ -55,9 +53,9 @@ export async function joinWorkspaceByDirectory(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Admin client bypasses RLS: user is not yet a member, so regular SELECT returns nothing
-  const admin = createAdminClient();
-  const { data: workspace } = await admin
+  // The directory is readable by any signed-in user (workspaces_select), so a not-yet-member can
+  // look up the workspace they are joining without the service-role client.
+  const { data: workspace } = await supabase
     .from("workspaces")
     .select("id, name")
     .eq("id", workspaceId)
@@ -100,10 +98,9 @@ export async function leaveWorkspace(workspaceId: string): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Admin client: no DELETE policy exists on workspace_members yet.
-  // Auth is verified above; scope is locked to user.id.
-  const admin = createAdminClient();
-  const { error } = await admin
+  // workspace_members_delete_self (migration 007) restricts this to the caller's own rows; the
+  // auth_user_id filter below keeps the intent explicit rather than relying on RLS alone.
+  const { error } = await supabase
     .from("workspace_members")
     .delete()
     .eq("workspace_id", workspaceId)

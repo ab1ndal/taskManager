@@ -48,7 +48,9 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
   private orderBy: { column: string; ascending: boolean } | null = null;
   private limitN: number | null = null;
   private wantSingle = false;
+  private wantMaybeSingle = false;
   private countMode = false;
+  private returning = false;
 
   constructor(
     private readonly table: string,
@@ -61,8 +63,12 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
   }
 
   select(_columns?: string, options?: { count?: string; head?: boolean }) {
-    this.op = "select";
-    if (options?.count) this.countMode = true;
+    // `.insert(...).select()` means RETURNING, not a separate read — the op stays as the write.
+    if (this.op === "select") {
+      if (options?.count) this.countMode = true;
+    } else {
+      this.returning = true;
+    }
     return this;
   }
 
@@ -113,13 +119,21 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
     return this;
   }
 
+  /** Like `single()`, but an empty result is `{ data: null, error: null }` rather than PGRST116. */
+  maybeSingle() {
+    this.wantMaybeSingle = true;
+    return this;
+  }
+
   private run() {
     const failure = this.failOn?.(this.table, this.op, this.payload);
     if (failure) return { data: null, error: failure, count: null };
 
     if (this.op === "insert") {
-      this.rows().push({ ...this.payload });
-      return { data: null, error: null, count: null };
+      // Postgres fills the id default when the caller does not supply one.
+      const row = { id: crypto.randomUUID(), ...this.payload };
+      this.rows().push(row);
+      return { data: this.returning ? row : null, error: null, count: null };
     }
 
     const selected = this.rows().filter((r) => matches(r, this.filters));
@@ -147,10 +161,12 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
     }
     if (this.limitN !== null) result = result.slice(0, this.limitN);
 
-    if (this.wantSingle) {
+    if (this.wantSingle || this.wantMaybeSingle) {
       // PostgREST returns PGRST116 rather than an empty body when `.single()` matches no row.
       if (result.length === 0) {
-        return { data: null, error: { message: "no rows", code: "PGRST116" }, count: null };
+        return this.wantMaybeSingle
+          ? { data: null, error: null, count: null }
+          : { data: null, error: { message: "no rows", code: "PGRST116" }, count: null };
       }
       return { data: result[0], error: null, count: null };
     }
