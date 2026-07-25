@@ -99,3 +99,28 @@ both cases.
 
 **Rule:** treat `docs/db.md` as intent, not as a description of the live schema. Verify against
 `supabase/migrations/` before assuming an index exists.
+
+## L9 — This project's remote database has almost no CLI migration history
+
+Applied 2026-07-25. The hosted project is `xamdgvxziobpptcfymug` (task-manager). Migrations 001-006
+were applied out-of-band, so `supabase_migrations.schema_migrations` was **empty** until 007 was
+applied through the Supabase MCP server, which recorded a single row:
+`20260725220330 rls_security_definer`.
+
+**Rule:** never run `supabase db push` here without first repairing the history — it would try to
+replay 001-006 against a schema that already has them. `supabase link` works, but `db push` needs
+`SUPABASE_DB_PASSWORD`: the CLI's passwordless login-role fallback fails on this project with
+"permission denied to alter role".
+
+**How to verify DB behaviour without Docker or a password** — run SQL as the querying role:
+
+```sql
+begin;
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"<auth_user_id>","role":"authenticated"}';
+select count(*) from tasks;   -- what that user actually sees
+rollback;
+```
+
+This is how 007 and Task 3 were verified. It exercises the real policies, which the jest suite
+cannot do — the suite mocks Supabase entirely.

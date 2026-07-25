@@ -7,27 +7,21 @@ Audit: `.planning/AUDIT-2026-07-25.md`
 
 Started 2026-07-25 on branch `main` @ `5d3c743`.
 
-## Environment blocker (affects Tasks 1 and 3)
+## Environment — resolved 2026-07-25
 
-**Update 2026-07-25:** the user populated `.env` with all three variables under the correct names
-(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` — no
-`NEXT_PUBLIC_` on the secret). `.env` is gitignored. The URL points at a hosted project, so
-migration 007 could be applied with `supabase db push`, but that is a production schema change and
-needs an explicit go-ahead — and the key still needs rotating in the dashboard first (Task 2).
-
-No `supabase/config.toml` (`supabase init` never ran), Docker not running, no `.env.local`.
-Migration 007 can be **authored** but not applied or verified. Task 3 cannot be verified.
-
-To unblock, the user runs:
-
-```bash
-open -a Docker           # then wait for it to come up
-supabase init
-supabase start
-supabase db reset        # applies 001-007 + seed.sql
-```
-
-Everything else in the phase is verifiable with `npx tsc --noEmit` and `npx jest`.
+- Secret key rotated by the user. `.env` holds all three variables under the correct names
+  (`SUPABASE_SECRET_KEY`, no `NEXT_PUBLIC_` prefix) and is gitignored.
+- Migration 007 **applied to the hosted project** `xamdgvxziobpptcfymug` (task-manager) via the
+  Supabase MCP server, not the CLI. `supabase link` succeeded but `db push` needs
+  `SUPABASE_DB_PASSWORD` — the CLI's passwordless login-role fallback fails on this project with
+  "permission denied to alter role".
+- **Remote migration history contains only `20260725220330 rls_security_definer`.** Migrations
+  001-006 were applied out-of-band before the CLI was ever used, so they are absent from
+  `supabase_migrations.schema_migrations`. Do **not** run `supabase db push` without repairing that
+  history first — it would try to replay 001-006 against a schema that already has them.
+- Local Docker/`supabase start` still unavailable, and there is still no `supabase/config.toml`
+  beyond what `link` generated. Verification of DB behaviour is done by running SQL as the
+  `authenticated` role with `set local request.jwt.claims`, which is how 007 and Task 3 were checked.
 
 ## Done
 
@@ -65,31 +59,55 @@ Same trap applies to any future insert-then-return on `task_assignments` and `ta
       All test fixtures now use real UUIDs; `"t-1"`-style ids fail validation.
       Verified: `npx tsc --noEmit` clean, 134 tests pass, lint unchanged.
 
+- [x] **Task 1 (apply + verify)** — 007 live on the hosted project. Verified: policies all scoped to
+      `authenticated` and expressed through `private.*` helpers; all five helpers are
+      `SECURITY DEFINER` with `search_path=''` and **not** executable by `anon`; no 42P17. Two users
+      queried under their own JWT claims see 12 and 1 tasks out of 13 — isolation holds.
+- [x] **Task 6** — actions return `{ ok, error }`, every Supabase error checked, failures toasted,
+      optimistic row rolled back, `error.tsx` + `loading.tsx` added. `7d8081a`.
+      Also replaced the `initialTasks` sync effect with a render-time adjustment — that was the
+      second `set-state-in-effect` lint error.
+- [x] **Task 3** — `/tasks` reads through the user client. `094b4a3`. Verified by replaying the
+      page's query chain as the `authenticated` role: same counts as service-role for that user.
+
 ## In progress
 
-- [ ] **Task 6** — actions return `{ ok, error }`; surface failures.
+- [ ] **Task 7** — completing a parent completes its subtasks; re-enable the button.
 
-## Lint findings, deferred (surfaced once `npm run lint` worked again)
+## Lint findings, deferred
 
-`npm run lint` now runs and reports 2 errors + 4 warnings, all pre-existing. Not fixed in Task 8 —
-out of scope, and the first one is a deliberate decision.
+`npm run lint` reports 1 error + 3 warnings, all pre-existing. Both original `set-state-in-effect`
+errors are gone (Task 4 removed the dead binding, Task 6 removed the tasks-page effect).
 
-- `react-hooks/set-state-in-effect` at `tasks-page-client.tsx:64` — this is the
-  "sync localTasks with server data on revalidation" effect from commit `3e03df1`. Task 6 rewrites
-  this area for optimistic rollback; fix it there, not before.
 - `react-hooks/set-state-in-effect` at `login-card.tsx:26` — belongs to Phase 04.
-- Unused `supabase` binding at `actions.ts:102` — dead `createClient()` call inside
-  `createTaskWithSubtasks`. Task 4 rewrites that function; remove it there.
 - Unused `currentMemberIds` (`edit-task-modal.tsx:16`), unused `memberIdByWorkspaceId`
   (`tasks-page-client.tsx:44`) — the latter is reserved for drag-to-reorder, Phase 05.
 - Unused `workspaceData` (`workspaces/actions.test.ts:99`).
 
 ## Next
 
-- [ ] **Task 6** — Actions return `{ ok, error }`; surface failures via toaster; add `error.tsx` /
-      `loading.tsx`; roll back optimistic state.
 - [ ] **Task 7** — Completing a parent task completes its subtasks; re-enable the disabled button.
-- [ ] **Task 3** — Drop admin client from `page.tsx` read path. **Blocked** on the environment above.
+- [ ] **Task 8** — Phase wrap-up: reconcile `.planning/STATE.md`, renumber `ROADMAP.md`.
+
+### Surfaced during Task 3, not yet done
+
+`src/app/workspaces/page.tsx` and all three actions in `src/app/workspaces/actions.ts` still use the
+service-role client. All three actions *are* authenticated and scoped to `user.id`, so this is not
+the S1 hole — but every comment justifying the admin client there is now stale: 007 gives
+`workspaces_select` (true), so `RETURNING` and the directory read both work, and
+`workspace_members_delete_self` now exists for `leaveWorkspace`. Port them to the user client and
+move `workspaces/actions.test.ts` onto `src/test/supabase-fake.ts` while doing it.
+
+### Production advisories worth a look (from `get_advisors` after 007)
+
+- `public.rls_auto_enable()` is a `SECURITY DEFINER` function in the exposed schema, callable by
+  `anon`. It is Supabase platform-provided (an event-trigger function, not ours — nothing in
+  `supabase/migrations/` creates it) and returns `event_trigger`, so an RPC call cannot do anything
+  useful. Left alone deliberately.
+- `task_rules` has RLS enabled and no policies — deny-all, which is the safe direction. Phase 07.
+- `workspaces_insert` is `with check (true)`: any signed-in user can create a workspace. Deliberate,
+  matches the public-directory decision.
+- Leaked-password protection is disabled in Auth settings. Dashboard toggle, Phase 04.
 
 ## Deferred to later phases
 
