@@ -135,14 +135,17 @@ export function NewTaskModal({
     toast("Task created");
 
     startTransition(async () => {
-      try {
-        const { subtaskErrors } = await createTaskWithSubtasks(input);
-        if (subtaskErrors > 0) {
-          toast(`Task created, but ${subtaskErrors} subtask(s) could not be saved`, "warning");
-        }
-      } catch {
+      const result = await createTaskWithSubtasks(input);
+
+      if (!result.ok) {
+        // Roll the optimistic row back out of the list — it was never persisted.
         onTaskError?.(tempId);
-        toast("Failed to create task", "error");
+        toast(result.error, "error");
+        return;
+      }
+
+      if (result.subtaskErrors > 0) {
+        toast(`Task created, but ${result.subtaskErrors} subtask(s) could not be saved`, "warning");
       }
     });
   }

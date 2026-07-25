@@ -37,7 +37,7 @@ describe("EditTaskModal", () => {
 
   it("calls updateTask with updated values on submit", async () => {
     const mock = jest.mocked(updateTask);
-    mock.mockResolvedValue(undefined);
+    mock.mockResolvedValue({ ok: true });
 
     render(
       <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
@@ -57,7 +57,7 @@ describe("EditTaskModal", () => {
 
   it("calls onClose after successful save", async () => {
     const mock = jest.mocked(updateTask);
-    mock.mockResolvedValue(undefined);
+    mock.mockResolvedValue({ ok: true });
     const onClose = jest.fn();
 
     render(

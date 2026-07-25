@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { NewTaskModal } from "./new-task-modal";
 import { TabPill } from "./tab-pill";
@@ -60,10 +60,15 @@ export function TasksPageClient({
   const [optimisticTaskIds, setOptimisticTaskIds] = useState<Set<string>>(new Set());
   const [editingTask, setEditingTask] = useState<RawTask | null>(null);
 
-  useEffect(() => {
+  // Server data is the source of truth: once a revalidation delivers a new list, the optimistic
+  // overlay is dropped. Adjusting during render rather than in an effect avoids the extra pass that
+  // renders stale rows first (react-hooks/set-state-in-effect).
+  const [syncedFrom, setSyncedFrom] = useState(initialTasks);
+  if (syncedFrom !== initialTasks) {
+    setSyncedFrom(initialTasks);
     setLocalTasks(initialTasks);
     setOptimisticTaskIds(new Set());
-  }, [initialTasks]);
+  }
 
   const hasWorkspace = workspaces.length > 0;
 

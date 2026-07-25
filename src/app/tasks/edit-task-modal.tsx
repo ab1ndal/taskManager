@@ -55,14 +55,13 @@ export function EditTaskModal({
     }
 
     onClose();
-    toast("Task updated");
 
+    // No optimistic update happens here — the list only changes once the server revalidates — so
+    // the success toast waits for the result rather than announcing an edit that may not land.
     startTransition(async () => {
-      try {
-        await updateTask(parsed.data);
-      } catch {
-        toast("Failed to update task", "error");
-      }
+      const result = await updateTask(parsed.data);
+      if (result.ok) toast("Task updated");
+      else toast(result.error, "error");
     });
   }
 
