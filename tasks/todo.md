@@ -9,6 +9,12 @@ Started 2026-07-25 on branch `main` @ `5d3c743`.
 
 ## Environment blocker (affects Tasks 1 and 3)
 
+**Update 2026-07-25:** the user populated `.env` with all three variables under the correct names
+(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` — no
+`NEXT_PUBLIC_` on the secret). `.env` is gitignored. The URL points at a hosted project, so
+migration 007 could be applied with `supabase db push`, but that is a production schema change and
+needs an explicit go-ahead — and the key still needs rotating in the dashboard first (Task 2).
+
 No `supabase/config.toml` (`supabase init` never ran), Docker not running, no `.env.local`.
 Migration 007 can be **authored** but not applied or verified. Task 3 cannot be verified.
 
@@ -31,6 +37,12 @@ Everything else in the phase is verifiable with `npx tsc --noEmit` and `npx jest
       **Still needs the user to rotate the key in the Supabase dashboard.**
 - [x] **Task 1 (authoring)** — `supabase/migrations/007_rls_security_definer.sql` written.
       Apply + verify still blocked on the environment above.
+- [x] **Task 4** — `requireUser()` + per-row authorization in all five remaining task actions. `5cf8987`.
+      `createTask` deleted rather than guarded — no callers, `createTaskWithSubtasks` supersedes it.
+      The mock-builder extraction did not land as a separate commit as planned; `actions.ts` was
+      already rewritten when the work resumed, so splitting it would have been artificial.
+      Verified: `npx tsc --noEmit` clean, 125 tests pass, lint down to the pre-existing 2 errors +
+      3 warnings (the dead `supabase` binding at `actions.ts:102` is gone).
 
 ## Discovered during Task 1 — changes Task 4
 
@@ -47,7 +59,7 @@ Same trap applies to any future insert-then-return on `task_assignments` and `ta
 
 ## In progress
 
-- [ ] **Task 4** — see Next.
+- [ ] **Task 5** — zod schemas at the action boundary.
 
 ## Lint findings, deferred (surfaced once `npm run lint` worked again)
 
@@ -66,9 +78,6 @@ out of scope, and the first one is a deliberate decision.
 
 ## Next
 
-- [ ] **Task 4** — `requireUser()` guard + per-row authorization in all six task actions, plus the
-      `crypto.randomUUID()` change above.
-      Expect ~40 existing tests to break; extract `mockSupabase()` builder as its own commit first.
 - [ ] **Task 5** — zod schemas at the action boundary, shared with the modals.
 - [ ] **Task 6** — Actions return `{ ok, error }`; surface failures via toaster; add `error.tsx` /
       `loading.tsx`; roll back optimistic state.

@@ -59,6 +59,17 @@ order* of Supabase calls inside an action breaks its tests, even when behaviour 
 **Rule:** expect large test churn from any action-internals change, and do not read it as a signal
 the change is wrong. Extract a shared `mockSupabase()` builder before the change, not after.
 
+**Resolved 2026-07-25 (`5cf8987`)** for `src/app/tasks/actions.test.ts`: replaced by
+`src/test/supabase-fake.ts`, an in-memory fake that answers by table and filter. Seed rows, run the
+action, assert on `fake.tables`. Adding or reordering queries inside an action no longer breaks
+tests. `src/app/workspaces/actions.test.ts` still uses the old hand-rolled chains — port it when it
+next needs touching.
+
+The fake implements only what these actions use: `eq` / `in` / `is` / `order` / `limit` / `single`,
+`{ count: "exact", head: true }`, and `insert` / `update` / `delete`. It does **not** implement
+PostgREST embedded joins (`workspace_members!inner(...)`) — `assertTaskAssignee` was written as two
+queries partly for that reason.
+
 ## L6 — `getUser()` is safe; `getSession()` is not
 
 Supabase docs now recommend `getClaims()` server-side (verifies the JWT signature locally, no network
