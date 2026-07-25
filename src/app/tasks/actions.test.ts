@@ -546,3 +546,66 @@ describe("input validation", () => {
     expect(assignmentsIn(tables)[0].member_sort_key).toBe(1000);
   });
 });
+
+// ─── parent/subtask completion rule ──────────────────────────────────────────
+
+describe("completeTask — parent and subtasks complete together", () => {
+  function seedFamily() {
+    const tables = seed();
+    tables.tasks.push(
+      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null, title: "Parent" },
+      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null, title: "Sub 1" },
+      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: null, title: "Sub 2" }
+    );
+    tables.task_assignments.push(
+      { task_id: P1, member_id: M1, member_sort_key: 2000 },
+      { task_id: S1, member_id: M1, member_sort_key: 3000 },
+      { task_id: S2, member_id: M1, member_sort_key: 4000 }
+    );
+    return tables;
+  }
+
+  it("completing a parent completes its open subtasks", async () => {
+    const tables = seedFamily();
+    setup({ tables });
+
+    await completeTask(P1);
+
+    const byId = (id: string) => tasksIn(tables).find((t) => t.id === id);
+    expect(byId(P1)?.completed_at).toEqual(expect.any(String));
+    expect(byId(S1)?.completed_at).toEqual(expect.any(String));
+    expect(byId(S2)?.completed_at).toEqual(expect.any(String));
+  });
+
+  it("leaves an already-completed subtask's timestamp untouched", async () => {
+    const tables = seedFamily();
+    const earlier = "2026-01-01T00:00:00Z";
+    tasksIn(tables).find((t) => t.id === S1)!.completed_at = earlier;
+    setup({ tables });
+
+    await completeTask(P1);
+
+    expect(tasksIn(tables).find((t) => t.id === S1)?.completed_at).toBe(earlier);
+  });
+
+  it("completing the last open subtask still completes the parent", async () => {
+    const tables = seedFamily();
+    tasksIn(tables).find((t) => t.id === S1)!.completed_at = "2026-01-01T00:00:00Z";
+    setup({ tables });
+
+    await completeTask(S2);
+
+    expect(tasksIn(tables).find((t) => t.id === P1)?.completed_at).toEqual(expect.any(String));
+  });
+
+  it("does not complete a task that is not this task's subtask", async () => {
+    const tables = seedFamily();
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, parent_task_id: null, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M1, member_sort_key: 5000 });
+    setup({ tables });
+
+    await completeTask(P1);
+
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)?.completed_at).toBeNull();
+  });
+});

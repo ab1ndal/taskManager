@@ -100,13 +100,11 @@ export async function completeTask(rawTaskId: string): Promise<ActionResult> {
     await assertTaskAssignee(taskId, user.id);
 
     const admin = createAdminClient();
+    const completedAt = new Date().toISOString();
 
     assertNoError(
       "complete task",
-      await admin
-        .from("tasks")
-        .update({ completed_at: new Date().toISOString() })
-        .eq("id", taskId)
+      await admin.from("tasks").update({ completed_at: completedAt }).eq("id", taskId)
     );
 
     const { data: task, error: taskError } = await admin
@@ -116,6 +114,18 @@ export async function completeTask(rawTaskId: string): Promise<ActionResult> {
       .single();
 
     assertNoError("load task", { error: taskError });
+
+    // docs/product.md: "A task is completed when the entire task and all its subtasks are marked as
+    // complete." Completing a parent therefore completes its open subtasks — the rule has to hold
+    // in both directions, or a parent with an open subtask could never be completed at all.
+    assertNoError(
+      "complete subtasks",
+      await admin
+        .from("tasks")
+        .update({ completed_at: completedAt })
+        .eq("parent_task_id", taskId)
+        .is("completed_at", null)
+    );
 
     if (task?.parent_task_id) {
       const { count, error: countError } = await admin
@@ -131,7 +141,7 @@ export async function completeTask(rawTaskId: string): Promise<ActionResult> {
           "complete parent task",
           await admin
             .from("tasks")
-            .update({ completed_at: new Date().toISOString() })
+            .update({ completed_at: completedAt })
             .eq("id", task.parent_task_id)
         );
       }

@@ -68,13 +68,12 @@ export function TaskCard({
         {/* Complete button */}
         <button
           onClick={() => {
-            const hasIncomplete = (subtasks ?? []).some((s) => !s.completed_at);
-            if (!completed && !hasIncomplete) {
-              runAction(() => completeTask(taskId), "Failed to complete task");
-            }
+            // Completing a parent completes its open subtasks server-side, so an open subtask is no
+            // longer a reason to block the button.
+            if (!completed) runAction(() => completeTask(taskId), "Failed to complete task");
           }}
           aria-label={completed ? "Completed" : "Mark complete"}
-          disabled={completed || (subtasks ?? []).some((s) => !s.completed_at)}
+          disabled={completed}
           className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
           {completed ? (
