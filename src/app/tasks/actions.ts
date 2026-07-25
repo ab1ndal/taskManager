@@ -1,10 +1,44 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import {
+  requireUser,
+  assertTaskAssignee,
+  assertWorkspaceMember,
+  assertMembersInWorkspace,
+  memberIdsForUser,
+  ForbiddenError,
+} from "@/lib/auth";
+
+// Every exported function in this file is a public endpoint. Each one authenticates the caller and
+// then authorizes them for the specific row named in its arguments — a disabled button or a
+// filtered list is not access control. See tasks/lessons.md L4.
+//
+// Mutations still run on the admin client because migration 007 is not yet applied; the assertions
+// above them are what enforces access. Once 007 is live these can move to the user-scoped client
+// and let RLS enforce as well (Task 3).
+
+/** Next-highest sort key for a member, +1000. Racy under concurrency — see audit C3, fixed in Phase 05. */
+async function nextSortKey(
+  admin: ReturnType<typeof createAdminClient>,
+  memberId: string
+): Promise<number> {
+  const { data: last } = await admin
+    .from("task_assignments")
+    .select("member_sort_key")
+    .eq("member_id", memberId)
+    .order("member_sort_key", { ascending: false })
+    .limit(1)
+    .single();
+
+  return last ? (last.member_sort_key as number) + 1000 : 1000;
+}
 
 export async function completeTask(taskId: string) {
+  const { user } = await requireUser();
+  await assertTaskAssignee(taskId, user.id);
+
   const admin = createAdminClient();
 
   await admin
@@ -37,49 +71,11 @@ export async function completeTask(taskId: string) {
 }
 
 export async function deleteTask(taskId: string) {
-  const supabase = await createClient();
-  await supabase.from("tasks").delete().eq("id", taskId);
-  revalidatePath("/tasks");
-}
+  const { user } = await requireUser();
+  await assertTaskAssignee(taskId, user.id);
 
-export async function createTask({
-  title,
-  dueAt,
-  workspaceId,
-  memberIds,
-}: {
-  title: string;
-  dueAt?: string;
-  workspaceId: string;
-  memberIds: string[];
-}) {
-  const supabase = await createClient();
-
-  const { data: task, error } = await supabase
-    .from("tasks")
-    .insert({ title, due_at: dueAt ? `${dueAt}T00:00:00Z` : null, workspace_id: workspaceId })
-    .select()
-    .single();
-
-  if (error || !task) throw new Error(error?.message ?? "Failed to create task");
-
-  for (const memberId of memberIds) {
-    const { data: last } = await supabase
-      .from("task_assignments")
-      .select("member_sort_key")
-      .eq("member_id", memberId)
-      .order("member_sort_key", { ascending: false })
-      .limit(1)
-      .single();
-
-    const sortKey = last ? (last.member_sort_key as number) + 1000 : 1000;
-
-    await supabase.from("task_assignments").insert({
-      task_id: task.id,
-      member_id: memberId,
-      member_sort_key: sortKey,
-    });
-  }
+  const admin = createAdminClient();
+  await admin.from("tasks").delete().eq("id", taskId);
 
   revalidatePath("/tasks");
 }
@@ -99,75 +95,60 @@ export async function createTaskWithSubtasks({
   memberIds: string[];
   subtasks: { title: string; dueAt?: string; description?: string }[];
 }): Promise<{ subtaskErrors: number }> {
-  const supabase = await createClient();
-  const admin = createAdminClient();
+  const { user } = await requireUser();
   const uniqueMemberIds = [...new Set(memberIds)];
 
-  // Use admin client for tasks INSERT — tasks_insert RLS queries workspace_members,
-  // triggering the self-referential workspace_members_select policy (42P17 recursion).
-  const { data: parent, error: parentError } = await admin
-    .from("tasks")
-    .insert({
-      title,
-      description: description ?? null,
-      due_at: dueAt ? `${dueAt}T00:00:00Z` : null,
-      workspace_id: workspaceId,
-    })
-    .select()
-    .single();
+  await assertWorkspaceMember(workspaceId, user.id);
+  await assertMembersInWorkspace(uniqueMemberIds, workspaceId);
 
-  if (parentError || !parent) throw new Error(parentError?.message ?? "Failed to create task");
+  const admin = createAdminClient();
+
+  // Ids are generated here rather than read back via `.insert().select()`. Under migration 007,
+  // tasks_select requires an assignment row, which does not exist yet at insert time — so
+  // INSERT ... RETURNING would come back empty. See tasks/todo.md.
+  const parentId = crypto.randomUUID();
+
+  const { error: parentError } = await admin.from("tasks").insert({
+    id: parentId,
+    title,
+    description: description ?? null,
+    due_at: dueAt ? `${dueAt}T00:00:00Z` : null,
+    workspace_id: workspaceId,
+  });
+
+  if (parentError) throw new Error(parentError.message ?? "Failed to create task");
 
   for (const memberId of uniqueMemberIds) {
-    // Use admin client for task_assignments — task_assignments_select is also recursive,
-    // and task_assignments_insert WITH CHECK queries workspace_members + tasks (42P17).
-    const { data: last } = await admin
-      .from("task_assignments")
-      .select("member_sort_key")
-      .eq("member_id", memberId)
-      .order("member_sort_key", { ascending: false })
-      .limit(1)
-      .single();
-    const sortKey = last ? (last.member_sort_key as number) + 1000 : 1000;
     await admin.from("task_assignments").insert({
-      task_id: parent.id,
+      task_id: parentId,
       member_id: memberId,
-      member_sort_key: sortKey,
+      member_sort_key: await nextSortKey(admin, memberId),
     });
   }
 
   let subtaskErrors = 0;
   for (const sub of subtasks) {
-    const { data: subtask, error: subError } = await admin
-      .from("tasks")
-      .insert({
-        title: sub.title,
-        description: sub.description ?? null,
-        due_at: sub.dueAt ? `${sub.dueAt}T00:00:00Z` : null,
-        workspace_id: workspaceId,
-        parent_task_id: parent.id,
-      })
-      .select()
-      .single();
+    const subtaskId = crypto.randomUUID();
 
-    if (subError || !subtask) {
+    const { error: subError } = await admin.from("tasks").insert({
+      id: subtaskId,
+      title: sub.title,
+      description: sub.description ?? null,
+      due_at: sub.dueAt ? `${sub.dueAt}T00:00:00Z` : null,
+      workspace_id: workspaceId,
+      parent_task_id: parentId,
+    });
+
+    if (subError) {
       subtaskErrors++;
       continue;
     }
 
     for (const memberId of uniqueMemberIds) {
-      const { data: last } = await admin
-        .from("task_assignments")
-        .select("member_sort_key")
-        .eq("member_id", memberId)
-        .order("member_sort_key", { ascending: false })
-        .limit(1)
-        .single();
-      const sortKey = last ? (last.member_sort_key as number) + 1000 : 1000;
       await admin.from("task_assignments").insert({
-        task_id: subtask.id,
+        task_id: subtaskId,
         member_id: memberId,
-        member_sort_key: sortKey,
+        member_sort_key: await nextSortKey(admin, memberId),
       });
     }
   }
@@ -189,7 +170,23 @@ export async function updateTask({
   dueAt?: string;
   memberIds: string[];
 }) {
+  const { user } = await requireUser();
+  await assertTaskAssignee(taskId, user.id);
+
   const admin = createAdminClient();
+  const uniqueNewIds = [...new Set(memberIds)];
+
+  // Reassignment is scoped to the task's own workspace — otherwise a caller could hand the task to
+  // a member row belonging to a workspace they have nothing to do with.
+  const { data: task, error: taskError } = await admin
+    .from("tasks")
+    .select("workspace_id")
+    .eq("id", taskId)
+    .single();
+
+  if (taskError || !task) throw new Error(taskError?.message ?? "Task not found");
+
+  await assertMembersInWorkspace(uniqueNewIds, task.workspace_id as string);
 
   await admin
     .from("tasks")
@@ -206,7 +203,6 @@ export async function updateTask({
     .eq("task_id", taskId);
 
   const currentIds = (currentAssignments ?? []).map((a) => a.member_id as string);
-  const uniqueNewIds = [...new Set(memberIds)];
 
   // Remove dropped members
   for (const memberId of currentIds.filter((id) => !uniqueNewIds.includes(id))) {
@@ -215,15 +211,11 @@ export async function updateTask({
 
   // Add new members
   for (const memberId of uniqueNewIds.filter((id) => !currentIds.includes(id))) {
-    const { data: last } = await admin
-      .from("task_assignments")
-      .select("member_sort_key")
-      .eq("member_id", memberId)
-      .order("member_sort_key", { ascending: false })
-      .limit(1)
-      .single();
-    const sortKey = last ? (last.member_sort_key as number) + 1000 : 1000;
-    await admin.from("task_assignments").insert({ task_id: taskId, member_id: memberId, member_sort_key: sortKey });
+    await admin.from("task_assignments").insert({
+      task_id: taskId,
+      member_id: memberId,
+      member_sort_key: await nextSortKey(admin, memberId),
+    });
   }
 
   revalidatePath("/tasks");
@@ -240,6 +232,16 @@ export async function reorderTask({
   prevKey: number | null;
   nextKey: number | null;
 }) {
+  const { user } = await requireUser();
+
+  // member_sort_key is per-user priority: you may only reorder your own list, not someone else's.
+  const ownMemberIds = await memberIdsForUser(user.id);
+  if (!ownMemberIds.includes(memberId)) {
+    throw new ForbiddenError(`member ${memberId} does not belong to the current user`);
+  }
+
+  await assertTaskAssignee(taskId, user.id);
+
   let newKey: number;
   if (prevKey === null && nextKey === null) return;
   if (prevKey === null) newKey = nextKey! - 1000;
