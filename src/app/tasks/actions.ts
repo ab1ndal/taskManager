@@ -10,6 +10,18 @@ import {
   memberIdsForUser,
   ForbiddenError,
 } from "@/lib/auth";
+import {
+  parseInput,
+  taskIdSchema,
+  createTaskWithSubtasksSchema,
+  updateTaskSchema,
+  reorderTaskSchema,
+} from "./schemas";
+import type {
+  CreateTaskWithSubtasksInput,
+  UpdateTaskInput,
+  ReorderTaskInput,
+} from "./schemas";
 
 // Every exported function in this file is a public endpoint. Each one authenticates the caller and
 // then authorizes them for the specific row named in its arguments — a disabled button or a
@@ -35,8 +47,9 @@ async function nextSortKey(
   return last ? (last.member_sort_key as number) + 1000 : 1000;
 }
 
-export async function completeTask(taskId: string) {
+export async function completeTask(rawTaskId: string) {
   const { user } = await requireUser();
+  const taskId = parseInput(taskIdSchema, rawTaskId);
   await assertTaskAssignee(taskId, user.id);
 
   const admin = createAdminClient();
@@ -70,8 +83,9 @@ export async function completeTask(taskId: string) {
   revalidatePath("/tasks");
 }
 
-export async function deleteTask(taskId: string) {
+export async function deleteTask(rawTaskId: string) {
   const { user } = await requireUser();
+  const taskId = parseInput(taskIdSchema, rawTaskId);
   await assertTaskAssignee(taskId, user.id);
 
   const admin = createAdminClient();
@@ -80,22 +94,14 @@ export async function deleteTask(taskId: string) {
   revalidatePath("/tasks");
 }
 
-export async function createTaskWithSubtasks({
-  title,
-  description,
-  dueAt,
-  workspaceId,
-  memberIds,
-  subtasks,
-}: {
-  title: string;
-  description?: string;
-  dueAt?: string;
-  workspaceId: string;
-  memberIds: string[];
-  subtasks: { title: string; dueAt?: string; description?: string }[];
-}): Promise<{ subtaskErrors: number }> {
+export async function createTaskWithSubtasks(
+  input: CreateTaskWithSubtasksInput
+): Promise<{ subtaskErrors: number }> {
   const { user } = await requireUser();
+  const { title, description, dueAt, workspaceId, memberIds, subtasks } = parseInput(
+    createTaskWithSubtasksSchema,
+    input
+  );
   const uniqueMemberIds = [...new Set(memberIds)];
 
   await assertWorkspaceMember(workspaceId, user.id);
@@ -157,20 +163,9 @@ export async function createTaskWithSubtasks({
   return { subtaskErrors };
 }
 
-export async function updateTask({
-  taskId,
-  title,
-  description,
-  dueAt,
-  memberIds,
-}: {
-  taskId: string;
-  title: string;
-  description?: string;
-  dueAt?: string;
-  memberIds: string[];
-}) {
+export async function updateTask(input: UpdateTaskInput) {
   const { user } = await requireUser();
+  const { taskId, title, description, dueAt, memberIds } = parseInput(updateTaskSchema, input);
   await assertTaskAssignee(taskId, user.id);
 
   const admin = createAdminClient();
@@ -221,18 +216,9 @@ export async function updateTask({
   revalidatePath("/tasks");
 }
 
-export async function reorderTask({
-  taskId,
-  memberId,
-  prevKey,
-  nextKey,
-}: {
-  taskId: string;
-  memberId: string;
-  prevKey: number | null;
-  nextKey: number | null;
-}) {
+export async function reorderTask(input: ReorderTaskInput) {
   const { user } = await requireUser();
+  const { taskId, memberId, prevKey, nextKey } = parseInput(reorderTaskSchema, input);
 
   // member_sort_key is per-user priority: you may only reorder your own list, not someone else's.
   const ownMemberIds = await memberIdsForUser(user.id);

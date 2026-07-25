@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useRef } from "react";
 import { createTaskWithSubtasks } from "./actions";
+import { createTaskWithSubtasksSchema } from "./schemas";
 import { toast } from "../../components/toaster";
 import type { RawTask } from "./bucket-tasks";
 
@@ -87,30 +88,43 @@ export function NewTaskModal({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !workspaceId || selectedMemberIds.length === 0) return;
 
-    // Snapshot form values before resetting
+    // Same schema the action parses, so the optimistic task below can never be one the server is
+    // about to reject.
+    const parsed = createTaskWithSubtasksSchema.safeParse({
+      title,
+      description: description.trim() || undefined,
+      dueAt: dueAt || undefined,
+      workspaceId,
+      memberIds: selectedMemberIds,
+      subtasks: subtaskRows
+        .filter((r) => r.title.trim())
+        .map((r) => ({
+          title: r.title,
+          dueAt: r.dueAt || undefined,
+          description: r.description.trim() || undefined,
+        })),
+    });
+
+    if (!parsed.success) {
+      toast(parsed.error.issues[0].message, "error");
+      return;
+    }
+
+    const input = parsed.data;
     const tempId = crypto.randomUUID();
-    const trimmedTitle = title.trim();
-    const trimmedDescription = description.trim() || undefined;
-    const snapshotDueAt = dueAt || undefined;
-    const snapshotWorkspaceId = workspaceId;
-    const snapshotMemberIds = [...selectedMemberIds];
-    const snapshotSubtasks = subtaskRows
-      .filter((r) => r.title.trim())
-      .map((r) => ({ title: r.title.trim(), dueAt: r.dueAt || undefined, description: r.description.trim() || undefined }));
-    const ws = workspaces.find((w) => w.id === workspaceId)!;
+    const ws = workspaces.find((w) => w.id === input.workspaceId)!;
 
     // Build optimistic RawTask
     const optimisticTask: RawTask = {
       id: tempId,
-      title: trimmedTitle,
-      due_at: snapshotDueAt ? `${snapshotDueAt}T00:00:00Z` : null,
+      title: input.title,
+      due_at: input.dueAt ? `${input.dueAt}T00:00:00Z` : null,
       completed_at: null,
       workspace: { id: ws.id, name: ws.name, kind: ws.kind },
       member_sort_key: 0,
-      assignee_count: snapshotMemberIds.length,
-      member_ids: snapshotMemberIds,
+      assignee_count: input.memberIds.length,
+      member_ids: input.memberIds,
       subtasks: [],
     };
 
@@ -122,14 +136,7 @@ export function NewTaskModal({
 
     startTransition(async () => {
       try {
-        const { subtaskErrors } = await createTaskWithSubtasks({
-          title: trimmedTitle,
-          description: trimmedDescription,
-          dueAt: snapshotDueAt,
-          workspaceId: snapshotWorkspaceId,
-          memberIds: snapshotMemberIds,
-          subtasks: snapshotSubtasks,
-        });
+        const { subtaskErrors } = await createTaskWithSubtasks(input);
         if (subtaskErrors > 0) {
           toast(`Task created, but ${subtaskErrors} subtask(s) could not be saved`, "warning");
         }

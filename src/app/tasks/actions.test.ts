@@ -10,21 +10,33 @@ import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTa
 
 beforeEach(() => jest.clearAllMocks());
 
+// Ids must be real UUIDs — the actions validate them against the schemas in ./schemas.
+const WS1 = "a0000000-0000-4000-8000-000000000001";
+const WS2 = "a0000000-0000-4000-8000-000000000002";
+const M1 = "b0000000-0000-4000-8000-000000000001";
+const M2 = "b0000000-0000-4000-8000-000000000002";
+const M_OUTSIDER = "b0000000-0000-4000-8000-000000000003";
+const T1 = "c0000000-0000-4000-8000-000000000001";
+const T_OTHER = "c0000000-0000-4000-8000-000000000002";
+const P1 = "d0000000-0000-4000-8000-000000000001";
+const S1 = "d0000000-0000-4000-8000-000000000002";
+const S2 = "d0000000-0000-4000-8000-000000000003";
+
 /**
- * Default fixture: two members of ws-1 (m-1 is the signed-in user, m-2 a colleague), one outsider
- * in ws-2, and one task t-1 assigned to m-1.
+ * Default fixture: two members of WS1 (M1 is the signed-in user, M2 a colleague), one outsider in
+ * WS2, and one task T1 assigned to M1.
  */
 function seed(): Tables {
   return {
     workspace_members: [
-      { id: "m-1", workspace_id: "ws-1", auth_user_id: "auth-user-1" },
-      { id: "m-2", workspace_id: "ws-1", auth_user_id: "auth-user-2" },
-      { id: "m-outsider", workspace_id: "ws-2", auth_user_id: "auth-user-3" },
+      { id: M1, workspace_id: WS1, auth_user_id: "auth-user-1" },
+      { id: M2, workspace_id: WS1, auth_user_id: "auth-user-2" },
+      { id: M_OUTSIDER, workspace_id: WS2, auth_user_id: "auth-user-3" },
     ],
     tasks: [
-      { id: "t-1", workspace_id: "ws-1", parent_task_id: null, completed_at: null, title: "Task 1" },
+      { id: T1, workspace_id: WS1, parent_task_id: null, completed_at: null, title: "Task 1" },
     ],
-    task_assignments: [{ task_id: "t-1", member_id: "m-1", member_sort_key: 1000 }],
+    task_assignments: [{ task_id: T1, member_id: M1, member_sort_key: 1000 }],
   };
 }
 
@@ -50,7 +62,7 @@ describe("completeTask", () => {
   it("marks task complete and revalidates", async () => {
     const { tables } = setup();
 
-    await completeTask("t-1");
+    await completeTask(T1);
 
     expect(tasksIn(tables)[0].completed_at).toEqual(expect.any(String));
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
@@ -59,39 +71,39 @@ describe("completeTask", () => {
   it("auto-completes parent when all siblings are done", async () => {
     const tables = seed();
     tables.tasks.push(
-      { id: "p-1", workspace_id: "ws-1", parent_task_id: null, completed_at: null },
-      { id: "s-1", workspace_id: "ws-1", parent_task_id: "p-1", completed_at: null },
-      { id: "s-2", workspace_id: "ws-1", parent_task_id: "p-1", completed_at: "2026-01-01T00:00:00Z" }
+      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null },
+      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null },
+      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: "2026-01-01T00:00:00Z" }
     );
-    tables.task_assignments.push({ task_id: "s-1", member_id: "m-1", member_sort_key: 2000 });
+    tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
     setup({ tables });
 
-    await completeTask("s-1");
+    await completeTask(S1);
 
-    const parent = tasksIn(tables).find((t) => t.id === "p-1");
+    const parent = tasksIn(tables).find((t) => t.id === P1);
     expect(parent?.completed_at).toEqual(expect.any(String));
   });
 
   it("does not auto-complete parent when siblings remain", async () => {
     const tables = seed();
     tables.tasks.push(
-      { id: "p-1", workspace_id: "ws-1", parent_task_id: null, completed_at: null },
-      { id: "s-1", workspace_id: "ws-1", parent_task_id: "p-1", completed_at: null },
-      { id: "s-2", workspace_id: "ws-1", parent_task_id: "p-1", completed_at: null }
+      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null },
+      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null },
+      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: null }
     );
-    tables.task_assignments.push({ task_id: "s-1", member_id: "m-1", member_sort_key: 2000 });
+    tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
     setup({ tables });
 
-    await completeTask("s-1");
+    await completeTask(S1);
 
-    const parent = tasksIn(tables).find((t) => t.id === "p-1");
+    const parent = tasksIn(tables).find((t) => t.id === P1);
     expect(parent?.completed_at).toBeNull();
   });
 
   it("rejects an unauthenticated caller", async () => {
     const { tables } = setup({ user: null });
 
-    await expect(completeTask("t-1")).rejects.toThrow("Unauthorized");
+    await expect(completeTask(T1)).rejects.toThrow("Unauthorized");
 
     expect(tasksIn(tables)[0].completed_at).toBeNull();
     expect(revalidatePath).not.toHaveBeenCalled();
@@ -99,13 +111,13 @@ describe("completeTask", () => {
 
   it("rejects a caller who is not assigned to the task", async () => {
     const tables = seed();
-    tables.tasks.push({ id: "t-other", workspace_id: "ws-1", parent_task_id: null, completed_at: null });
-    tables.task_assignments.push({ task_id: "t-other", member_id: "m-2", member_sort_key: 1000 });
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, parent_task_id: null, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
     setup({ tables });
 
-    await expect(completeTask("t-other")).rejects.toThrow("Forbidden");
+    await expect(completeTask(T_OTHER)).rejects.toThrow("Forbidden");
 
-    expect(tasksIn(tables).find((t) => t.id === "t-other")?.completed_at).toBeNull();
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)?.completed_at).toBeNull();
   });
 });
 
@@ -115,7 +127,7 @@ describe("deleteTask", () => {
   it("deletes task and revalidates /tasks", async () => {
     const { tables } = setup();
 
-    await deleteTask("t-1");
+    await deleteTask(T1);
 
     expect(tasksIn(tables)).toHaveLength(0);
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
@@ -124,20 +136,20 @@ describe("deleteTask", () => {
   it("rejects an unauthenticated caller", async () => {
     const { tables } = setup({ user: null });
 
-    await expect(deleteTask("t-1")).rejects.toThrow("Unauthorized");
+    await expect(deleteTask(T1)).rejects.toThrow("Unauthorized");
 
     expect(tasksIn(tables)).toHaveLength(1);
   });
 
   it("rejects a caller who is not assigned to the task", async () => {
     const tables = seed();
-    tables.tasks.push({ id: "t-other", workspace_id: "ws-1", parent_task_id: null, completed_at: null });
-    tables.task_assignments.push({ task_id: "t-other", member_id: "m-2", member_sort_key: 1000 });
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, parent_task_id: null, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
     setup({ tables });
 
-    await expect(deleteTask("t-other")).rejects.toThrow("Forbidden");
+    await expect(deleteTask(T_OTHER)).rejects.toThrow("Forbidden");
 
-    expect(tasksIn(tables).find((t) => t.id === "t-other")).toBeDefined();
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)).toBeDefined();
   });
 });
 
@@ -149,15 +161,15 @@ describe("createTaskWithSubtasks", () => {
 
     const result = await createTaskWithSubtasks({
       title: "Parent task",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
+      workspaceId: WS1,
+      memberIds: [M1],
       subtasks: [],
     });
 
     const parent = tasksIn(tables).find((t) => t.title === "Parent task");
-    expect(parent).toMatchObject({ workspace_id: "ws-1", description: null, due_at: null });
+    expect(parent).toMatchObject({ workspace_id: WS1, description: null, due_at: null });
     expect(assignmentsIn(tables)).toContainEqual(
-      expect.objectContaining({ task_id: parent!.id, member_id: "m-1" })
+      expect.objectContaining({ task_id: parent!.id, member_id: M1 })
     );
     expect(result).toEqual({ subtaskErrors: 0 });
     expect(revalidatePath).toHaveBeenCalledTimes(1);
@@ -169,8 +181,8 @@ describe("createTaskWithSubtasks", () => {
     const result = await createTaskWithSubtasks({
       title: "Parent",
       description: "Arrange catering and venue",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
+      workspaceId: WS1,
+      memberIds: [M1],
       subtasks: [{ title: "Subtask A", dueAt: "2026-03-25" }],
     });
 
@@ -183,7 +195,7 @@ describe("createTaskWithSubtasks", () => {
       due_at: "2026-03-25T00:00:00Z",
     });
     expect(assignmentsIn(tables)).toContainEqual(
-      expect.objectContaining({ task_id: subtask!.id, member_id: "m-1" })
+      expect.objectContaining({ task_id: subtask!.id, member_id: M1 })
     );
     expect(result).toEqual({ subtaskErrors: 0 });
   });
@@ -194,8 +206,8 @@ describe("createTaskWithSubtasks", () => {
     await createTaskWithSubtasks({
       title: "Meeting",
       dueAt: "2026-06-15",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
+      workspaceId: WS1,
+      memberIds: [M1],
       subtasks: [{ title: "No-date subtask" }],
     });
 
@@ -212,8 +224,8 @@ describe("createTaskWithSubtasks", () => {
 
     await createTaskWithSubtasks({
       title: "Shared",
-      workspaceId: "ws-1",
-      memberIds: ["m-1", "m-2"],
+      workspaceId: WS1,
+      memberIds: [M1, M2],
       subtasks: [],
     });
 
@@ -221,10 +233,10 @@ describe("createTaskWithSubtasks", () => {
     const forShared = assignmentsIn(tables).filter((a) => a.task_id === shared!.id);
 
     expect(forShared).toContainEqual(
-      expect.objectContaining({ member_id: "m-1", member_sort_key: 2000 })
+      expect.objectContaining({ member_id: M1, member_sort_key: 2000 })
     );
     expect(forShared).toContainEqual(
-      expect.objectContaining({ member_id: "m-2", member_sort_key: 1000 })
+      expect.objectContaining({ member_id: M2, member_sort_key: 1000 })
     );
   });
 
@@ -233,8 +245,8 @@ describe("createTaskWithSubtasks", () => {
 
     await createTaskWithSubtasks({
       title: "Dedup test",
-      workspaceId: "ws-1",
-      memberIds: ["m-1", "m-1", "m-1"],
+      workspaceId: WS1,
+      memberIds: [M1, M1, M1],
       subtasks: [],
     });
 
@@ -256,8 +268,8 @@ describe("createTaskWithSubtasks", () => {
 
     const result = await createTaskWithSubtasks({
       title: "Parent",
-      workspaceId: "ws-1",
-      memberIds: ["m-1"],
+      workspaceId: WS1,
+      memberIds: [M1],
       subtasks: [{ title: "Bad subtask" }],
     });
 
@@ -275,8 +287,8 @@ describe("createTaskWithSubtasks", () => {
     await expect(
       createTaskWithSubtasks({
         title: "Failing parent",
-        workspaceId: "ws-1",
-        memberIds: ["m-1"],
+        workspaceId: WS1,
+        memberIds: [M1],
         subtasks: [],
       })
     ).rejects.toThrow("constraint violation");
@@ -288,7 +300,7 @@ describe("createTaskWithSubtasks", () => {
     const { tables } = setup({ user: null });
 
     await expect(
-      createTaskWithSubtasks({ title: "X", workspaceId: "ws-1", memberIds: ["m-1"], subtasks: [] })
+      createTaskWithSubtasks({ title: "X", workspaceId: WS1, memberIds: [M1], subtasks: [] })
     ).rejects.toThrow("Unauthorized");
 
     expect(tasksIn(tables)).toHaveLength(1);
@@ -298,8 +310,8 @@ describe("createTaskWithSubtasks", () => {
     const { tables } = setup();
 
     await expect(
-      createTaskWithSubtasks({ title: "X", workspaceId: "ws-2", memberIds: [], subtasks: [] })
-    ).rejects.toThrow("not a member of workspace ws-2");
+      createTaskWithSubtasks({ title: "X", workspaceId: WS2, memberIds: [M1], subtasks: [] })
+    ).rejects.toThrow(`not a member of workspace ${WS2}`);
 
     expect(tasksIn(tables)).toHaveLength(1);
   });
@@ -310,11 +322,11 @@ describe("createTaskWithSubtasks", () => {
     await expect(
       createTaskWithSubtasks({
         title: "X",
-        workspaceId: "ws-1",
-        memberIds: ["m-1", "m-outsider"],
+        workspaceId: WS1,
+        memberIds: [M1, M_OUTSIDER],
         subtasks: [],
       })
-    ).rejects.toThrow("members not in workspace ws-1: m-outsider");
+    ).rejects.toThrow(`members not in workspace ${WS1}: ${M_OUTSIDER}`);
 
     expect(tasksIn(tables)).toHaveLength(1);
   });
@@ -326,7 +338,7 @@ describe("updateTask", () => {
   it("updates task fields and revalidates", async () => {
     const { tables } = setup();
 
-    await updateTask({ taskId: "t-1", title: "Updated title", dueAt: "2026-05-01", memberIds: ["m-1"] });
+    await updateTask({ taskId: T1, title: "Updated title", dueAt: "2026-05-01", memberIds: [M1] });
 
     expect(tasksIn(tables)[0]).toMatchObject({
       title: "Updated title",
@@ -339,17 +351,17 @@ describe("updateTask", () => {
   it("adds new assignees and removes dropped ones", async () => {
     const { tables } = setup();
 
-    await updateTask({ taskId: "t-1", title: "T", memberIds: ["m-2"] });
+    await updateTask({ taskId: T1, title: "T", memberIds: [M2] });
 
-    const forTask = assignmentsIn(tables).filter((a) => a.task_id === "t-1");
+    const forTask = assignmentsIn(tables).filter((a) => a.task_id === T1);
     expect(forTask).toHaveLength(1);
-    expect(forTask[0]).toMatchObject({ member_id: "m-2", member_sort_key: 1000 });
+    expect(forTask[0]).toMatchObject({ member_id: M2, member_sort_key: 1000 });
   });
 
   it("rejects an unauthenticated caller", async () => {
     const { tables } = setup({ user: null });
 
-    await expect(updateTask({ taskId: "t-1", title: "Hacked", memberIds: ["m-1"] })).rejects.toThrow(
+    await expect(updateTask({ taskId: T1, title: "Hacked", memberIds: [M1] })).rejects.toThrow(
       "Unauthorized"
     );
 
@@ -358,26 +370,26 @@ describe("updateTask", () => {
 
   it("rejects a caller who is not assigned to the task", async () => {
     const tables = seed();
-    tables.tasks.push({ id: "t-other", workspace_id: "ws-1", title: "Theirs", completed_at: null });
-    tables.task_assignments.push({ task_id: "t-other", member_id: "m-2", member_sort_key: 1000 });
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, title: "Theirs", completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
     setup({ tables });
 
     await expect(
-      updateTask({ taskId: "t-other", title: "Hacked", memberIds: ["m-1"] })
+      updateTask({ taskId: T_OTHER, title: "Hacked", memberIds: [M1] })
     ).rejects.toThrow("Forbidden");
 
-    expect(tasksIn(tables).find((t) => t.id === "t-other")?.title).toBe("Theirs");
+    expect(tasksIn(tables).find((t) => t.id === T_OTHER)?.title).toBe("Theirs");
   });
 
   it("rejects reassignment to a member of another workspace", async () => {
     const { tables } = setup();
 
     await expect(
-      updateTask({ taskId: "t-1", title: "T", memberIds: ["m-outsider"] })
-    ).rejects.toThrow("members not in workspace ws-1: m-outsider");
+      updateTask({ taskId: T1, title: "T", memberIds: [M_OUTSIDER] })
+    ).rejects.toThrow(`members not in workspace ${WS1}: ${M_OUTSIDER}`);
 
     expect(assignmentsIn(tables)).toHaveLength(1);
-    expect(assignmentsIn(tables)[0].member_id).toBe("m-1");
+    expect(assignmentsIn(tables)[0].member_id).toBe(M1);
   });
 });
 
@@ -385,12 +397,12 @@ describe("updateTask", () => {
 
 describe("reorderTask", () => {
   const keyOf = (tables: Tables) =>
-    assignmentsIn(tables).find((a) => a.task_id === "t-1")?.member_sort_key;
+    assignmentsIn(tables).find((a) => a.task_id === T1)?.member_sort_key;
 
   it("computes midpoint key between prev and next", async () => {
     const { tables } = setup();
 
-    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: 1000, nextKey: 3000 });
+    await reorderTask({ taskId: T1, memberId: M1, prevKey: 1000, nextKey: 3000 });
 
     expect(keyOf(tables)).toBe(2000);
     expect(revalidatePath).toHaveBeenCalledWith("/tasks");
@@ -399,7 +411,7 @@ describe("reorderTask", () => {
   it("uses prevKey + 1000 when dropped at end", async () => {
     const { tables } = setup();
 
-    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: 5000, nextKey: null });
+    await reorderTask({ taskId: T1, memberId: M1, prevKey: 5000, nextKey: null });
 
     expect(keyOf(tables)).toBe(6000);
   });
@@ -407,7 +419,7 @@ describe("reorderTask", () => {
   it("uses nextKey - 1000 when dropped at start", async () => {
     const { tables } = setup();
 
-    await reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: null, nextKey: 3000 });
+    await reorderTask({ taskId: T1, memberId: M1, prevKey: null, nextKey: 3000 });
 
     expect(keyOf(tables)).toBe(2000);
   });
@@ -416,7 +428,7 @@ describe("reorderTask", () => {
     const { tables } = setup({ user: null });
 
     await expect(
-      reorderTask({ taskId: "t-1", memberId: "m-1", prevKey: 1000, nextKey: 3000 })
+      reorderTask({ taskId: T1, memberId: M1, prevKey: 1000, nextKey: 3000 })
     ).rejects.toThrow("Unauthorized");
 
     expect(keyOf(tables)).toBe(1000);
@@ -424,24 +436,133 @@ describe("reorderTask", () => {
 
   it("rejects reordering another member's list", async () => {
     const tables = seed();
-    tables.task_assignments.push({ task_id: "t-1", member_id: "m-2", member_sort_key: 5000 });
+    tables.task_assignments.push({ task_id: T1, member_id: M2, member_sort_key: 5000 });
     setup({ tables });
 
     await expect(
-      reorderTask({ taskId: "t-1", memberId: "m-2", prevKey: 1000, nextKey: 3000 })
-    ).rejects.toThrow("member m-2 does not belong to the current user");
+      reorderTask({ taskId: T1, memberId: M2, prevKey: 1000, nextKey: 3000 })
+    ).rejects.toThrow(`member ${M2} does not belong to the current user`);
 
-    expect(assignmentsIn(tables).find((a) => a.member_id === "m-2")?.member_sort_key).toBe(5000);
+    expect(assignmentsIn(tables).find((a) => a.member_id === M2)?.member_sort_key).toBe(5000);
   });
 
   it("rejects a caller who is not assigned to the task", async () => {
     const tables = seed();
-    tables.tasks.push({ id: "t-other", workspace_id: "ws-1", completed_at: null });
-    tables.task_assignments.push({ task_id: "t-other", member_id: "m-2", member_sort_key: 1000 });
+    tables.tasks.push({ id: T_OTHER, workspace_id: WS1, completed_at: null });
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M2, member_sort_key: 1000 });
     setup({ tables });
 
     await expect(
-      reorderTask({ taskId: "t-other", memberId: "m-1", prevKey: 1000, nextKey: 3000 })
+      reorderTask({ taskId: T_OTHER, memberId: M1, prevKey: 1000, nextKey: 3000 })
     ).rejects.toThrow("Forbidden");
+  });
+});
+
+// ─── input validation ────────────────────────────────────────────────────────
+
+describe("input validation", () => {
+  it("rejects a malformed task id before touching the database", async () => {
+    const { tables } = setup();
+
+    await expect(completeTask("not-a-uuid")).rejects.toThrow("Expected a UUID");
+
+    expect(tasksIn(tables)[0].completed_at).toBeNull();
+  });
+
+  it("rejects an oversized title", async () => {
+    const { tables } = setup();
+
+    await expect(
+      createTaskWithSubtasks({
+        title: "x".repeat(201),
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: [],
+      })
+    ).rejects.toThrow("Title must be 200 characters or fewer");
+
+    expect(tasksIn(tables)).toHaveLength(1);
+  });
+
+  it("rejects a blank title", async () => {
+    setup();
+
+    await expect(
+      createTaskWithSubtasks({ title: "   ", workspaceId: WS1, memberIds: [M1], subtasks: [] })
+    ).rejects.toThrow("Title is required");
+  });
+
+  it("trims the title before storing it", async () => {
+    const { tables } = setup();
+
+    await createTaskWithSubtasks({
+      title: "  Padded  ",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+    });
+
+    expect(tasksIn(tables).some((t) => t.title === "Padded")).toBe(true);
+  });
+
+  it("rejects an oversized description", async () => {
+    setup();
+
+    await expect(
+      createTaskWithSubtasks({
+        title: "Fine",
+        description: "x".repeat(2001),
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: [],
+      })
+    ).rejects.toThrow("Description must be 2000 characters or fewer");
+  });
+
+  it("rejects a due date that is not YYYY-MM-DD", async () => {
+    setup();
+
+    await expect(
+      createTaskWithSubtasks({
+        title: "Fine",
+        dueAt: "15/06/2026",
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: [],
+      })
+    ).rejects.toThrow("Due date must be in YYYY-MM-DD format");
+  });
+
+  it("rejects more than 50 subtasks", async () => {
+    setup();
+
+    await expect(
+      createTaskWithSubtasks({
+        title: "Fine",
+        workspaceId: WS1,
+        memberIds: [M1],
+        subtasks: Array.from({ length: 51 }, (_, i) => ({ title: `Step ${i}` })),
+      })
+    ).rejects.toThrow("A task cannot have more than 50 subtasks");
+  });
+
+  it("rejects an update that would leave the task with no assignees", async () => {
+    const { tables } = setup();
+
+    await expect(updateTask({ taskId: T1, title: "T", memberIds: [] })).rejects.toThrow(
+      "Assign the task to at least one person"
+    );
+
+    expect(assignmentsIn(tables)).toHaveLength(1);
+  });
+
+  it("rejects a reorder whose keys are out of order", async () => {
+    const { tables } = setup();
+
+    await expect(
+      reorderTask({ taskId: T1, memberId: M1, prevKey: 3000, nextKey: 1000 })
+    ).rejects.toThrow("prevKey must be less than nextKey");
+
+    expect(assignmentsIn(tables)[0].member_sort_key).toBe(1000);
   });
 });

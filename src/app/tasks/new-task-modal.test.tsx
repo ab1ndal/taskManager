@@ -15,30 +15,30 @@ jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSear
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 const mockWs = {
-  id: "ws-1",
+  id: "a0000000-0000-4000-8000-000000000001",
   name: "Home",
   kind: "household",
   members: [
-    { id: "m-1", display_name: "Alice" },
-    { id: "m-2", display_name: "Bob" },
+    { id: "b0000000-0000-4000-8000-000000000001", display_name: "Alice" },
+    { id: "b0000000-0000-4000-8000-000000000002", display_name: "Bob" },
   ],
 };
 
 const workspaces = [
   {
-    id: "ws-1",
+    id: "a0000000-0000-4000-8000-000000000001",
     name: "Home",
     kind: "household",
     members: [
-      { id: "m-1", display_name: "Alice" },
-      { id: "m-2", display_name: "Bob" },
+      { id: "b0000000-0000-4000-8000-000000000001", display_name: "Alice" },
+      { id: "b0000000-0000-4000-8000-000000000002", display_name: "Bob" },
     ],
   },
   {
-    id: "ws-2",
+    id: "a0000000-0000-4000-8000-000000000002",
     name: "Acme Corp",
     kind: "work",
-    members: [{ id: "m-3", display_name: "Carol" }],
+    members: [{ id: "b0000000-0000-4000-8000-000000000003", display_name: "Carol" }],
   },
 ];
 
@@ -49,7 +49,7 @@ function renderModal(open = true) {
       open={open}
       onClose={onClose}
       workspaces={workspaces}
-      currentMemberIds={["m-1"]}
+      currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
     />
   );
   return { onClose };
@@ -185,7 +185,7 @@ describe("NewTaskModal — member selection", () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(createTaskWithSubtasks).toHaveBeenCalledWith(
-      expect.objectContaining({ memberIds: ["m-2"] })
+      expect.objectContaining({ memberIds: ["b0000000-0000-4000-8000-000000000002"] })
     );
   });
 
@@ -197,7 +197,7 @@ describe("NewTaskModal — member selection", () => {
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(createTaskWithSubtasks).toHaveBeenCalledWith(
-      expect.objectContaining({ memberIds: expect.arrayContaining(["m-1", "m-2"]) })
+      expect.objectContaining({ memberIds: expect.arrayContaining(["b0000000-0000-4000-8000-000000000001", "b0000000-0000-4000-8000-000000000002"]) })
     );
   });
 });
@@ -209,7 +209,7 @@ describe("NewTaskModal — workspace switching", () => {
 
   it("switches workspace and shows new workspace members", () => {
     renderModal();
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "ws-2" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "a0000000-0000-4000-8000-000000000002" } });
     expect(screen.getByRole("checkbox", { name: /carol/i })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: /alice/i })).not.toBeInTheDocument();
   });
@@ -219,7 +219,7 @@ describe("NewTaskModal — workspace switching", () => {
     // Check Bob first in ws-1
     fireEvent.click(screen.getByRole("checkbox", { name: /bob/i }));
     // Switch to ws-2 — Carol is not in currentMemberIds so she should be unchecked
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "ws-2" } });
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "a0000000-0000-4000-8000-000000000002" } });
     expect(screen.getByRole("checkbox", { name: /carol/i })).not.toBeChecked();
   });
 });
@@ -378,7 +378,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
         open={true}
         onClose={onClose}
         workspaces={workspaces}
-        currentMemberIds={["m-1"]}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
         onTaskCreated={onTaskCreated}
       />
     );
@@ -401,7 +401,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
         open={true}
         onClose={onClose}
         workspaces={workspaces}
-        currentMemberIds={["m-1"]}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
       />
     );
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
@@ -419,7 +419,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
         open={true}
         onClose={jest.fn()}
         workspaces={workspaces}
-        currentMemberIds={["m-1"]}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
         onTaskCreated={onTaskCreated}
         onTaskError={onTaskError}
       />
@@ -438,7 +438,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
 
 describe("NewTaskModal — subtask description", () => {
   it("renders description textarea for each subtask row", async () => {
-    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["m-1"]} onClose={() => {}} />);
+    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />);
     await userEvent.click(screen.getByText("+ Add subtask"));
     expect(screen.getByPlaceholderText("Details…")).toBeInTheDocument();
   });
@@ -447,7 +447,7 @@ describe("NewTaskModal — subtask description", () => {
     const mock = jest.mocked(createTaskWithSubtasks);
     mock.mockResolvedValue({ subtaskErrors: 0 });
 
-    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["m-1"]} onClose={() => {}} />);
+    render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />);
 
     await userEvent.type(screen.getByPlaceholderText("Task title"), "Parent");
     await userEvent.click(screen.getByText("+ Add subtask"));
