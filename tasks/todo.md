@@ -57,9 +57,17 @@ the current user must not be shown."
 
 Same trap applies to any future insert-then-return on `task_assignments` and `task_updates`.
 
+- [x] **Task 5** — zod 4 schemas in `src/app/tasks/schemas.ts`, parsed after `requireUser()`, and
+      reused by both modals before their optimistic close. `23ae4cb`.
+      Zod 4 API: top-level `z.uuid()` / `z.iso.date()`, `z.flattenError()`. Not the v3 method forms.
+      `memberIds` requires ≥1 in create *and* update — an empty list makes the task invisible to
+      everyone, not merely unassigned.
+      All test fixtures now use real UUIDs; `"t-1"`-style ids fail validation.
+      Verified: `npx tsc --noEmit` clean, 134 tests pass, lint unchanged.
+
 ## In progress
 
-- [ ] **Task 5** — zod schemas at the action boundary.
+- [ ] **Task 6** — actions return `{ ok, error }`; surface failures.
 
 ## Lint findings, deferred (surfaced once `npm run lint` worked again)
 
@@ -78,7 +86,6 @@ out of scope, and the first one is a deliberate decision.
 
 ## Next
 
-- [ ] **Task 5** — zod schemas at the action boundary, shared with the modals.
 - [ ] **Task 6** — Actions return `{ ok, error }`; surface failures via toaster; add `error.tsx` /
       `loading.tsx`; roll back optimistic state.
 - [ ] **Task 7** — Completing a parent task completes its subtasks; re-enable the disabled button.
