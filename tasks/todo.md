@@ -47,8 +47,22 @@ Same trap applies to any future insert-then-return on `task_assignments` and `ta
 
 ## In progress
 
-- [ ] **Task 8** — Cleanup: untrack build artifacts, fix the dead `next lint` script.
-      Independent of everything; pulled forward because it is verifiable today.
+- [ ] **Task 4** — see Next.
+
+## Lint findings, deferred (surfaced once `npm run lint` worked again)
+
+`npm run lint` now runs and reports 2 errors + 4 warnings, all pre-existing. Not fixed in Task 8 —
+out of scope, and the first one is a deliberate decision.
+
+- `react-hooks/set-state-in-effect` at `tasks-page-client.tsx:64` — this is the
+  "sync localTasks with server data on revalidation" effect from commit `3e03df1`. Task 6 rewrites
+  this area for optimistic rollback; fix it there, not before.
+- `react-hooks/set-state-in-effect` at `login-card.tsx:26` — belongs to Phase 04.
+- Unused `supabase` binding at `actions.ts:102` — dead `createClient()` call inside
+  `createTaskWithSubtasks`. Task 4 rewrites that function; remove it there.
+- Unused `currentMemberIds` (`edit-task-modal.tsx:16`), unused `memberIdByWorkspaceId`
+  (`tasks-page-client.tsx:44`) — the latter is reserved for drag-to-reorder, Phase 05.
+- Unused `workspaceData` (`workspaces/actions.test.ts:99`).
 
 ## Next
 
