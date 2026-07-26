@@ -15,9 +15,14 @@ jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSear
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 beforeAll(() => {
-  // jsdom does not implement showModal(); mock it so Dialog's mount effect doesn't throw.
-  HTMLDialogElement.prototype.showModal = jest.fn();
-  HTMLDialogElement.prototype.close = jest.fn();
+  // jsdom does not implement showModal(); mock it so Dialog's mount effect doesn't throw, and set
+  // the `open` attribute so testing-library's accessibility tree treats dialog content as visible.
+  HTMLDialogElement.prototype.showModal = jest.fn(function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  });
+  HTMLDialogElement.prototype.close = jest.fn(function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+  });
 });
 
 const mockWs = {

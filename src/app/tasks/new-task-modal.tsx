@@ -4,6 +4,7 @@ import { useState, useTransition, useRef } from "react";
 import { createTaskWithSubtasks } from "./actions";
 import { createTaskWithSubtasksSchema } from "./schemas";
 import { toast } from "../../components/toaster";
+import { Dialog } from "@/components/dialog";
 import type { RawTask } from "./bucket-tasks";
 
 type WorkspaceMember = { id: string; display_name: string };
@@ -154,42 +155,36 @@ export function NewTaskModal({
 
   if (workspaces.length === 0) {
     return (
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-        onClick={onClose}
+      <Dialog
+        open={open}
+        onClose={onClose}
+        className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm text-center backdrop:bg-black/40"
       >
-        <div
-          className="bg-[var(--color-surface)] rounded-[14px] border border-[var(--color-border)] p-6 w-full max-w-sm mx-4 shadow-xl text-center"
-          onClick={(e) => e.stopPropagation()}
+        <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+          You must join a workspace before creating tasks.
+        </p>
+        <a
+          href="/workspaces"
+          className="text-sm font-medium text-[var(--color-accent)] hover:underline"
         >
-          <p className="text-sm text-[var(--color-text-secondary)] mb-4">
-            You must join a workspace before creating tasks.
-          </p>
-          <a
-            href="/workspaces"
-            className="text-sm font-medium text-[var(--color-accent)] hover:underline"
-          >
-            Go to Workspaces
-          </a>
-        </div>
-      </div>
+          Go to Workspaces
+        </a>
+      </Dialog>
     );
   }
 
   const disabled = pending;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      initialFocusSelector="input[type=text]"
+      ariaLabelledBy="new-task-modal-title"
     >
-      <div
-        className="bg-[var(--color-surface)] rounded-[14px] border border-[var(--color-border)] p-6 w-full max-w-md mx-4 shadow-xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-base font-semibold mb-4">New task</h3>
+      <h3 id="new-task-modal-title" className="text-base font-semibold mb-4">New task</h3>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="text"
             placeholder="Task title"
@@ -334,7 +329,6 @@ export function NewTaskModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }
