@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { createFakeSupabase, type FailureHook, type Row, type Tables } from "@/test/supabase-fake";
-import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask, getTaskUpdates } from "./actions";
+import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask, getTaskUpdates, addTaskUpdate } from "./actions";
 import { GENERIC_ERROR } from "./action-result";
 
 beforeEach(() => jest.clearAllMocks());
@@ -515,6 +515,37 @@ describe("getTaskUpdates", () => {
     setup({ tables: { ...seed(), task_updates: [] }, user: { id: "auth-user-3" } });
 
     const result = await getTaskUpdates(T1);
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+// ─── addTaskUpdate ───────────────────────────────────────────────────────────
+
+describe("addTaskUpdate", () => {
+  it("inserts an update authored by the caller's own member row and returns it", async () => {
+    setup({ tables: { ...seed(), task_updates: [] } });
+
+    const result = await addTaskUpdate({ taskId: T1, updateText: "Picked up the package" });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.update.updateText).toBe("Picked up the package");
+    expect(result.update.authorName).toBe("Alice");
+  });
+
+  it("rejects empty update text", async () => {
+    setup({ tables: { ...seed(), task_updates: [] } });
+
+    const result = await addTaskUpdate({ taskId: T1, updateText: "   " });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a user who is not assigned to the task", async () => {
+    setup({ tables: { ...seed(), task_updates: [] }, user: { id: "auth-user-3" } });
+
+    const result = await addTaskUpdate({ taskId: T1, updateText: "Not my task" });
 
     expect(result.ok).toBe(false);
   });

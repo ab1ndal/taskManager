@@ -54,6 +54,17 @@ export const updateTaskSchema = z.object({
   memberIds,
 });
 
+const updateText = z
+  .string()
+  .trim()
+  .min(1, "Update text is required")
+  .max(2000, "Update must be 2000 characters or fewer");
+
+export const createTaskUpdateSchema = z.object({
+  taskId: uuid,
+  updateText,
+});
+
 export const taskIdSchema = uuid;
 
 export const reorderTaskSchema = z
@@ -71,6 +82,7 @@ export const reorderTaskSchema = z
 export type CreateTaskWithSubtasksInput = z.input<typeof createTaskWithSubtasksSchema>;
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 export type ReorderTaskInput = z.input<typeof reorderTaskSchema>;
+export type CreateTaskUpdateInput = z.input<typeof createTaskUpdateSchema>;
 
 /** Thrown when input fails a schema. Carries per-field messages so the UI can point at the field. */
 export class ValidationError extends Error {

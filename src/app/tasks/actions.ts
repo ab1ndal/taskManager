@@ -17,12 +17,14 @@ import {
   createTaskWithSubtasksSchema,
   updateTaskSchema,
   reorderTaskSchema,
+  createTaskUpdateSchema,
 } from "./schemas";
 import { ValidationError } from "./schemas";
 import type {
   CreateTaskWithSubtasksInput,
   UpdateTaskInput,
   ReorderTaskInput,
+  CreateTaskUpdateInput,
 } from "./schemas";
 import { GENERIC_ERROR } from "./action-result";
 import type { ActionResult } from "./action-result";
@@ -384,5 +386,61 @@ export async function getTaskUpdates(rawTaskId: string): Promise<ActionResult<{ 
     }));
 
     return { updates };
+  });
+}
+
+export async function addTaskUpdate(input: CreateTaskUpdateInput): Promise<ActionResult<{ update: TaskUpdate }>> {
+  return run("addTaskUpdate", async () => {
+    const { user } = await requireUser();
+    const { taskId, updateText } = parseInput(createTaskUpdateSchema, input);
+    await assertTaskAssignee(taskId, user.id);
+
+    const ownMemberIds = await memberIdsForUser(user.id);
+    const admin = createAdminClient();
+
+    // A task belongs to one workspace and auth_user_id is unique within a workspace
+    // (workspace_members: unique(workspace_id, auth_user_id)), so at most one of the caller's own
+    // member rows can be assigned to this task — this resolves to exactly one author.
+    const { data: assignments, error: assignError } = await admin
+      .from("task_assignments")
+      .select("member_id")
+      .eq("task_id", taskId)
+      .in("member_id", ownMemberIds);
+
+    assertNoError("resolve update author", { error: assignError });
+
+    const memberId = assignments?.[0]?.member_id as string | undefined;
+    if (!memberId) throw new ForbiddenError(`not assigned to task ${taskId}`);
+
+    const createdAt = new Date().toISOString();
+    const updateId = crypto.randomUUID();
+
+    assertNoError(
+      "add task update",
+      await admin.from("task_updates").insert({
+        id: updateId,
+        task_id: taskId,
+        member_id: memberId,
+        update_text: updateText,
+        created_at: createdAt,
+      })
+    );
+
+    const { data: member, error: memberError } = await admin
+      .from("workspace_members")
+      .select("display_name")
+      .eq("id", memberId)
+      .single();
+
+    assertNoError("load author name", { error: memberError });
+
+    return {
+      update: {
+        id: updateId,
+        authorName: (member?.display_name as string) ?? "Unknown",
+        createdAt,
+        updateText,
+      },
+    };
   });
 }
