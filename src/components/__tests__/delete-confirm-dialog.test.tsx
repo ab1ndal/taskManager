@@ -18,7 +18,7 @@ describe("DeleteConfirmDialog", () => {
         onCancel={jest.fn()}
       />
     );
-    expect(screen.getByRole("button", { name: "Cancel delete" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Cancel delete", hidden: true })).toHaveFocus();
   });
 
   it('calls onConfirm when clicking "Confirm delete" button', () => {
@@ -31,7 +31,7 @@ describe("DeleteConfirmDialog", () => {
         onCancel={jest.fn()}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: 'Confirm delete "Buy milk"' }));
+    fireEvent.click(screen.getByRole("button", { name: 'Confirm delete "Buy milk"', hidden: true }));
     expect(onConfirm).toHaveBeenCalled();
   });
 
@@ -45,7 +45,7 @@ describe("DeleteConfirmDialog", () => {
         onCancel={onCancel}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: "Cancel delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel delete", hidden: true }));
     expect(onCancel).toHaveBeenCalled();
   });
 
@@ -58,10 +58,12 @@ describe("DeleteConfirmDialog", () => {
         onCancel={jest.fn()}
       />
     );
-    expect(screen.getByRole("button", { name: "Cancel delete" })).toHaveClass("min-h-11");
-    expect(screen.getByRole("button", { name: 'Confirm delete "Buy milk"' })).toHaveClass(
+    expect(screen.getByRole("button", { name: "Cancel delete", hidden: true })).toHaveClass(
       "min-h-11"
     );
+    expect(
+      screen.getByRole("button", { name: 'Confirm delete "Buy milk"', hidden: true })
+    ).toHaveClass("min-h-11");
   });
 
   it("has no axe violations", async () => {
