@@ -96,6 +96,43 @@ async function assignTaskMember(
   if (error) throw new Error(`assign task member: ${error.message}`);
 }
 
+/**
+ * Inserts a subtask row and assigns it the given members. Shared by `createTaskWithSubtasks`
+ * (batch, at parent-creation time) and `addSubtask` (single, on an already-existing task) — both
+ * need the identical insert-then-assign shape, just triggered at different times.
+ */
+async function insertSubtask(
+  admin: ReturnType<typeof createAdminClient>,
+  args: {
+    parentId: string;
+    workspaceId: string;
+    memberIds: string[];
+    title: string;
+    description?: string;
+    dueAt?: string;
+  }
+): Promise<string> {
+  const subtaskId = crypto.randomUUID();
+
+  assertNoError(
+    "create subtask",
+    await admin.from("tasks").insert({
+      id: subtaskId,
+      title: args.title,
+      description: args.description ?? null,
+      due_at: args.dueAt ? `${args.dueAt}T00:00:00Z` : null,
+      workspace_id: args.workspaceId,
+      parent_task_id: args.parentId,
+    })
+  );
+
+  for (const memberId of args.memberIds) {
+    await assignTaskMember(admin, subtaskId, memberId);
+  }
+
+  return subtaskId;
+}
+
 export async function completeTask(rawTaskId: string): Promise<ActionResult> {
   return run("completeTask", async () => {
     const { user } = await requireUser();
@@ -209,33 +246,26 @@ export async function createTaskWithSubtasks(
     // discarding it would lose work the user can see. The count travels back to the toaster.
     let subtaskErrors = 0;
     for (const sub of subtasks) {
-      const subtaskId = crypto.randomUUID();
-
-      const { error: subError } = await admin.from("tasks").insert({
-        id: subtaskId,
-        title: sub.title,
-        description: sub.description ?? null,
-        due_at: sub.dueAt ? `${sub.dueAt}T00:00:00Z` : null,
-        workspace_id: workspaceId,
-        parent_task_id: parentId,
-      });
-
-      if (subError) {
+      try {
+        await insertSubtask(admin, {
+          parentId,
+          workspaceId,
+          memberIds: uniqueMemberIds,
+          title: sub.title,
+          description: sub.description,
+          dueAt: sub.dueAt,
+        });
+      } catch (err) {
         console.error(
           JSON.stringify({
             level: "error",
             action: "createTaskWithSubtasks",
             step: "create subtask",
             parentId,
-            message: subError.message,
+            message: err instanceof Error ? err.message : String(err),
           })
         );
         subtaskErrors++;
-        continue;
-      }
-
-      for (const memberId of uniqueMemberIds) {
-        await assignTaskMember(admin, subtaskId, memberId);
       }
     }
 
