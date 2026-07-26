@@ -16,16 +16,27 @@ export function toast(message: string, type: "success" | "warning" | "error" = "
   );
 }
 
+function toastClasses(type: Toast["type"]) {
+  return `max-w-xs rounded-lg pl-4 pr-1 py-1 text-sm text-white shadow-lg transition-all flex items-center gap-2 ${
+    type === "error" ? "bg-red-600" : type === "warning" ? "bg-amber-500" : "bg-gray-900"
+  }`;
+}
+
 export function Toaster() {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [politeToasts, setPoliteToasts] = useState<Toast[]>([]);
+  const [assertiveToasts, setAssertiveToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
     function handler(e: Event) {
       const { message, type } = (e as CustomEvent<{ message: string; type: Toast["type"] }>).detail;
       const id = Date.now();
-      setToasts((prev) => [...prev, { id, message, type }]);
+      if (type === "error") {
+        setAssertiveToasts((prev) => [...prev, { id, message, type }]);
+        return;
+      }
+      setPoliteToasts((prev) => [...prev, { id, message, type }]);
       setTimeout(
-        () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+        () => setPoliteToasts((prev) => prev.filter((t) => t.id !== id)),
         3500
       );
     }
@@ -33,20 +44,38 @@ export function Toaster() {
     return () => window.removeEventListener("app:toast", handler);
   }, []);
 
-  if (toasts.length === 0) return null;
-
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={`max-w-xs rounded-lg px-4 py-2.5 text-sm text-white shadow-lg transition-all ${
-            t.type === "error" ? "bg-red-600" : t.type === "warning" ? "bg-amber-500" : "bg-gray-900"
-          }`}
-        >
-          {t.message}
-        </div>
-      ))}
+      <div role="status" aria-live="polite" aria-atomic="true" className="flex flex-col gap-2">
+        {politeToasts.map((t) => (
+          <div key={t.id} className={toastClasses(t.type)}>
+            <span className="py-1.5">{t.message}</span>
+            <button
+              type="button"
+              onClick={() => setPoliteToasts((prev) => prev.filter((x) => x.id !== t.id))}
+              aria-label={`Close ${t.type} message`}
+              className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <div role="alert" aria-live="assertive" aria-atomic="true" className="flex flex-col gap-2">
+        {assertiveToasts.map((t) => (
+          <div key={t.id} className={toastClasses(t.type)}>
+            <span className="py-1.5">{t.message}</span>
+            <button
+              type="button"
+              onClick={() => setAssertiveToasts((prev) => prev.filter((x) => x.id !== t.id))}
+              aria-label={`Close ${t.type} message`}
+              className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

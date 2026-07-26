@@ -2,11 +2,22 @@ jest.mock("./actions", () => ({ updateTask: jest.fn() }));
 jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EditTaskModal } from "./edit-task-modal";
 import { updateTask } from "./actions";
 import type { RawTask } from "./bucket-tasks";
+
+beforeAll(() => {
+  // jsdom does not implement showModal(); mock it so Dialog's mount effect doesn't throw, and set
+  // the `open` attribute so testing-library's accessibility tree treats dialog content as visible.
+  HTMLDialogElement.prototype.showModal = jest.fn(function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  });
+  HTMLDialogElement.prototype.close = jest.fn(function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+  });
+});
 
 const mockTask: RawTask = {
   id: "c0000000-0000-4000-8000-000000000001",
@@ -74,5 +85,28 @@ describe("EditTaskModal", () => {
       <EditTaskModal open={false} task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
     );
     expect(screen.queryByDisplayValue("Buy groceries")).not.toBeInTheDocument();
+  });
+});
+
+// ─── Dialog primitive behavior ────────────────────────────────────────────────
+
+describe("EditTaskModal — Dialog primitive", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("focuses the title input when the modal opens, without user interaction", () => {
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+    expect(screen.getByDisplayValue("Buy groceries")).toHaveFocus();
+  });
+
+  it("pressing Escape calls the same onClose Cancel calls", () => {
+    const onClose = jest.fn();
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={onClose} />
+    );
+    const dialogEl = screen.getByRole("dialog", { hidden: true });
+    fireEvent(dialogEl, new Event("close"));
+    expect(onClose).toHaveBeenCalled();
   });
 });

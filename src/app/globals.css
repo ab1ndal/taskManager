@@ -17,6 +17,7 @@
   --color-accent-hover: #6A4DAD;
   --color-accent-subtle: #EDE8F8;
   --color-accent-text: #5B3FA8;
+  --color-focus: #7C5CBF;
   --color-deadline-red: #E05252;
   --color-deadline-yellow: #D4A017;
   --color-deadline-green: #4A9B6F;
@@ -29,4 +30,10 @@
   /* Shadows */
   --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 1px 8px rgba(124,92,191,0.05);
   --shadow-login: 0 8px 32px rgba(124,92,191,0.14), 0 2px 8px rgba(0,0,0,0.06);
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
