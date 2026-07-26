@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { createFakeSupabase, type FailureHook, type Row, type Tables } from "@/test/supabase-fake";
-import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask } from "./actions";
+import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask, getTaskUpdates } from "./actions";
 import { GENERIC_ERROR } from "./action-result";
 
 beforeEach(() => jest.clearAllMocks());
@@ -30,9 +30,9 @@ const S2 = "d0000000-0000-4000-8000-000000000003";
 function seed(): Tables {
   return {
     workspace_members: [
-      { id: M1, workspace_id: WS1, auth_user_id: "auth-user-1" },
-      { id: M2, workspace_id: WS1, auth_user_id: "auth-user-2" },
-      { id: M_OUTSIDER, workspace_id: WS2, auth_user_id: "auth-user-3" },
+      { id: M1, workspace_id: WS1, auth_user_id: "auth-user-1", display_name: "Alice" },
+      { id: M2, workspace_id: WS1, auth_user_id: "auth-user-2", display_name: "Bob" },
+      { id: M_OUTSIDER, workspace_id: WS2, auth_user_id: "auth-user-3", display_name: "Carol" },
     ],
     tasks: [
       { id: T1, workspace_id: WS1, parent_task_id: null, completed_at: null, title: "Task 1" },
@@ -473,6 +473,50 @@ describe("reorderTask", () => {
     setup({ tables });
 
     await expectFailure(reorderTask({ taskId: T_OTHER, memberId: M1, prevKey: 1000, nextKey: 3000 }), "Forbidden");
+  });
+});
+
+// ─── getTaskUpdates ──────────────────────────────────────────────────────
+
+describe("getTaskUpdates", () => {
+  it("returns updates in chronological order with author names", async () => {
+    const fake = setup({
+      tables: {
+        ...seed(),
+        task_updates: [
+          {
+            id: "e0000000-0000-4000-8000-000000000002",
+            task_id: T1,
+            member_id: M1,
+            update_text: "second update",
+            created_at: "2026-07-26T10:00:00Z",
+          },
+          {
+            id: "e0000000-0000-4000-8000-000000000001",
+            task_id: T1,
+            member_id: M1,
+            update_text: "first update",
+            created_at: "2026-07-26T09:00:00Z",
+          },
+        ],
+      },
+    });
+    void fake;
+
+    const result = await getTaskUpdates(T1);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.updates.map((u) => u.updateText)).toEqual(["first update", "second update"]);
+    expect(result.updates[0].authorName).toBe("Alice");
+  });
+
+  it("rejects a user who is not assigned to the task", async () => {
+    setup({ tables: { ...seed(), task_updates: [] }, user: { id: "auth-user-3" } });
+
+    const result = await getTaskUpdates(T1);
+
+    expect(result.ok).toBe(false);
   });
 });
 

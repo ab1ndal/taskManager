@@ -337,3 +337,52 @@ export async function reorderTask(input: ReorderTaskInput): Promise<ActionResult
     return {};
   });
 }
+
+export type TaskUpdate = {
+  id: string;
+  authorName: string;
+  createdAt: string;
+  updateText: string;
+};
+
+export async function getTaskUpdates(rawTaskId: string): Promise<ActionResult<{ updates: TaskUpdate[] }>> {
+  return run("getTaskUpdates", async () => {
+    const { user } = await requireUser();
+    const taskId = parseInput(taskIdSchema, rawTaskId);
+    await assertTaskAssignee(taskId, user.id);
+
+    const admin = createAdminClient();
+
+    const { data: rows, error: updatesError } = await admin
+      .from("task_updates")
+      .select("id, member_id, created_at, update_text")
+      .eq("task_id", taskId)
+      .order("created_at", { ascending: true });
+
+    assertNoError("load updates", { error: updatesError });
+
+    const sortedRows = (rows ?? []).sort((a, b) =>
+      (a.created_at as string).localeCompare(b.created_at as string)
+    );
+
+    const memberIds = [...new Set(sortedRows.map((r) => r.member_id as string))];
+
+    const { data: members, error: membersError } = await admin
+      .from("workspace_members")
+      .select("id, display_name")
+      .in("id", memberIds);
+
+    assertNoError("load update authors", { error: membersError });
+
+    const nameById = new Map((members ?? []).map((m) => [m.id as string, m.display_name as string]));
+
+    const updates: TaskUpdate[] = sortedRows.map((r) => ({
+      id: r.id as string,
+      authorName: nameById.get(r.member_id as string) ?? "Unknown",
+      createdAt: r.created_at as string,
+      updateText: r.update_text as string,
+    }));
+
+    return { updates };
+  });
+}
