@@ -1,11 +1,16 @@
-jest.mock("./actions", () => ({ updateTask: jest.fn() }));
+jest.mock("./actions", () => ({
+  updateTask: jest.fn(),
+  getTaskUpdates: jest.fn(),
+  addTaskUpdate: jest.fn(),
+  addSubtask: jest.fn(),
+}));
 jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 
 import React from "react";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EditTaskModal } from "./edit-task-modal";
-import { updateTask } from "./actions";
+import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
 import type { RawTask } from "./bucket-tasks";
 
 beforeAll(() => {
@@ -33,6 +38,12 @@ const mockTask: RawTask = {
 };
 
 const mockWs = { id: "a0000000-0000-4000-8000-000000000001", name: "Home", kind: "household", members: [{ id: "b0000000-0000-4000-8000-000000000001", display_name: "Alice" }] };
+
+beforeEach(() => {
+  // Every render of the modal fires the Updates-loading effect; default it to an empty list so
+  // tests unrelated to Updates don't have to stub it themselves.
+  jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+});
 
 describe("EditTaskModal", () => {
   beforeEach(() => jest.clearAllMocks());
@@ -129,5 +140,73 @@ describe("EditTaskModal — Dialog primitive", () => {
     const dialogEl = screen.getByRole("dialog", { hidden: true });
     fireEvent(dialogEl, new Event("close"));
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+// ─── Updates section ──────────────────────────────────────────────────────────
+
+describe("EditTaskModal — Updates", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("loads and shows existing updates when opened", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({
+      ok: true,
+      updates: [
+        { id: "u1", authorName: "Alice", createdAt: "2026-07-26T09:00:00Z", updateText: "First update" },
+      ],
+    });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    const updateItem = (await screen.findByText("First update")).closest("li")!;
+    expect(within(updateItem).getByText("Alice")).toBeInTheDocument();
+  });
+
+  it("optimistically appends a new update and calls addTaskUpdate", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+    jest.mocked(addTaskUpdate).mockResolvedValue({
+      ok: true,
+      update: { id: "u2", authorName: "Alice", createdAt: "2026-07-26T11:00:00Z", updateText: "Picked it up" },
+    });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await screen.findByPlaceholderText(/add an update/i);
+    await userEvent.type(screen.getByPlaceholderText(/add an update/i), "Picked it up");
+    await userEvent.click(screen.getByRole("button", { name: /^add update$/i }));
+
+    expect(await screen.findByText("Picked it up")).toBeInTheDocument();
+    expect(addTaskUpdate).toHaveBeenCalledWith({ taskId: mockTask.id, updateText: "Picked it up" });
+  });
+
+  it("rolls back the optimistic update and shows an inline error on failure", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+    jest.mocked(addTaskUpdate).mockResolvedValue({ ok: false, error: "Something went wrong" });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await screen.findByPlaceholderText(/add an update/i);
+    await userEvent.type(screen.getByPlaceholderText(/add an update/i), "Will fail");
+    await userEvent.click(screen.getByRole("button", { name: /^add update$/i }));
+
+    await screen.findByText("Something went wrong");
+    expect(screen.queryByText("Will fail")).not.toBeInTheDocument();
+  });
+
+  it("does not render a mic button when SpeechRecognition is unsupported", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await screen.findByPlaceholderText(/add an update/i);
+    expect(screen.queryByRole("button", { name: /dictate/i })).not.toBeInTheDocument();
   });
 });
