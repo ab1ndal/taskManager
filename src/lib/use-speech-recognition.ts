@@ -62,6 +62,9 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
     const Ctor = getConstructor();
     if (!Ctor) return;
 
+    // Guard against concurrent start() calls: if a recognition session is already active, bail out.
+    if (recognitionRef.current) return;
+
     setError(null);
     const recognition = new Ctor();
     recognition.continuous = true;
@@ -78,7 +81,11 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
 
     recognition.onend = () => {
       if (!stoppedByUserRef.current) {
-        recognition.start();
+        try {
+          recognition.start();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Failed to start speech recognition");
+        }
         return;
       }
       setIsListening(false);
@@ -86,7 +93,12 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
 
     stoppedByUserRef.current = false;
     recognitionRef.current = recognition;
-    recognition.start();
+    try {
+      recognition.start();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start speech recognition");
+      recognitionRef.current = null;
+    }
     setIsListening(true);
   }, []);
 

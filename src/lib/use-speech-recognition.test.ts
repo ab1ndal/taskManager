@@ -84,4 +84,53 @@ describe("useSpeechRecognition", () => {
 
     expect(result.current.isListening).toBe(false);
   });
+
+  it("guards against concurrent start() calls and does not create a second instance", () => {
+    let instanceCount = 0;
+    let firstInstance: MockSpeechRecognition | null = null;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instanceCount++;
+      const instance = new MockSpeechRecognition();
+      if (instanceCount === 1) {
+        firstInstance = instance;
+      }
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+    act(() => result.current.start());
+    expect(instanceCount).toBe(1);
+
+    // Call start() again before the first session ends — should be a no-op.
+    act(() => result.current.start());
+    expect(instanceCount).toBe(1); // Still only one instance created.
+  });
+
+  it("catches exceptions from recognition.start() and surfaces them via error state", () => {
+    let instance: MockSpeechRecognition | null = null;
+    let startCallCount = 0;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instance = new MockSpeechRecognition();
+      // Mock start() to throw on the second call.
+      instance.start.mockImplementation(() => {
+        startCallCount++;
+        if (startCallCount === 2) {
+          throw new Error("InvalidStateError: recognition already started");
+        }
+      });
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+    act(() => result.current.start());
+    expect(result.current.error).toBeNull();
+    expect(startCallCount).toBe(1);
+
+    // Simulate Chrome ending the session on silence.
+    // The onend handler tries to auto-restart, which should throw.
+    act(() => instance!.onend?.());
+
+    // The error should be caught and set in the error state.
+    expect(result.current.error).toBe("InvalidStateError: recognition already started");
+  });
 });
