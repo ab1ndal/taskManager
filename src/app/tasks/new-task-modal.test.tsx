@@ -370,6 +370,19 @@ describe("NewTaskModal — toast feedback", () => {
       expect(toast).toHaveBeenCalledWith("Something went wrong. Please try again.", "error")
     );
   });
+
+  // Client-side schema failures show inline in the still-open dialog rather than a toast: a
+  // fixed-position toast is inert while a native <dialog> is showModal()-open (everything else in
+  // the document is made inert, popovers included), so its dismiss button would be unreachable.
+  it("shows a validation failure inline instead of toasting, and does not close the dialog", async () => {
+    renderModal();
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "x".repeat(201) } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/200 characters or fewer/i);
+    expect(toast).not.toHaveBeenCalled();
+    expect(createTaskWithSubtasks).not.toHaveBeenCalled();
+  });
 });
 
 // ─── onTaskCreated callback ──────────────────────────────────────────────────

@@ -80,6 +80,27 @@ describe("EditTaskModal", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
+  // Client-side schema failures show inline in the still-open dialog rather than a toast: a
+  // fixed-position toast is inert while a native <dialog> is showModal()-open (everything else in
+  // the document is made inert, popovers included), so its dismiss button would be unreachable.
+  it("shows a validation failure inline instead of toasting, and does not close the dialog", async () => {
+    const mock = jest.mocked(updateTask);
+    const onClose = jest.fn();
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={onClose} />
+    );
+
+    const titleInput = screen.getByDisplayValue("Buy groceries");
+    await userEvent.clear(titleInput);
+    fireEvent.change(titleInput, { target: { value: "x".repeat(201) } });
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/200 characters or fewer/i);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(mock).not.toHaveBeenCalled();
+  });
+
   it("does not render when open is false", () => {
     render(
       <EditTaskModal open={false} task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />

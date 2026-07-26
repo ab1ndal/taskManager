@@ -143,3 +143,33 @@ transaction), not be split across an RPC call and a follow-up `.insert()`/`.upda
 with nothing inserted in between and got the same value back — which proves nothing, since a
 pure read of unchanged state returns the same answer regardless of locking. A concurrency test has
 to include the write, or it can't distinguish "lock works" from "nothing happened between the calls."
+
+## L11 — A `<dialog>` open via `showModal()` makes ALL other content inert, including popovers
+
+Learned 2026-07-26, phase 04 verification. An error toast fired while a modal was still open
+(client-side validation failure in `new-task-modal.tsx`/`edit-task-modal.tsx`) had an unreachable
+dismiss button — `focus()` silently no-op'd, and a real mouse click at the button's screen
+coordinates hit the `<dialog>` element instead (`document.elementFromPoint` returned `DIALOG`).
+
+First hypothesis was a paint-order/z-index issue, since the toast is a plain `position:fixed;
+z-50` div and the dialog's `::backdrop` is native top-layer content. Tried promoting the toaster
+itself into the top layer via the Popover API (`popover="manual"` + `showPopover()`), including
+re-promoting it on every new toast to force it to the top of the top-layer stack. Still failed.
+
+**Root cause, confirmed with a bare HTML repro with no React/Next involved:** a `<dialog>` shown
+via `showModal()` marks everything else in the document inert per spec — and that inertness is
+NOT scoped to "non-top-layer content." It also catches other top-layer elements, including
+`popover="manual"` elements. Order of promotion (dialog-then-popover vs. popover-then-dialog)
+makes no difference; the popover is inert either way while any modal dialog is open.
+
+**Rule:** the Popover API cannot be used to make anything interactive while a native `<dialog>` is
+`showModal()`-open — there is no known escape hatch. If something must stay interactive during a
+modal (an error toast, a status indicator), it has to live inside that dialog's own subtree, not
+in a separate top-layer or fixed-position element outside it.
+
+**How to verify a "does X escape/survive an open modal" claim before committing to a fix:** write
+the smallest possible reproduction outside the app and framework (a bare `.html` file opened
+directly in a real browser via Playwright) before spending time wiring the fix into React. Ruling
+out a fix approach this way took a few minutes; discovering it was wrong after fully wiring it into
+`toaster.tsx` (state, refs, effects, CSS resets for the UA popover default styles) took much
+longer and had to be reverted.

@@ -41,6 +41,7 @@ export function NewTaskModal({
   );
   const [subtaskRows, setSubtaskRows] = useState<SubtaskRow[]>([]);
   const [pending, startTransition] = useTransition();
+  const [formError, setFormError] = useState("");
   const lastSubtaskRef = useRef<HTMLInputElement>(null);
 
   const currentWorkspace = workspaces.find((w) => w.id === workspaceId);
@@ -85,6 +86,7 @@ export function NewTaskModal({
     setWorkspaceId(firstWorkspace?.id ?? "");
     setSelectedMemberIds(getInitialMembers(firstWorkspace?.id ?? ""));
     setSubtaskRows([]);
+    setFormError("");
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -108,9 +110,14 @@ export function NewTaskModal({
     });
 
     if (!parsed.success) {
-      toast(parsed.error.issues[0].message, "error");
+      // Inline, not a toast: the toaster is a plain fixed div, not part of the dialog's own
+      // top layer, so while this modal is open (native <dialog>.showModal()) a toast fired here
+      // would be inert — unfocusable and unclickable — because the open dialog makes everything
+      // else in the document inert, popovers included. See docs/audit findings, phase 04.
+      setFormError(parsed.error.issues[0].message);
       return;
     }
+    setFormError("");
 
     const input = parsed.data;
     const tempId = crypto.randomUUID();
@@ -310,6 +317,12 @@ export function NewTaskModal({
               + Add subtask
             </button>
           </div>
+
+          {formError && (
+            <p role="alert" className="rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+              {formError}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button

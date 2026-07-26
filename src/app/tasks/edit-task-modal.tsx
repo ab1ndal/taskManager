@@ -28,6 +28,7 @@ export function EditTaskModal({
   const [dueAt, setDueAt] = useState(task.due_at ? task.due_at.slice(0, 10) : "");
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(task.member_ids);
   const [pending, startTransition] = useTransition();
+  const [formError, setFormError] = useState("");
 
   const currentWorkspace = workspaces.find((w) => w.id === task.workspace.id);
 
@@ -51,9 +52,14 @@ export function EditTaskModal({
     });
 
     if (!parsed.success) {
-      toast(parsed.error.issues[0].message, "error");
+      // Inline, not a toast: the toaster is a plain fixed div, not part of this dialog's own
+      // top layer, so while the modal is open (native <dialog>.showModal()) a toast fired here
+      // would be inert — unfocusable and unclickable — because the open dialog makes everything
+      // else in the document inert, popovers included. See docs/audit findings, phase 04.
+      setFormError(parsed.error.issues[0].message);
       return;
     }
+    setFormError("");
 
     onClose();
 
@@ -124,6 +130,12 @@ export function EditTaskModal({
               ))}
             </div>
           </div>
+
+          {formError && (
+            <p role="alert" className="rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+              {formError}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
