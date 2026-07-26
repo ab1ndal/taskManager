@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { updateTask } from "./actions";
 import { updateTaskSchema } from "./schemas";
 import { toast } from "@/components/toaster";
+import { Dialog } from "@/components/dialog";
 import type { RawTask } from "./bucket-tasks";
 
 type WorkspaceMember = { id: string; display_name: string };
@@ -68,17 +69,15 @@ export function EditTaskModal({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      initialFocusSelector="input[type=text]"
+      ariaLabelledBy="edit-task-modal-title"
     >
-      <div
-        className="bg-[var(--color-surface)] rounded-[14px] border border-[var(--color-border)] p-6 w-full max-w-md mx-4 shadow-xl max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-base font-semibold mb-4">Edit task</h3>
+      <h3 id="edit-task-modal-title" className="text-base font-semibold mb-4">Edit task</h3>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
             type="text"
             placeholder="Task title"
@@ -144,7 +143,6 @@ export function EditTaskModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }
