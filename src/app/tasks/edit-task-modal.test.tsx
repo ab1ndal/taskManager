@@ -210,3 +210,52 @@ describe("EditTaskModal — Updates", () => {
     expect(screen.queryByRole("button", { name: /dictate/i })).not.toBeInTheDocument();
   });
 });
+
+// ─── Subtasks section ─────────────────────────────────────────────────────────
+
+describe("EditTaskModal — Subtasks", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("shows existing subtasks from the task prop", () => {
+    const taskWithSubtasks = { ...mockTask, subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }] };
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+
+    render(
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    expect(screen.getByText("Existing subtask")).toBeInTheDocument();
+  });
+
+  it("optimistically appends a new subtask and calls addSubtask", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+    jest.mocked(addSubtask).mockResolvedValue({ ok: true, subtask: { id: "s2", title: "New subtask", completed_at: null } });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await userEvent.type(screen.getByPlaceholderText(/new subtask title/i), "New subtask");
+    await userEvent.click(screen.getByRole("button", { name: /^add subtask$/i }));
+
+    expect(await screen.findByText("New subtask")).toBeInTheDocument();
+    expect(addSubtask).toHaveBeenCalledWith(
+      expect.objectContaining({ parentTaskId: mockTask.id, title: "New subtask" })
+    );
+  });
+
+  it("rolls back the optimistic subtask and shows an inline error on failure", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+    jest.mocked(addSubtask).mockResolvedValue({ ok: false, error: "Something went wrong" });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await userEvent.type(screen.getByPlaceholderText(/new subtask title/i), "Will fail");
+    await userEvent.click(screen.getByRole("button", { name: /^add subtask$/i }));
+
+    await screen.findByText("Something went wrong");
+    expect(screen.queryByText("Will fail")).not.toBeInTheDocument();
+  });
+});

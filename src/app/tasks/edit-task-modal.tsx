@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { updateTask, getTaskUpdates, addTaskUpdate } from "./actions";
-import { updateTaskSchema, createTaskUpdateSchema } from "./schemas";
+import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
+import { updateTaskSchema, createTaskUpdateSchema, addSubtaskSchema } from "./schemas";
 import { toast } from "@/components/toaster";
 import { Dialog } from "@/components/dialog";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
@@ -36,6 +36,11 @@ export function EditTaskModal({
   const [updateDraft, setUpdateDraft] = useState("");
   const [updateError, setUpdateError] = useState("");
   const [updatesPending, startUpdateTransition] = useTransition();
+
+  const [subtasks, setSubtasks] = useState(task.subtasks);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [subtaskError, setSubtaskError] = useState("");
+  const [subtaskPending, startSubtaskTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
@@ -78,6 +83,29 @@ export function EditTaskModal({
         return;
       }
       setUpdates((prev) => prev.map((u) => (u.id === tempId ? result.update : u)));
+    });
+  }
+
+  function handleAddSubtask() {
+    const parsed = addSubtaskSchema.safeParse({ parentTaskId: task.id, title: subtaskTitle });
+    if (!parsed.success) {
+      setSubtaskError(parsed.error.issues[0].message);
+      return;
+    }
+    setSubtaskError("");
+
+    const tempId = crypto.randomUUID();
+    setSubtasks((prev) => [...prev, { id: tempId, title: parsed.data.title, completed_at: null }]);
+    setSubtaskTitle("");
+
+    startSubtaskTransition(async () => {
+      const result = await addSubtask(parsed.data);
+      if (!result.ok) {
+        setSubtasks((prev) => prev.filter((s) => s.id !== tempId));
+        setSubtaskError(result.error);
+        return;
+      }
+      setSubtasks((prev) => prev.map((s) => (s.id === tempId ? result.subtask : s)));
     });
   }
 
@@ -257,6 +285,42 @@ export function EditTaskModal({
         {speech.error && (
           <p role="alert" className="mt-2 text-sm text-red-600">
             {speech.error}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-6 border-t border-[var(--color-border)] pt-4">
+        <h4 className="text-sm font-semibold mb-2">Subtasks</h4>
+        <ul className="flex flex-col gap-1 mb-3">
+          {subtasks.map((s) => (
+            <li key={s.id} className="text-sm flex items-center gap-2">
+              <span className={s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""}>
+                {s.title}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="New subtask title"
+            value={subtaskTitle}
+            onChange={(e) => setSubtaskTitle(e.target.value)}
+            disabled={subtaskPending}
+            className="flex-1 border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={handleAddSubtask}
+            disabled={!subtaskTitle.trim() || subtaskPending}
+            className="px-4 rounded-[8px] bg-[var(--color-accent)] text-white text-sm disabled:opacity-40"
+          >
+            Add subtask
+          </button>
+        </div>
+        {subtaskError && (
+          <p role="alert" className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+            {subtaskError}
           </p>
         )}
       </div>
