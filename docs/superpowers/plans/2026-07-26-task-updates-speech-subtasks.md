@@ -356,6 +356,18 @@ git commit -m "feat(tasks): add createTaskUpdateSchema and addTaskUpdate action"
 This is a pure refactor — no new test file. The existing `createTaskWithSubtasks` tests in
 `actions.test.ts` are the regression check.
 
+**Note (post-implementation, added during review adjudication):** wrapping the assignment loop
+inside `insertSubtask`'s scope, then wrapping the whole helper call in the caller's try/catch,
+means an `assignTaskMember` failure for a subtask now gets caught and counted in `subtaskErrors`
+instead of propagating uncaught out of `createTaskWithSubtasks`. This is a deliberate behavior
+change, not a regression: the pre-refactor code's own comment ("a failed subtask is reported
+rather than thrown... the parent task exists at this point, and discarding it would lose work the
+user can see") already established that subtask failures should degrade to a count, not a thrown
+error — but the original code only applied that to insert failures, leaving assign failures as an
+inconsistency. This refactor closes that gap. Task quality review flagged it as a "Critical"
+diff-visible behavior change; adjudicated here as an intentional fix, not a defect — no code change
+required.
+
 - [ ] **Step 1: Confirm the baseline passes before changing anything**
 
 Run: `npx jest src/app/tasks/actions.test.ts -t createTaskWithSubtasks`
