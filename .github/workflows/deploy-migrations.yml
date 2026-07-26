@@ -35,12 +35,15 @@ jobs:
 
       - name: Inspect remote schema (temporary, read-only)
         run: |
-          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
-          psql "postgresql://postgres@db.xamdgvxziobpptcfymug.supabase.co:5432/postgres" -c "\dn" \
-            -c "select column_name from information_schema.columns where table_name='task_assignments' and column_name='member_sort_key';" \
-            -c "select routine_schema, routine_name from information_schema.routines where routine_schema='private';" \
-            -c "select proname from pg_proc where proname='next_sort_key';"
+          supabase db dump --linked --schema public,private -f /tmp/schema.sql
+          echo "--- private schema present? ---"
+          grep -c "CREATE SCHEMA.*private" /tmp/schema.sql || true
+          echo "--- member_sort_key column? ---"
+          grep -c "member_sort_key" /tmp/schema.sql || true
+          echo "--- next_sort_key function (should be absent pre-008)? ---"
+          grep -c "next_sort_key" /tmp/schema.sql || true
         env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Push pending migrations
