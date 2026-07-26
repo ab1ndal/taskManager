@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Task Creation** - Complete task creation with full field support and real-time list update (completed 2026-03-27)
 - [x] **Phase 3: Security Hardening & Failure Visibility** - Non-recursive RLS, authorized server actions, validated input, visible failures (completed 2026-07-25)
 - [ ] **Phase 4: Accessibility & Mobile** - Touch targets, focus management, dialog semantics, live regions
-- [ ] **Phase 5: Task Prioritization** - Drag-to-reorder personal task priority
+- [x] **Phase 5: Task Prioritization** - Drag-to-reorder personal task priority (completed 2026-07-26)
 - [ ] **Phase 6: Task Updates & Speech-to-Text** - Text updates on a task; speech only at the input layer
 - [ ] **Phase 7: Recurring Tasks** - Rule-driven task generation
 - [ ] **Phase 8: Design Polish** - Dark mode, semantic tokens, icon consolidation, reduced motion
@@ -101,10 +101,11 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 05-01: Integrate drag-and-drop library and wire sort key update server action.
-      `reorderTask()` already exists, is authorized, and is tested — it has no UI caller yet.
-      Fix the racy global `max + 1000` sort keys (audit C3) before wiring the UI, and ship a
-      keyboard alternative alongside the drag interaction.
+- [x] 05-01: Integrated `@hello-pangea/dnd`, wired `reorderTask()` to the UI with a keyboard
+      alternative. Fixed the racy global `max + 1000` sort keys twice — migration 008's advisory
+      lock only covered the read, not the follow-up insert (audit C3 was not actually closed
+      until migration 009 folded both into one locked function; see `tasks/lessons.md` L10).
+      All four manual verification checks pass (`05-VERIFICATION.md`).
 
 ### Phase 6: Task Updates & Speech-to-Text
 **Goal**: Users can add text updates to a task, dictated if they prefer
@@ -144,8 +145,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Workspace Directory | 3/3 | Complete | 2026-03-27 |
 | 2. Task Creation | 2/2 | Complete | 2026-03-27 |
 | 3. Security Hardening & Failure Visibility | 1/1 | Complete | 2026-07-25 |
-| 4. Accessibility & Mobile | 5/6 | In Progress|  |
-| 5. Task Prioritization | 0/1 | Not started | - |
+| 4. Accessibility & Mobile | 5/6 | In Progress — 3 of 4 manual checks in 04-06 done or partial, resuming later |  |
+| 5. Task Prioritization | 1/1 | Complete | 2026-07-26 |
 | 6. Task Updates & Speech-to-Text | 0/? | Not started | - |
 | 7. Recurring Tasks | 0/? | Not started | - |
 | 8. Design Polish | 0/? | Not started | - |

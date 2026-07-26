@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-07-26T04:53:54.646Z"
+stopped_at: Phase 5 complete, Phase 4 verification partially deferred, starting Phase 6 planning
+last_updated: "2026-07-26T22:00:00.000Z"
 progress:
   total_phases: 8
-  completed_phases: 2
-  total_plans: 12
-  completed_plans: 5
-  percent: 25
+  completed_phases: 3
+  total_plans: 13
+  completed_plans: 12
+  percent: 38
 ---
 
 # Project State
@@ -20,14 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users can create, manage, and complete tasks across household and work workspaces — with frictionless workspace onboarding and full task lifecycle control.
-**Current focus:** Phase 04 — accessibility-mobile
+**Current focus:** Phase 06 — task updates & speech-to-text (planning)
 
 ## Current Position
 
-Phase: 04 (accessibility-mobile) — EXECUTING
-Plan: 1 of 6
+Phase: 04 (accessibility-mobile) — 3 of 4 manual checks in 04-06 resolved (fully or partial),
+resuming the rest (real-device address-bar check, leaked-password dashboard toggle) later.
+Phase: 05 (task-prioritization) — COMPLETE, all verification checks pass.
+Phase: 06 (task-updates-speech-to-text) — about to start planning.
 
-Branch: `feat/security-hardening`, not yet merged to `main`.
+All work has been landing directly on `main` (not a feature branch) since phase 03.
 
 ## Accumulated Context
 
@@ -50,6 +52,13 @@ Branch: `feat/security-hardening`, not yet merged to `main`.
 - [Phase 03-security-hardening]: Completing a parent completes its open subtasks; the rule now holds in both directions
 - [Phase 03-security-hardening]: `createTask` deleted rather than guarded — it had no callers
 - [Phase 03-security-hardening]: One service-role read remains by design, member counts in `workspaces/page.tsx`; RLS cannot produce counts for workspaces you have not joined
+- [Phase 05-task-prioritization]: Sort-key computation and the row insert must share one
+  advisory-lock scope — a lock held only for the RPC's own transaction protects nothing once the
+  actual write happens in a separate round trip (`tasks/lessons.md` L10)
+- [Phase 04-accessibility-mobile]: Toasts fired while a modal is open must render inline in that
+  dialog, not through the global toaster — a `<dialog>.showModal()` makes all other content inert,
+  including other top-layer elements like popovers, so there is no way to keep a separate toast
+  interactive over an open modal (`tasks/lessons.md` L11)
 
 ### Decisions reversed
 
@@ -66,14 +75,22 @@ Branch: `feat/security-hardening`, not yet merged to `main`.
 
 - Remote migration history holds only `20260725220330 rls_security_definer`; 001-006 were applied out-of-band. `supabase db push` would try to replay them (tasks/lessons.md L9)
 - No local Supabase stack: Docker unavailable, and `db push` needs `SUPABASE_DB_PASSWORD`. DB verification is done by running SQL as the `authenticated` role with `set local request.jwt.claims`
-- Sort key allocation is still a racy global `max + 1000` (audit C3) — fix before wiring drag-to-reorder in Phase 5
 - `/tasks` has no redirect for signed-out users. Under RLS the page now renders empty rather than leaking, but there is still no middleware
-- Leaked-password protection is disabled in Supabase Auth settings — dashboard toggle, Phase 04
+- Leaked-password protection is disabled in Supabase Auth settings — dashboard toggle, Phase 04, still pending (deferred with the rest of 04-06)
+- Phase 04-06 real-device address-bar-collapse check (U7) still needs an actual phone — devtools/Playwright viewport emulation can't reproduce it
 
 ### Resolved concerns
 
 - ~~`completeTask()` and `deleteTask()` have silent error handling~~ — fixed in Phase 3 (`7d8081a`)
 - ~~PIN system live in DB and server actions~~ — removed in Phase 1
+- ~~Sort key allocation is a racy global `max + 1000` (audit C3)~~ — fixed in Phase 5, migration
+  009 (`assign_task_member`). Migration 008's fix was incomplete — its advisory lock only covered
+  the read, not the app's separate follow-up insert; see `tasks/lessons.md` L10.
+- ~~Error toast unreachable while a modal is open~~ — found + fixed during Phase 04-06 manual
+  verification. Client-side validation errors now render inline in the still-open dialog instead
+  of toasting; a `<dialog>.showModal()` makes all other top-layer content (including popovers)
+  inert, so a separate toast can never be interactive over an open modal. See
+  `tasks/lessons.md` L11.
 
 ### Quick Tasks Completed
 
