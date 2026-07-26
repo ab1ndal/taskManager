@@ -124,3 +124,22 @@ rollback;
 
 This is how 007 and Task 3 were verified. It exercises the real policies, which the jest suite
 cannot do — the suite mocks Supabase entirely.
+
+## L10 — `pg_advisory_xact_lock` only protects what happens inside the same transaction
+
+Migration 008 wrapped a `SELECT MAX(...)` in `pg_advisory_xact_lock`, computed a sort key, and
+returned it to the app — which then did a *separate* `.insert()` call. The lock released the moment
+the RPC's own transaction ended, before the insert ever ran. Two concurrent callers could both pass
+the lock, both read the same stale `MAX`, and both insert the same key — the exact race the lock was
+meant to prevent, just moved one step later. Fixed in 009 by folding the read and the write into one
+function call, so the lock spans both.
+
+**Rule:** an advisory-lock-guarded read is only as atomic as the transaction it's called in. If the
+value it protects gets used in a later, separate query or round trip, the lock already released and
+protected nothing. The read and every write that depends on it must share one function call (one
+transaction), not be split across an RPC call and a follow-up `.insert()`/`.update()`.
+
+**How this was first (wrongly) "verified":** a manual SQL-editor test called the read-only RPC twice
+with nothing inserted in between and got the same value back — which proves nothing, since a
+pure read of unchanged state returns the same answer regardless of locking. A concurrency test has
+to include the write, or it can't distinguish "lock works" from "nothing happened between the calls."
