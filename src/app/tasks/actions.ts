@@ -77,20 +77,14 @@ function assertNoError(
   if (error) throw new Error(`${step}: ${error.message}`);
 }
 
-/** Next-highest sort key for a member, +1000. Racy under concurrency — see audit C3, fixed in Phase 05. */
+/** Next sort key for a member, computed atomically in Postgres. See migration 008 (audit C3). */
 async function nextSortKey(
   admin: ReturnType<typeof createAdminClient>,
   memberId: string
 ): Promise<number> {
-  const { data: last } = await admin
-    .from("task_assignments")
-    .select("member_sort_key")
-    .eq("member_id", memberId)
-    .order("member_sort_key", { ascending: false })
-    .limit(1)
-    .single();
-
-  return last ? (last.member_sort_key as number) + 1000 : 1000;
+  const { data, error } = await admin.rpc("next_sort_key", { p_member_id: memberId });
+  if (error) throw new Error(`next sort key: ${error.message}`);
+  return data as number;
 }
 
 export async function completeTask(rawTaskId: string): Promise<ActionResult> {

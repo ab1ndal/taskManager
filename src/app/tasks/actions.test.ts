@@ -336,6 +336,27 @@ describe("createTaskWithSubtasks", () => {
 
     expect(tasksIn(tables)).toHaveLength(1);
   });
+
+  it("computes each assignee's sort key via the next_sort_key rpc, not a stale read", async () => {
+    const tables = seed();
+    tables.task_assignments.push({ task_id: T_OTHER, member_id: M1, member_sort_key: 5000 });
+    const fake = setup({ tables });
+
+    const rpcSpy = jest.spyOn(fake, "rpc");
+
+    await createTaskWithSubtasks({
+      title: "New task",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+    });
+
+    expect(rpcSpy).toHaveBeenCalledWith("next_sort_key", { p_member_id: M1 });
+    const newAssignment = assignmentsIn(fake.tables).find(
+      (a) => a.member_id === M1 && a.member_sort_key === 6000
+    );
+    expect(newAssignment).toBeDefined();
+  });
 });
 
 // ─── updateTask ──────────────────────────────────────────────────────────────
