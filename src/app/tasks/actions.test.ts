@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { createFakeSupabase, type FailureHook, type Row, type Tables } from "@/test/supabase-fake";
-import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask, getTaskUpdates, addTaskUpdate } from "./actions";
+import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
 import { GENERIC_ERROR } from "./action-result";
 
 beforeEach(() => jest.clearAllMocks());
@@ -546,6 +546,37 @@ describe("addTaskUpdate", () => {
     setup({ tables: { ...seed(), task_updates: [] }, user: { id: "auth-user-3" } });
 
     const result = await addTaskUpdate({ taskId: T1, updateText: "Not my task" });
+
+    expect(result.ok).toBe(false);
+  });
+});
+
+// ─── addSubtask ──────────────────────────────────────────────────────────
+
+describe("addSubtask", () => {
+  it("creates a subtask assigned to the parent's current assignees", async () => {
+    setup();
+
+    const result = await addSubtask({ parentTaskId: T1, title: "New subtask" });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.subtask.title).toBe("New subtask");
+    expect(result.subtask.completed_at).toBeNull();
+  });
+
+  it("rejects an empty title", async () => {
+    setup();
+
+    const result = await addSubtask({ parentTaskId: T1, title: "  " });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects a user who is not assigned to the parent task", async () => {
+    setup({ user: { id: "auth-user-3" } });
+
+    const result = await addSubtask({ parentTaskId: T1, title: "Not my task" });
 
     expect(result.ok).toBe(false);
   });

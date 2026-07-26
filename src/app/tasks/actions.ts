@@ -18,6 +18,7 @@ import {
   updateTaskSchema,
   reorderTaskSchema,
   createTaskUpdateSchema,
+  addSubtaskSchema,
 } from "./schemas";
 import { ValidationError } from "./schemas";
 import type {
@@ -25,6 +26,7 @@ import type {
   UpdateTaskInput,
   ReorderTaskInput,
   CreateTaskUpdateInput,
+  AddSubtaskInput,
 } from "./schemas";
 import { GENERIC_ERROR } from "./action-result";
 import type { ActionResult } from "./action-result";
@@ -472,5 +474,45 @@ export async function addTaskUpdate(input: CreateTaskUpdateInput): Promise<Actio
         updateText,
       },
     };
+  });
+}
+
+export async function addSubtask(
+  input: AddSubtaskInput
+): Promise<ActionResult<{ subtask: { id: string; title: string; completed_at: string | null } }>> {
+  return run("addSubtask", async () => {
+    const { user } = await requireUser();
+    const { parentTaskId, title, description, dueAt } = parseInput(addSubtaskSchema, input);
+    await assertTaskAssignee(parentTaskId, user.id);
+
+    const admin = createAdminClient();
+
+    const { data: parent, error: parentError } = await admin
+      .from("tasks")
+      .select("workspace_id")
+      .eq("id", parentTaskId)
+      .single();
+
+    if (parentError || !parent) throw new Error(parentError?.message ?? "Task not found");
+
+    const { data: assignments, error: assignError } = await admin
+      .from("task_assignments")
+      .select("member_id")
+      .eq("task_id", parentTaskId);
+
+    assertNoError("load parent assignments", { error: assignError });
+    const memberIds = (assignments ?? []).map((a) => a.member_id as string);
+
+    const subtaskId = await insertSubtask(admin, {
+      parentId: parentTaskId,
+      workspaceId: parent.workspace_id as string,
+      memberIds,
+      title,
+      description,
+      dueAt,
+    });
+
+    revalidatePath("/tasks");
+    return { subtask: { id: subtaskId, title, completed_at: null } };
   });
 }

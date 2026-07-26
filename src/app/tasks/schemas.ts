@@ -65,6 +65,13 @@ export const createTaskUpdateSchema = z.object({
   updateText,
 });
 
+export const addSubtaskSchema = z.object({
+  parentTaskId: uuid,
+  title,
+  description,
+  dueAt,
+});
+
 export const taskIdSchema = uuid;
 
 export const reorderTaskSchema = z
@@ -83,6 +90,7 @@ export type CreateTaskWithSubtasksInput = z.input<typeof createTaskWithSubtasksS
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 export type ReorderTaskInput = z.input<typeof reorderTaskSchema>;
 export type CreateTaskUpdateInput = z.input<typeof createTaskUpdateSchema>;
+export type AddSubtaskInput = z.input<typeof addSubtaskSchema>;
 
 /** Thrown when input fails a schema. Carries per-field messages so the UI can point at the field. */
 export class ValidationError extends Error {
