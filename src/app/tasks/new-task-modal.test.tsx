@@ -14,6 +14,17 @@ jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSear
 
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
+beforeAll(() => {
+  // jsdom does not implement showModal(); mock it so Dialog's mount effect doesn't throw, and set
+  // the `open` attribute so testing-library's accessibility tree treats dialog content as visible.
+  HTMLDialogElement.prototype.showModal = jest.fn(function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  });
+  HTMLDialogElement.prototype.close = jest.fn(function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+  });
+});
+
 const mockWs = {
   id: "a0000000-0000-4000-8000-000000000001",
   name: "Home",
@@ -460,5 +471,23 @@ describe("NewTaskModal — subtask description", () => {
         subtasks: [expect.objectContaining({ title: "Sub 1", description: "Sub details" })],
       })
     );
+  });
+});
+
+// ─── Dialog primitive behavior ────────────────────────────────────────────────
+
+describe("NewTaskModal — Dialog primitive", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("focuses the title input when the modal opens, without user interaction", () => {
+    renderModal();
+    expect(screen.getByPlaceholderText(/task title/i)).toHaveFocus();
+  });
+
+  it("pressing Escape calls the same onClose Cancel calls", () => {
+    const { onClose } = renderModal();
+    const dialogEl = screen.getByRole("dialog", { hidden: true });
+    fireEvent(dialogEl, new Event("close"));
+    expect(onClose).toHaveBeenCalled();
   });
 });
