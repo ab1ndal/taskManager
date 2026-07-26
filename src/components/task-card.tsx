@@ -1,8 +1,9 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { completeTask, deleteTask } from "@/app/tasks/actions";
 import { toast } from "@/components/toaster";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
 export type DeadlineVariant = "red" | "yellow" | "green";
 
@@ -50,6 +51,7 @@ export function TaskCard({
   onEdit?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   /** Mutations return a result rather than throwing, so a failure has to be read off `ok`. */
   function runAction(action: () => Promise<{ ok: boolean; error?: string }>, fallback: string) {
@@ -72,9 +74,9 @@ export function TaskCard({
             // longer a reason to block the button.
             if (!completed) runAction(() => completeTask(taskId), "Failed to complete task");
           }}
-          aria-label={completed ? "Completed" : "Mark complete"}
+          aria-label={completed ? "Completed" : `Mark "${title}" complete`}
           disabled={completed}
-          className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
+          className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
           {completed ? (
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -102,8 +104,8 @@ export function TaskCard({
         {!completed && onEdit && (
           <button
             onClick={onEdit}
-            aria-label="Edit task"
-            className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+            aria-label={`Edit "${title}"`}
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" />
@@ -113,12 +115,9 @@ export function TaskCard({
 
         {!completed && (
           <button
-            onClick={() => {
-              if (!window.confirm(`Delete "${title}"?`)) return;
-              runAction(() => deleteTask(taskId), "Failed to delete task");
-            }}
-            aria-label="Delete task"
-            className="flex-shrink-0 text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+            onClick={() => setDeleteConfirmOpen(true)}
+            aria-label={`Delete "${title}"`}
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4M3 3.5l.5 8a.5.5 0 00.5.5h6a.5.5 0 00.5-.5l.5-8" />
@@ -126,6 +125,16 @@ export function TaskCard({
           </button>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        open={deleteConfirmOpen}
+        taskTitle={title}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => {
+          setDeleteConfirmOpen(false);
+          runAction(() => deleteTask(taskId), "Failed to delete task");
+        }}
+      />
 
       {/* Subtasks */}
       {(subtasks ?? []).length > 0 && (
@@ -137,8 +146,8 @@ export function TaskCard({
                   if (!sub.completed_at) runAction(() => completeTask(sub.id), "Failed to complete subtask");
                 }}
                 disabled={!!sub.completed_at}
-                aria-label={sub.completed_at ? "Subtask completed" : "Complete subtask"}
-                className="flex-shrink-0 text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
+                aria-label={sub.completed_at ? "Subtask completed" : `Mark "${sub.title}" complete`}
+                className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
               >
                 {sub.completed_at ? (
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
