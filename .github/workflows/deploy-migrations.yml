@@ -32,3 +32,32 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: next_sort_key concurrency smoke test (temporary, read-only)
+        # Fires two truly concurrent calls to next_sort_key for the same member_id via
+        # backgrounded psql + wait, and asserts distinct results — this is the 05-VERIFICATION.md
+        # item 3 regression check for audit C3, run once against the real database rather than by
+        # hand in two SQL editor tabs. next_sort_key only computes and returns a candidate key
+        # (SELECT + advisory lock) — it performs no writes, so this is safe to run repeatedly.
+        run: |
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          CONN="postgresql://postgres.xamdgvxziobpptcfymug@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+          MEMBER_ID=$(psql "$CONN" -t -A -c "select member_id from task_assignments limit 1;")
+          if [ -z "$MEMBER_ID" ]; then
+            echo "No task_assignments rows found — cannot run concurrency test without a real member_id."
+            exit 1
+          fi
+          echo "Using member_id=$MEMBER_ID"
+          psql "$CONN" -t -A -c "select public.next_sort_key('$MEMBER_ID'::uuid);" > /tmp/r1.txt &
+          psql "$CONN" -t -A -c "select public.next_sort_key('$MEMBER_ID'::uuid);" > /tmp/r2.txt &
+          wait
+          R1=$(cat /tmp/r1.txt)
+          R2=$(cat /tmp/r2.txt)
+          echo "r1=$R1 r2=$R2"
+          if [ "$R1" = "$R2" ]; then
+            echo "FAIL: both concurrent calls returned the same key ($R1) — advisory lock did not serialize"
+            exit 1
+          fi
+          echo "PASS: distinct keys ($R1, $R2) — advisory lock serialized correctly"
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
