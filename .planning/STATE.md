@@ -4,11 +4,11 @@ milestone: v1.0
 milestone_name: milestone
 status: in_progress
 stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-07-25T23:13:27.250Z"
+last_updated: "2026-07-26T04:53:54.646Z"
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 6
+  total_plans: 12
   completed_plans: 5
   percent: 25
 ---
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users can create, manage, and complete tasks across household and work workspaces — with frictionless workspace onboarding and full task lifecycle control.
-**Current focus:** Phase 04 — accessibility & mobile
+**Current focus:** Phase 04 — accessibility-mobile
 
 ## Current Position
 
-Phase: 03 (security-hardening) — COMPLETE
-Plan: 1 of 1 (8 tasks, all complete)
+Phase: 04 (accessibility-mobile) — EXECUTING
+Plan: 1 of 6
 
 Branch: `feat/security-hardening`, not yet merged to `main`.
 
