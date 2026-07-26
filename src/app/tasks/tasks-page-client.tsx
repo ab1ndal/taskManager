@@ -2,15 +2,94 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { NewTaskModal } from "./new-task-modal";
 import { TabPill } from "./tab-pill";
 import { TaskCard, EmptyState } from "@/components/task-card";
 import { CompletedSection } from "./completed-section";
 import { bucketTasks, type RawTask } from "./bucket-tasks";
 import { EditTaskModal } from "./edit-task-modal";
+import { reorderTask } from "./actions";
+import { computeNeighborKeys } from "./reorder-helpers";
+import { toast } from "@/components/toaster";
 
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
+
+/**
+ * Extracted from the component so it's testable by calling it directly with a fabricated
+ * DropResult, rather than simulating real @hello-pangea/dnd pointer/keyboard sensor events —
+ * the library's own tests take the same approach; its sensors aren't designed to be triggered
+ * by synthetic DOM events.
+ */
+export function buildDragEndHandler({
+  localTasks,
+  memberIdByWorkspaceId,
+  setLocalTasks,
+  onReorderError,
+}: {
+  localTasks: RawTask[];
+  memberIdByWorkspaceId: Record<string, string>;
+  setLocalTasks: (updater: (prev: RawTask[]) => RawTask[]) => void;
+  onReorderError: (message: string) => void;
+}) {
+  return async function onDragEnd(result: DropResult) {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+    if (source.droppableId !== destination.droppableId) return;
+    if (source.index === destination.index) return;
+
+    const bucketId = source.droppableId;
+    const bucketTasks = localTasks.filter((t) => bucketOf(t) === bucketId);
+    const dragged = bucketTasks.find((t) => t.id === draggableId);
+    if (!dragged) return;
+
+    const withoutDragged = bucketTasks.filter((t) => t.id !== draggableId);
+    const reordered = [
+      ...withoutDragged.slice(0, destination.index),
+      dragged,
+      ...withoutDragged.slice(destination.index),
+    ];
+    const { prevKey, nextKey } = computeNeighborKeys(reordered, destination.index);
+
+    const previousOrder = localTasks;
+
+    // Optimistic move: give the dragged task a synthetic sort key placed between its new
+    // neighbors so bucketTasks()'s existing member_sort_key sort reflects the drop immediately,
+    // before the server confirms. This is the single state update for the optimistic phase —
+    // bucketTasks() re-sorts by member_sort_key on every render, so reassigning just this one
+    // task's key is sufficient to move it; no manual array-splice-into-place is needed.
+    const optimisticKey =
+      prevKey !== null && nextKey !== null
+        ? (prevKey + nextKey) / 2
+        : prevKey !== null
+          ? prevKey + 1000
+          : nextKey !== null
+            ? nextKey - 1000
+            : dragged.member_sort_key;
+    setLocalTasks(() =>
+      localTasks.map((t) => (t.id === draggableId ? { ...t, member_sort_key: optimisticKey } : t))
+    );
+
+    const memberId = memberIdByWorkspaceId[dragged.workspace.id];
+    const res = await reorderTask({ taskId: draggableId, memberId, prevKey, nextKey });
+
+    if (!res.ok) {
+      setLocalTasks(() => previousOrder);
+      onReorderError(res.error ?? "Failed to reorder task");
+    }
+  };
+}
+
+function bucketOf(task: RawTask): "Overdue" | "Today" | "Upcoming" | "Completed" {
+  if (task.completed_at) return "Completed";
+  if (!task.due_at) return "Upcoming";
+  const dueStr = task.due_at.slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (dueStr < todayStr) return "Overdue";
+  if (dueStr === todayStr) return "Today";
+  return "Upcoming";
+}
 
 function SidebarLink({
   href,
@@ -84,6 +163,10 @@ export function TasksPageClient({
       next.delete(taskId);
       return next;
     });
+  }
+
+  function handleReorderError(message: string) {
+    toast(message, "error");
   }
 
   const filtered = localTasks.filter((t) => {
@@ -245,41 +328,65 @@ export function TasksPageClient({
             <EmptyState />
           ) : (
             <>
-              {(
-                [
-                  { key: "Overdue", tasks: overdue },
-                  { key: "Today", tasks: today },
-                  { key: "Upcoming", tasks: upcoming },
-                ] as const
-              ).map(({ key, tasks: sectionTasks }) => {
-                if (!sectionTasks.length) return null;
-                return (
-                  <div key={key} className="mb-6">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
-                      {key}
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      {sectionTasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className={optimisticTaskIds.has(task.id) ? "opacity-40" : undefined}
-                        >
-                          <TaskCard
-                            taskId={task.id}
-                            title={task.title}
-                            deadline={task.deadlineLabel}
-                            deadlineVariant={task.deadlineVariant}
-                            workspace={task.workspace.name}
-                            shared={task.shared}
-                            subtasks={task.subtasks}
-                            onEdit={() => setEditingTask(task)}
-                          />
-                        </div>
-                      ))}
+              <DragDropContext
+                onDragEnd={buildDragEndHandler({
+                  localTasks,
+                  memberIdByWorkspaceId,
+                  setLocalTasks,
+                  onReorderError: handleReorderError,
+                })}
+              >
+                {(
+                  [
+                    { key: "Overdue", tasks: overdue },
+                    { key: "Today", tasks: today },
+                    { key: "Upcoming", tasks: upcoming },
+                  ] as const
+                ).map(({ key, tasks: sectionTasks }) => {
+                  if (!sectionTasks.length) return null;
+                  return (
+                    <div key={key} className="mb-6">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
+                        {key}
+                      </p>
+                      <Droppable droppableId={key}>
+                        {(provided) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.droppableProps}
+                            className="flex flex-col gap-1.5"
+                          >
+                            {sectionTasks.map((task, index) => (
+                              <Draggable key={task.id} draggableId={task.id} index={index}>
+                                {(dragProvided) => (
+                                  <div
+                                    ref={dragProvided.innerRef}
+                                    {...dragProvided.draggableProps}
+                                    className={optimisticTaskIds.has(task.id) ? "opacity-40" : undefined}
+                                  >
+                                    <TaskCard
+                                      taskId={task.id}
+                                      title={task.title}
+                                      deadline={task.deadlineLabel}
+                                      deadlineVariant={task.deadlineVariant}
+                                      workspace={task.workspace.name}
+                                      shared={task.shared}
+                                      subtasks={task.subtasks}
+                                      onEdit={() => setEditingTask(task)}
+                                      dragHandleProps={dragProvided.dragHandleProps ?? undefined}
+                                    />
+                                  </div>
+                                )}
+                              </Draggable>
+                            ))}
+                            {provided.placeholder}
+                          </div>
+                        )}
+                      </Droppable>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </DragDropContext>
               <CompletedSection
                 tasks={completed.map((t) => ({
                   taskId: t.id,
