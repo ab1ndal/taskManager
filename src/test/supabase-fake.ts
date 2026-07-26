@@ -192,13 +192,17 @@ export function createFakeSupabase(options: FakeOptions = {}) {
     tables,
     from: (table: string) => new Query(table, tables, options.failOn),
     rpc: async (fnName: string, params: Record<string, unknown>) => {
-      if (fnName === "next_sort_key") {
+      if (fnName === "assign_task_member") {
+        const taskId = params.p_task_id as string;
         const memberId = params.p_member_id as string;
         const rows = (tables.task_assignments ?? []) as Row[];
         const max = rows
           .filter((r) => r.member_id === memberId)
           .reduce((acc, r) => Math.max(acc, r.member_sort_key as number), 0);
-        return { data: max + 1000, error: null };
+        const row: Row = { task_id: taskId, member_id: memberId, member_sort_key: max + 1000 };
+        rows.push(row);
+        tables.task_assignments = rows;
+        return { data: row, error: null };
       }
       return { data: null, error: { message: `unknown rpc: ${fnName}` } };
     },

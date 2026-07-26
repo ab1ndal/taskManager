@@ -77,14 +77,21 @@ function assertNoError(
   if (error) throw new Error(`${step}: ${error.message}`);
 }
 
-/** Next sort key for a member, computed atomically in Postgres. See migration 008 (audit C3). */
-async function nextSortKey(
+/**
+ * Assign a member to a task with the next sort key, computed and inserted atomically in Postgres.
+ * See migration 009 (audit C3) — key computation and insert must share one advisory-lock scope, or
+ * concurrent assigns for the same member can both read the same stale max.
+ */
+async function assignTaskMember(
   admin: ReturnType<typeof createAdminClient>,
+  taskId: string,
   memberId: string
-): Promise<number> {
-  const { data, error } = await admin.rpc("next_sort_key", { p_member_id: memberId });
-  if (error) throw new Error(`next sort key: ${error.message}`);
-  return data as number;
+): Promise<void> {
+  const { error } = await admin.rpc("assign_task_member", {
+    p_task_id: taskId,
+    p_member_id: memberId,
+  });
+  if (error) throw new Error(`assign task member: ${error.message}`);
 }
 
 export async function completeTask(rawTaskId: string): Promise<ActionResult> {
@@ -193,14 +200,7 @@ export async function createTaskWithSubtasks(
     );
 
     for (const memberId of uniqueMemberIds) {
-      assertNoError(
-        "assign task",
-        await admin.from("task_assignments").insert({
-          task_id: parentId,
-          member_id: memberId,
-          member_sort_key: await nextSortKey(admin, memberId),
-        })
-      );
+      await assignTaskMember(admin, parentId, memberId);
     }
 
     // A failed subtask is reported rather than thrown: the parent task exists at this point, and
@@ -233,14 +233,7 @@ export async function createTaskWithSubtasks(
       }
 
       for (const memberId of uniqueMemberIds) {
-        assertNoError(
-          "assign subtask",
-          await admin.from("task_assignments").insert({
-            task_id: subtaskId,
-            member_id: memberId,
-            member_sort_key: await nextSortKey(admin, memberId),
-          })
-        );
+        await assignTaskMember(admin, subtaskId, memberId);
       }
     }
 
@@ -301,14 +294,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<ActionResult> 
 
     // Add new members
     for (const memberId of uniqueNewIds.filter((id) => !currentIds.includes(id))) {
-      assertNoError(
-        "assign task",
-        await admin.from("task_assignments").insert({
-          task_id: taskId,
-          member_id: memberId,
-          member_sort_key: await nextSortKey(admin, memberId),
-        })
-      );
+      await assignTaskMember(admin, taskId, memberId);
     }
 
     revalidatePath("/tasks");

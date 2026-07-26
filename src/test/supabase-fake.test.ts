@@ -1,7 +1,7 @@
 import { createFakeSupabase } from "./supabase-fake";
 
 describe("createFakeSupabase — rpc", () => {
-  it("next_sort_key returns max(member_sort_key) + 1000 for a member with existing rows", async () => {
+  it("assign_task_member inserts with max(member_sort_key) + 1000 for a member with existing rows", async () => {
     const fake = createFakeSupabase({
       tables: {
         task_assignments: [
@@ -12,19 +12,30 @@ describe("createFakeSupabase — rpc", () => {
       },
     });
 
-    const { data, error } = await fake.rpc("next_sort_key", { p_member_id: "m1" });
+    const { data, error } = await fake.rpc("assign_task_member", {
+      p_task_id: "t4",
+      p_member_id: "m1",
+    });
 
     expect(error).toBeNull();
-    expect(data).toBe(4000);
+    expect(data).toMatchObject({ task_id: "t4", member_id: "m1", member_sort_key: 4000 });
+    expect(fake.tables.task_assignments).toContainEqual({
+      task_id: "t4",
+      member_id: "m1",
+      member_sort_key: 4000,
+    });
   });
 
-  it("next_sort_key returns 1000 for a member with no existing rows", async () => {
+  it("assign_task_member inserts with sort key 1000 for a member with no existing rows", async () => {
     const fake = createFakeSupabase({ tables: { task_assignments: [] } });
 
-    const { data, error } = await fake.rpc("next_sort_key", { p_member_id: "m-new" });
+    const { data, error } = await fake.rpc("assign_task_member", {
+      p_task_id: "t1",
+      p_member_id: "m-new",
+    });
 
     expect(error).toBeNull();
-    expect(data).toBe(1000);
+    expect(data).toMatchObject({ task_id: "t1", member_id: "m-new", member_sort_key: 1000 });
   });
 
   it("returns an error for an unknown rpc name", async () => {

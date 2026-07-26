@@ -337,7 +337,7 @@ describe("createTaskWithSubtasks", () => {
     expect(tasksIn(tables)).toHaveLength(1);
   });
 
-  it("computes the assignee's sort key via the next_sort_key rpc", async () => {
+  it("assigns the member with the next sort key via the assign_task_member rpc", async () => {
     const tables = seed();
     tables.task_assignments.push({ task_id: T_OTHER, member_id: M1, member_sort_key: 5000 });
     const fake = setup({ tables });
@@ -351,7 +351,10 @@ describe("createTaskWithSubtasks", () => {
       subtasks: [],
     });
 
-    expect(rpcSpy).toHaveBeenCalledWith("next_sort_key", { p_member_id: M1 });
+    expect(rpcSpy).toHaveBeenCalledWith(
+      "assign_task_member",
+      expect.objectContaining({ p_member_id: M1 })
+    );
     const newAssignment = assignmentsIn(fake.tables).find(
       (a) => a.member_id === M1 && a.member_sort_key === 6000
     );
