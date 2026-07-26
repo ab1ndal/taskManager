@@ -86,8 +86,8 @@ Plans:
 - [x] 04-01-PLAN.md — jest-axe setup + Dialog primitive component (foundation for U3)
 - [x] 04-02-PLAN.md — Global :focus-visible rule (U2) + split polite/assertive toast live regions (U4)
 - [x] 04-03-PLAN.md — Nav cleanup (U5) + 100dvh viewport fix (U7) + login-card lint fix
-- [ ] 04-04-PLAN.md — Convert new-task-modal and edit-task-modal to Dialog (U3)
-- [ ] 04-05-PLAN.md — 44px touch targets + task-scoped labels (U1) + delete confirm dialog (U3)
+- [x] 04-04-PLAN.md — Convert new-task-modal and edit-task-modal to Dialog (U3)
+- [x] 04-05-PLAN.md — 44px touch targets + task-scoped labels (U1) + delete confirm dialog (U3)
 - [ ] 04-06-PLAN.md — Manual verification checkpoint (keyboard/VoiceOver/mobile) + leaked-password toggle
 
 ### Phase 5: Task Prioritization
@@ -144,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. Workspace Directory | 3/3 | Complete | 2026-03-27 |
 | 2. Task Creation | 2/2 | Complete | 2026-03-27 |
 | 3. Security Hardening & Failure Visibility | 1/1 | Complete | 2026-07-25 |
-| 4. Accessibility & Mobile | 3/6 | In Progress|  |
+| 4. Accessibility & Mobile | 5/6 | In Progress|  |
 | 5. Task Prioritization | 0/1 | Not started | - |
 | 6. Task Updates & Speech-to-Text | 0/? | Not started | - |
 | 7. Recurring Tasks | 0/? | Not started | - |
