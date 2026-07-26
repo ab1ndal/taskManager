@@ -23,12 +23,15 @@ type Workspace = { id: string; name: string; kind: string; members: WorkspaceMem
  * by synthetic DOM events.
  */
 export function buildDragEndHandler({
-  localTasks,
+  bucketsByKey,
   memberIdByWorkspaceId,
   setLocalTasks,
   onReorderError,
 }: {
-  localTasks: RawTask[];
+  // Keyed by droppableId ("Overdue" | "Today" | "Upcoming"). These must be the *rendered* arrays —
+  // already filtered and already sorted by member_sort_key — because destination.index is an index
+  // into the rendered list, not into the unsorted/unfiltered localTasks array.
+  bucketsByKey: Record<string, RawTask[]>;
   memberIdByWorkspaceId: Record<string, string>;
   setLocalTasks: (updater: (prev: RawTask[]) => RawTask[]) => void;
   onReorderError: (message: string) => void;
@@ -39,12 +42,12 @@ export function buildDragEndHandler({
     if (source.droppableId !== destination.droppableId) return;
     if (source.index === destination.index) return;
 
-    const bucketId = source.droppableId;
-    const bucketTasks = localTasks.filter((t) => bucketOf(t) === bucketId);
-    const dragged = bucketTasks.find((t) => t.id === draggableId);
+    const bucket = bucketsByKey[source.droppableId];
+    if (!bucket) return;
+    const dragged = bucket.find((t) => t.id === draggableId);
     if (!dragged) return;
 
-    const withoutDragged = bucketTasks.filter((t) => t.id !== draggableId);
+    const withoutDragged = bucket.filter((t) => t.id !== draggableId);
     const reordered = [
       ...withoutDragged.slice(0, destination.index),
       dragged,
@@ -52,13 +55,20 @@ export function buildDragEndHandler({
     ];
     const { prevKey, nextKey } = computeNeighborKeys(reordered, destination.index);
 
-    const previousOrder = localTasks;
+    const memberId = memberIdByWorkspaceId[dragged.workspace.id];
+    if (!memberId) {
+      onReorderError("Could not determine member for this task's workspace");
+      return;
+    }
 
     // Optimistic move: give the dragged task a synthetic sort key placed between its new
     // neighbors so bucketTasks()'s existing member_sort_key sort reflects the drop immediately,
     // before the server confirms. This is the single state update for the optimistic phase —
     // bucketTasks() re-sorts by member_sort_key on every render, so reassigning just this one
     // task's key is sufficient to move it; no manual array-splice-into-place is needed.
+    //
+    // Must stay in sync with reorderTask's key-assignment logic in actions.ts — the two compute
+    // the same value, one optimistically on the client and one authoritatively on the server.
     const optimisticKey =
       prevKey !== null && nextKey !== null
         ? (prevKey + nextKey) / 2
@@ -67,28 +77,23 @@ export function buildDragEndHandler({
           : nextKey !== null
             ? nextKey - 1000
             : dragged.member_sort_key;
-    setLocalTasks(() =>
-      localTasks.map((t) => (t.id === draggableId ? { ...t, member_sort_key: optimisticKey } : t))
+    setLocalTasks((prev) =>
+      prev.map((t) => (t.id === draggableId ? { ...t, member_sort_key: optimisticKey } : t))
     );
 
-    const memberId = memberIdByWorkspaceId[dragged.workspace.id];
     const res = await reorderTask({ taskId: draggableId, memberId, prevKey, nextKey });
 
     if (!res.ok) {
-      setLocalTasks(() => previousOrder);
+      // Roll back only the dragged task's key. Replacing the whole array with a pre-drag snapshot
+      // would erase any task optimistically created during the await.
+      setLocalTasks((prev) =>
+        prev.map((t) =>
+          t.id === draggableId ? { ...t, member_sort_key: dragged.member_sort_key } : t
+        )
+      );
       onReorderError(res.error ?? "Failed to reorder task");
     }
   };
-}
-
-function bucketOf(task: RawTask): "Overdue" | "Today" | "Upcoming" | "Completed" {
-  if (task.completed_at) return "Completed";
-  if (!task.due_at) return "Upcoming";
-  const dueStr = task.due_at.slice(0, 10);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  if (dueStr < todayStr) return "Overdue";
-  if (dueStr === todayStr) return "Today";
-  return "Upcoming";
 }
 
 function SidebarLink({
@@ -330,7 +335,7 @@ export function TasksPageClient({
             <>
               <DragDropContext
                 onDragEnd={buildDragEndHandler({
-                  localTasks,
+                  bucketsByKey: { Overdue: overdue, Today: today, Upcoming: upcoming },
                   memberIdByWorkspaceId,
                   setLocalTasks,
                   onReorderError: handleReorderError,
@@ -349,7 +354,9 @@ export function TasksPageClient({
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
                         {key}
                       </p>
-                      <Droppable droppableId={key}>
+                      {/* type={key} makes dnd treat each bucket as its own drag universe, so a
+                          foreign bucket never renders as a valid drop target mid-drag. */}
+                      <Droppable droppableId={key} type={key}>
                         {(provided) => (
                           <div
                             ref={provided.innerRef}
@@ -357,7 +364,12 @@ export function TasksPageClient({
                             className="flex flex-col gap-1.5"
                           >
                             {sectionTasks.map((task, index) => (
-                              <Draggable key={task.id} draggableId={task.id} index={index}>
+                              <Draggable
+                                key={task.id}
+                                draggableId={task.id}
+                                index={index}
+                                isDragDisabled={optimisticTaskIds.has(task.id)}
+                              >
                                 {(dragProvided) => (
                                   <div
                                     ref={dragProvided.innerRef}

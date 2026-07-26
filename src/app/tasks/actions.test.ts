@@ -337,7 +337,7 @@ describe("createTaskWithSubtasks", () => {
     expect(tasksIn(tables)).toHaveLength(1);
   });
 
-  it("computes each assignee's sort key via the next_sort_key rpc, not a stale read", async () => {
+  it("computes the assignee's sort key via the next_sort_key rpc", async () => {
     const tables = seed();
     tables.task_assignments.push({ task_id: T_OTHER, member_id: M1, member_sort_key: 5000 });
     const fake = setup({ tables });

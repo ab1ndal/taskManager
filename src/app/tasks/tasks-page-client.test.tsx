@@ -229,12 +229,12 @@ describe("buildDragEndHandler", () => {
 
   it("calls reorderTask with computed neighbor keys on a same-bucket move", async () => {
     (reorderTask as jest.Mock).mockResolvedValue({ ok: true });
-    const localTasks = [bucketTask("t1", 1000), bucketTask("t2", 2000), bucketTask("t3", 3000)];
+    const bucket = [bucketTask("t1", 1000), bucketTask("t2", 2000), bucketTask("t3", 3000)];
     const setLocalTasks = jest.fn();
     const handleReorderError = jest.fn();
 
     const handler = buildDragEndHandler({
-      localTasks,
+      bucketsByKey: { Upcoming: bucket },
       memberIdByWorkspaceId: { [WS1]: M1 },
       setLocalTasks,
       onReorderError: handleReorderError,
@@ -256,12 +256,97 @@ describe("buildDragEndHandler", () => {
     expect(setLocalTasks).toHaveBeenCalled(); // optimistic splice happened
   });
 
-  it("no-ops on a cross-bucket move", async () => {
-    const localTasks = [bucketTask("t1", 1000), bucketTask("t2", 2000)];
+  // Regression: destination.index indexes the *rendered* bucket. The handler must read neighbors
+  // out of the array it is handed, never re-derive an order from an unsorted source list.
+  it("computes neighbor keys from the passed-in bucket order, not from sort-key order", async () => {
+    (reorderTask as jest.Mock).mockResolvedValue({ ok: true });
+    // Deliberately not sort-key-ordered — mimics an arbitrary server query order.
+    const bucket = [bucketTask("t3", 3000), bucketTask("t1", 1000), bucketTask("t2", 2000)];
     const setLocalTasks = jest.fn();
 
     const handler = buildDragEndHandler({
-      localTasks,
+      bucketsByKey: { Upcoming: bucket },
+      memberIdByWorkspaceId: { [WS1]: M1 },
+      setLocalTasks,
+      onReorderError: jest.fn(),
+    });
+
+    await handler({
+      draggableId: "t1",
+      source: { droppableId: "Upcoming", index: 1 },
+      destination: { droppableId: "Upcoming", index: 2 },
+      reason: "DROP",
+    } as import("@hello-pangea/dnd").DropResult);
+
+    // Dropping at the end of [t3, t2] puts t1 after t2 → prevKey is t2's key.
+    expect(reorderTask).toHaveBeenCalledWith({
+      taskId: "t1",
+      memberId: M1,
+      prevKey: 2000,
+      nextKey: null,
+    });
+  });
+
+  it("reports an error and skips reorderTask when the workspace has no member id", async () => {
+    const bucket = [bucketTask("t1", 1000), bucketTask("t2", 2000)];
+    const setLocalTasks = jest.fn();
+    const onReorderError = jest.fn();
+
+    const handler = buildDragEndHandler({
+      bucketsByKey: { Upcoming: bucket },
+      memberIdByWorkspaceId: {},
+      setLocalTasks,
+      onReorderError,
+    });
+
+    await handler({
+      draggableId: "t1",
+      source: { droppableId: "Upcoming", index: 0 },
+      destination: { droppableId: "Upcoming", index: 1 },
+      reason: "DROP",
+    } as import("@hello-pangea/dnd").DropResult);
+
+    expect(reorderTask).not.toHaveBeenCalled();
+    expect(setLocalTasks).not.toHaveBeenCalled();
+    expect(onReorderError).toHaveBeenCalledWith(
+      "Could not determine member for this task's workspace"
+    );
+  });
+
+  it("rolls back only the dragged task, preserving tasks added during the await", async () => {
+    (reorderTask as jest.Mock).mockResolvedValue({ ok: false, error: "server exploded" });
+    const bucket = [bucketTask("t1", 1000), bucketTask("t2", 2000)];
+    const setLocalTasks = jest.fn();
+
+    const handler = buildDragEndHandler({
+      bucketsByKey: { Upcoming: bucket },
+      memberIdByWorkspaceId: { [WS1]: M1 },
+      setLocalTasks,
+      onReorderError: jest.fn(),
+    });
+
+    await handler({
+      draggableId: "t1",
+      source: { droppableId: "Upcoming", index: 0 },
+      destination: { droppableId: "Upcoming", index: 1 },
+      reason: "DROP",
+    } as import("@hello-pangea/dnd").DropResult);
+
+    // A task created while reorderTask was in flight.
+    const concurrent = bucketTask("t-new", 9000);
+    const rollback = setLocalTasks.mock.calls[1][0] as (prev: RawTask[]) => RawTask[];
+    const next = rollback([...bucket, concurrent]);
+
+    expect(next.map((t) => t.id)).toEqual(["t1", "t2", "t-new"]);
+    expect(next.find((t) => t.id === "t1")!.member_sort_key).toBe(1000);
+  });
+
+  it("no-ops on a cross-bucket move", async () => {
+    const bucket = [bucketTask("t1", 1000), bucketTask("t2", 2000)];
+    const setLocalTasks = jest.fn();
+
+    const handler = buildDragEndHandler({
+      bucketsByKey: { Today: bucket },
       memberIdByWorkspaceId: { [WS1]: M1 },
       setLocalTasks,
       onReorderError: jest.fn(),
@@ -280,12 +365,12 @@ describe("buildDragEndHandler", () => {
 
   it("reverts the optimistic order and reports the error when reorderTask fails", async () => {
     (reorderTask as jest.Mock).mockResolvedValue({ ok: false, error: "server exploded" });
-    const localTasks = [bucketTask("t1", 1000), bucketTask("t2", 2000)];
+    const bucket = [bucketTask("t1", 1000), bucketTask("t2", 2000)];
     const setLocalTasks = jest.fn();
     const onReorderError = jest.fn();
 
     const handler = buildDragEndHandler({
-      localTasks,
+      bucketsByKey: { Upcoming: bucket },
       memberIdByWorkspaceId: { [WS1]: M1 },
       setLocalTasks,
       onReorderError,
