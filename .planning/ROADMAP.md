@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Accessibility & Mobile** - Touch targets, focus management, dialog semantics, live regions
 - [x] **Phase 5: Task Prioritization** - Drag-to-reorder personal task priority (completed 2026-07-26)
 - [ ] **Phase 6: Task Updates & Speech-to-Text** - Text updates on a task; speech only at the input layer
+- [ ] **Phase 6.5: Task Panel UI Polish** (INSERTED) - Visual polish of the task panel via ui-ux-pro-max
 - [ ] **Phase 7: Recurring Tasks** - Rule-driven task generation
 - [ ] **Phase 8: Design Polish** - Dark mode, semantic tokens, icon consolidation, reduced motion
 
@@ -116,6 +117,17 @@ Plans:
   2. Speech-to-text is available at the input layer only — audio is never stored
 **Plans**: TBD
 
+### Phase 6.5: Task Panel UI Polish
+**Goal**: Task panel (edit-task-modal + updates/subtasks sections from Phase 6) reads as
+deliberately designed, not default-styled
+**Depends on**: Phase 6
+**Requirements**: raised mid-Phase-6-brainstorm 2026-07-26, not yet mapped to a docs/product.md requirement
+**Success Criteria**: TBD - needs its own brainstorm
+**Plans**: TBD
+
+Plans:
+- [ ] Not yet planned - run ui-ux-pro-max brainstorm before planning
+
 ### Phase 7: Recurring Tasks
 **Goal**: A recurrence rule generates task instances without duplicates
 **Depends on**: Phase 6
@@ -138,7 +150,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -147,7 +159,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 3. Security Hardening & Failure Visibility | 1/1 | Complete | 2026-07-25 |
 | 4. Accessibility & Mobile | 5/6 | In Progress — 3 of 4 manual checks in 04-06 done or partial, resuming later |  |
 | 5. Task Prioritization | 1/1 | Complete | 2026-07-26 |
-| 6. Task Updates & Speech-to-Text | 0/? | Not started | - |
+| 6. Task Updates & Speech-to-Text | 0/? | Not started (design spec written) | - |
+| 6.5. Task Panel UI Polish | 0/? | Not started — needs brainstorm | - |
 | 7. Recurring Tasks | 0/? | Not started | - |
 | 8. Design Polish | 0/? | Not started | - |
 

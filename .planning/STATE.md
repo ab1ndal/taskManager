@@ -70,6 +70,7 @@ All work has been landing directly on `main` (not a feature branch) since phase 
 - Phase 3 was "Task Detail & Editing"; that work landed outside the planning loop, and Phase 3 is now Security Hardening, matching `.planning/phases/03-security-hardening/`
 - Phases renumbered 2026-07-25: 4 accessibility, 5 prioritization, 6 updates/speech, 7 recurring, 8 design polish
 - Old "Phase 5: Task and workspace lifecycle" superseded — only workspace deletion remains, and it needs an ownership rule first
+- Phase 6.5 (INSERTED) added 2026-07-26 during Phase 6 brainstorm: task panel UI polish via ui-ux-pro-max, needs its own brainstorm before planning
 
 ### Blockers/Concerns
 
