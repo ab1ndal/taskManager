@@ -58,8 +58,9 @@ Read. `assertTaskAssignee(taskId, user.id)` → select `task_updates` joined to
 **`addTaskUpdate(input: { taskId, updateText }): ActionResult`**
 Write. `assertTaskAssignee(taskId, user.id)` → resolve author `member_id` as the single id in
 `memberIdsForUser(user.id) ∩ {assignees of taskId}` — deterministic because a task belongs to one
-workspace and `auth_user_id` is unique within a workspace, so at most one of the user's member rows
-can be assigned to any given task → insert `{ task_id, member_id, update_text }`.
+workspace and `unique (workspace_id, auth_user_id)` is a real DB constraint on `workspace_members`
+(`001_initial_schema.sql:15`, confirmed via research, not just a doc claim), so at most one of the
+user's member rows can be assigned to any given task → insert `{ task_id, member_id, update_text }`.
 
 **`addSubtask(input: { parentTaskId, title, description?, dueAt? }): ActionResult`**
 Write. `assertTaskAssignee(parentTaskId, user.id)` → load parent's current assignee `member_id`s
@@ -107,6 +108,19 @@ same `Dialog`.
   after stopping, same as typed text — nothing auto-submits.
 - No audio ever reaches application code or a server — the browser API returns text only, so
   "audio is never stored" holds by construction, not by a discard step.
+- **`onend` fires on silence even with `continuous: true`** (confirmed via research, not just a
+  Chrome quirk to patch later) — the hook needs a ref-guarded auto-restart from `onend` (restart
+  only if the user hasn't explicitly tapped stop) built in from the first implementation, not
+  bolted on after manual testing surfaces it.
+- Both `window.SpeechRecognition` and the `webkitSpeechRecognition` prefix must be checked — Safari
+  still requires the prefix (confirmed current as of this research), Chrome accepts either.
+- Firefox has no real support (flag-gated, never shipped) — feature-detection with no mic button is
+  the only correct fallback, not a gap to close later.
+- `isSupported` must be computed inside a `useEffect` or lazy initializer, never read from `window`
+  at module scope — this is a client component but still SSR-rendered once on the server.
+- Permission-denied vs. no-speech-detected: treat `onerror` with `event.error === "not-allowed"` as
+  the denied case; verify manually in Chrome + Safari during execution, since authoritative current
+  docs on re-prompt behavior weren't conclusively found in research.
 
 ## Error Handling
 
