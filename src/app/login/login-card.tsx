@@ -21,11 +21,12 @@ export function LoginCard() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [hasSession, setHasSession] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get("mode") === "reset") {
-      setMode("reset");
-    }
-  }, [searchParams]);
+  const resetParam = searchParams.get("mode") === "reset" ? "reset" : null;
+  const [syncedResetParam, setSyncedResetParam] = useState<string | null>(null);
+  if (syncedResetParam !== resetParam) {
+    setSyncedResetParam(resetParam);
+    if (resetParam === "reset") setMode("reset");
+  }
 
   useEffect(() => {
     if (mode !== "reset") return;

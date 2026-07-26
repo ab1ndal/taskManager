@@ -143,7 +143,7 @@ export function TasksPageClient({
       )}
 
       {/* Main layout */}
-      <div className="flex min-h-[calc(100vh-52px)] -m-6">
+      <div className="flex min-h-dvh">
         {/* Sidebar — medium screens and up */}
         <aside className="hidden md:flex w-[200px] flex-col bg-[var(--color-surface)] border-r border-[var(--color-border)] p-3 flex-shrink-0">
           <button
