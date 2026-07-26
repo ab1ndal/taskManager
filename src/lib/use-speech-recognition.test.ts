@@ -133,4 +133,24 @@ describe("useSpeechRecognition", () => {
     // The error should be caught and set in the error state.
     expect(result.current.error).toBe("InvalidStateError: recognition already started");
   });
+
+  it("does not set isListening when the initial start() call throws", () => {
+    let instance: MockSpeechRecognition | null = null;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instance = new MockSpeechRecognition();
+      // Mock start() to throw on the first call.
+      instance.start.mockImplementation(() => {
+        throw new Error("SecurityError: access denied");
+      });
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+    act(() => result.current.start());
+
+    // isListening should be false since start() threw.
+    expect(result.current.isListening).toBe(false);
+    // error should be set.
+    expect(result.current.error).toBe("SecurityError: access denied");
+  });
 });

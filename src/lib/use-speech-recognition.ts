@@ -95,11 +95,11 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
     recognitionRef.current = recognition;
     try {
       recognition.start();
+      setIsListening(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start speech recognition");
       recognitionRef.current = null;
     }
-    setIsListening(true);
   }, []);
 
   const stop = useCallback(() => {
