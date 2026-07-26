@@ -197,7 +197,6 @@ export function NewTaskModal({
             onChange={(e) => setTitle(e.target.value)}
             disabled={disabled}
             className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
-            autoFocus
           />
 
           <textarea
