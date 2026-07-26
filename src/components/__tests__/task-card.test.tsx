@@ -149,3 +149,24 @@ describe("TaskCard — subtasks and accessibility", () => {
     expect(results).toHaveNoViolations();
   });
 });
+
+describe("TaskCard — drag handle", () => {
+  it("renders a drag handle when dragHandleProps is provided", () => {
+    render(
+      <TaskCard
+        taskId="t1"
+        title="Task 1"
+        workspace="Home"
+        dragHandleProps={{ "aria-describedby": "drag-instructions" } as React.HTMLAttributes<HTMLButtonElement>}
+      />
+    );
+    const handle = screen.getByLabelText('Reorder "Task 1"');
+    expect(handle).toBeInTheDocument();
+    expect(handle).toHaveAttribute("aria-describedby", "drag-instructions");
+  });
+
+  it("renders no drag handle when dragHandleProps is omitted", () => {
+    render(<TaskCard taskId="t1" title="Task 1" workspace="Home" />);
+    expect(screen.queryByLabelText('Reorder "Task 1"')).not.toBeInTheDocument();
+  });
+});

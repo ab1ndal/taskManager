@@ -39,6 +39,7 @@ export function TaskCard({
   completed,
   subtasks,
   onEdit,
+  dragHandleProps,
 }: {
   taskId: string;
   title: string;
@@ -49,6 +50,7 @@ export function TaskCard({
   completed?: boolean;
   subtasks?: { id: string; title: string; completed_at: string | null }[];
   onEdit?: () => void;
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }) {
   const [pending, startTransition] = useTransition();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -67,6 +69,24 @@ export function TaskCard({
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <div className="flex items-center gap-3">
+        {dragHandleProps && (
+          <button
+            type="button"
+            aria-label={`Reorder "${title}"`}
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] cursor-grab active:cursor-grabbing"
+            {...dragHandleProps}
+          >
+            <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+              <circle cx="2.5" cy="2.5" r="1.5" />
+              <circle cx="7.5" cy="2.5" r="1.5" />
+              <circle cx="2.5" cy="8" r="1.5" />
+              <circle cx="7.5" cy="8" r="1.5" />
+              <circle cx="2.5" cy="13.5" r="1.5" />
+              <circle cx="7.5" cy="13.5" r="1.5" />
+            </svg>
+          </button>
+        )}
+
         {/* Complete button */}
         <button
           onClick={() => {
