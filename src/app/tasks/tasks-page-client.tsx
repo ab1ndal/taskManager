@@ -369,6 +369,13 @@ export function TasksPageClient({
                                 draggableId={task.id}
                                 index={index}
                                 isDragDisabled={optimisticTaskIds.has(task.id)}
+                                // The drag handle is a real <button> (needed for its own
+                                // aria-label/44px hit target), and the library refuses to start a
+                                // drag from any native interactive element (button/input/etc)
+                                // unless this is set — otherwise Space silently no-ops instead of
+                                // lifting, since tryGetLock's isEventInInteractiveElement check
+                                // rejects the lock before it ever reaches our onDragEnd.
+                                disableInteractiveElementBlocking
                               >
                                 {(dragProvided) => (
                                   <div
