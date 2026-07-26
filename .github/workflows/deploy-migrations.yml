@@ -27,21 +27,16 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Diagnose migration history (temporary)
-        run: supabase migration list
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-
-      - name: Inspect remote schema (temporary, read-only)
+      - name: Baseline migration history (one-time repair)
+        # 001-007 were applied directly via the Supabase SQL editor before this workflow
+        # existed, so the CLI's migration history table never recorded them — confirmed by
+        # inspecting the live schema (private schema, task_assignments.member_sort_key both
+        # present; next_sort_key absent, i.e. exactly the pre-008 state). This marks them as
+        # applied to match reality, and retires an orphan remote entry with no local file.
+        # Remove this step after it succeeds once — future runs only need `db push`.
         run: |
-          supabase db dump --linked --schema public,private -f /tmp/schema.sql
-          echo "--- private schema present? ---"
-          grep -c "CREATE SCHEMA.*private" /tmp/schema.sql || true
-          echo "--- member_sort_key column? ---"
-          grep -c "member_sort_key" /tmp/schema.sql || true
-          echo "--- next_sort_key function (should be absent pre-008)? ---"
-          grep -c "next_sort_key" /tmp/schema.sql || true
+          supabase migration repair --status applied 001 002 003 004 005 006 007
+          supabase migration repair --status reverted 20260725220330
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
