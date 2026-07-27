@@ -42,18 +42,20 @@ in `STATE.md`'s blockers, and in `lessons.md` (L1–L11).
       `e2e/fixtures.ts` keys on `E2E_SUPABASE_URL`, which exists only in `.env.local` — verified by
       forcing the production URL and watching the run abort before seeding. Full suite green against
       the new project: 187 passed, 38 skipped.
+- [x] **F14** — raised, then closed the same day because its premise was false. L9 recorded
+      production's migration history as holding one row; it actually lists 001-009, which the repair
+      workflow's own first step showed. `deploy-migrations.yml` was never broken, and a `--dry-run`
+      push now reports "Remote database is up to date". Kept the manual
+      `repair-migration-history.yml` for the next out-of-band apply, and added a `migration list`
+      step to the deploy workflow. L9 rewritten.
 
 Verified: `npx tsc --noEmit` clean, 245 jest tests pass, full Playwright suite 187 passed /
 38 skipped (the screenshot specs skip on webkit and firefox by design).
 
 ## Open followups — full statement of each in `06.5-FOLLOWUPS.md`
 
-- **F14** — production's migration history holds only 007, and
-  `.github/workflows/deploy-migrations.yml` runs `supabase db push` against it on every migration
-  change landing on `main`. The first such push fails (it aborts on 001's bare `create table`, so
-  nothing is corrupted, but migrations stop deploying). Needs `migration list --linked` then
-  `migration repair --status applied` per already-applied migration. Highest-value item left.
-- **F10** — dictation and mic-permission denial still need a human in Chrome and Safari.
+- **F10** — dictation and mic-permission denial still need a human in Chrome and Safari. Highest-value
+  item left.
 - **F6** — reopening a parent leaves its subtasks completed. Deliberate; watch in real use.
 - **F11** — no service worker, so the installed app needs the network for every load. Decide whether
   offline is in scope; if yes it is its own slice, not a config flag.

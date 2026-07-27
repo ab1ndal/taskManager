@@ -83,11 +83,12 @@ now pushed to `origin`.
 
 ### Blockers/Concerns
 
-- **Production** migration history holds only `20260725220330 rls_security_definer`; 001-006 were
-  applied out-of-band, so `supabase db push` would try to replay them (tasks/lessons.md L9). This now
-  blocks `.github/workflows/deploy-migrations.yml`, which pushes to production on every migration
-  change landing on `main` — tracked as followup F14. `task-manager-dev` is unaffected: it took all
-  nine cleanly on 2026-07-27 and its history is complete.
+- ~~Remote migration history holds only `20260725220330 rls_security_definer`~~ — resolved. Both
+  projects list 001-009, verified 2026-07-27 with `supabase migration list --linked`: production in
+  the `repair-migration-history` workflow run, which finished "Remote database is up to date", and
+  `task-manager-dev` locally after its clean `db push`. `.github/workflows/deploy-migrations.yml`
+  works. L9 kept the broken state on record for two days after it stopped being true, which is what
+  produced the short-lived followup F14.
 - No local Supabase stack: Docker unavailable, and `db push` needs `SUPABASE_DB_PASSWORD`. DB verification is done by running SQL as the `authenticated` role with `set local request.jwt.claims`
 - ~~`/tasks` has no redirect for signed-out users~~ — resolved 2026-07-27. The proxy existed but was
   never registered: Next resolves `proxy.ts` relative to the app dir, so a root-level file is ignored

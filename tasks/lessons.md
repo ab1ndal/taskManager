@@ -100,28 +100,33 @@ both cases.
 **Rule:** treat `docs/db.md` as intent, not as a description of the live schema. Verify against
 `supabase/migrations/` before assuming an index exists.
 
-## L9 — The PRODUCTION database has almost no CLI migration history
+## L9 — Migration history: broken 2026-07-25, complete on both projects since
 
-Applies to `xamdgvxziobpptcfymug` (task-manager, production) **only** — not to `mcdpiuiayfljzvnhtqto`
-(task-manager-dev), which was created empty on 2026-07-27 and took all nine migrations through a
-clean `supabase db push`, so its history is complete. See L14 for which project is which.
+**Resolved 2026-07-27.** Both projects now report a full, matching history, verified with
+`supabase migration list --linked`:
 
-Learned 2026-07-25. On production, migrations 001-006 were applied out-of-band, so
-`supabase_migrations.schema_migrations` was **empty** until 007 was applied through the Supabase MCP
-server, which recorded a single row: `20260725220330 rls_security_definer`.
+- `mcdpiuiayfljzvnhtqto` (task-manager-dev) — created empty and took all nine through one clean
+  `db push`.
+- `xamdgvxziobpptcfymug` (production) — lists 001-009, confirmed in the `repair-migration-history`
+  workflow run of 2026-07-27, which then reported "Remote database is up to date". The deploy path
+  in `.github/workflows/deploy-migrations.yml` works.
 
-**Rule:** never run `supabase db push` against production without first repairing the history — it
-would try to replay 001-006 against a schema that already has them. `supabase link` works, but
-`db push` needs `SUPABASE_DB_PASSWORD`: the CLI's passwordless login-role fallback fails on this
-project with "permission denied to alter role".
+**What was true on 2026-07-25, and why this lesson still exists:** migrations 001-006 were applied to
+production out-of-band, so `supabase_migrations.schema_migrations` was empty until 007 went through
+the Supabase MCP server and recorded one row, `20260725220330 rls_security_definer`. In that state a
+`db push` would have tried to replay 001-006 against a schema that already had them. The history was
+completed at some point between then and 2026-07-27; this lesson was not updated, and on 2026-07-27
+it caused a followup (F14) to be raised against a problem that no longer existed.
 
-**This is not hypothetical any more.** `.github/workflows/deploy-migrations.yml` links
-`xamdgvxziobpptcfymug` and runs `supabase db push` on every push to `main` that touches
-`supabase/migrations/**`. Until the history is repaired, the first such push fails — 001 issues bare
-`create table`, so the run aborts rather than corrupting anything, but production migrations do not
-deploy. Repair with `supabase migration repair --status applied <version>` for each migration
-production already has, confirmed against `supabase migration list --linked`, before relying on that
-workflow.
+**Rule, unchanged:** applying a migration outside `supabase db push` — MCP, the SQL editor, psql —
+leaves the history table disagreeing with the schema, and every later push inherits that. If you do
+it, repair immediately: `supabase migration repair --status applied <version>`. Note `db push` needs
+`SUPABASE_DB_PASSWORD` on this project; the CLI's passwordless login-role fallback fails with
+"permission denied to alter role".
+
+**Second rule, learned the hard way here:** a lesson that records a broken state must be re-verified
+before it is acted on, not quoted. `migration list --linked` is one command and would have shown the
+truth immediately.
 
 **How to verify DB behaviour without Docker or a password** — run SQL as the querying role:
 
