@@ -46,13 +46,14 @@ Verified: `npx tsc --noEmit` clean, 263 jest tests pass, full Playwright suite 1
 
 ## Open followups — full statement of each in `06.5-FOLLOWUPS.md`
 
-- **F20** — signup confirmation email never arrives on the production Vercel URL. Two candidates,
-  neither confirmed: `signUp` passes no `emailRedirectTo` so the link inherits Site URL, and
-  Supabase's built-in SMTP only delivers to team addresses under current defaults. Check the
-  production Auth logs before changing anything.
-- **F21** — no Google sign-in. Client work is small (`signInWithOAuth` against the existing
-  `/auth/callback`); the blocking part is a Google Cloud OAuth client plus the Supabase provider
-  toggle and redirect allowlist.
+- **F20** — cause found and fixed 2026-07-27: the report was a repeat signup on an existing address,
+  which Supabase answers with no error and no email, and the old code called that success.
+  Duplicate-signup message and explicit `emailRedirectTo` now in `login-card.tsx`. Remaining: custom
+  SMTP, because built-in SMTP delivers only to team addresses, and no fresh-address signup has been
+  seen through end to end on production.
+- **F21** — Google sign-in built 2026-07-27; Google Cloud client and Supabase provider configured by
+  the owner. "Continue with Google" button in `login-card.tsx` reuses `/auth/callback`. Remaining:
+  walk the flow once on production. Cannot be tested locally — no `supabase/config.toml`.
 - **F19** — updates take 1–2s to render on open and a new task is not editable until the server
   revalidates. Measure against `npm run build && npm start` before fixing — `next dev` compiles
   per route, so the observed number may be a dev artefact.
