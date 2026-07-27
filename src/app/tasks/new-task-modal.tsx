@@ -269,14 +269,16 @@ export function NewTaskModal({
             </label>
             <div className="flex flex-col gap-1">
               {/*
-                One row per subtask on desktop, stacked below `sm`. Title, details, date and remove
-                all shared a single flex row at every width, which inside a max-w-md dialog left
-                each field around 60px on a phone.
+                A subtask is a two-line block at every width, not one row. Title, details, date and
+                remove used to be promoted onto a single flex row at `sm` and up (via `sm:contents`),
+                and three text fields plus a date picker do not fit the dialog's 448px: the date
+                input holds its intrinsic ~140px, so the details textarea collapsed to roughly one
+                character and could not be typed into. Details now owns a full-width line.
               */}
               {subtaskRows.map((row, i) => (
                 <div
                   key={i}
-                  className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-sm border border-[var(--color-border)] p-2 sm:border-0 sm:p-0"
+                  className="flex flex-col gap-2 rounded-sm border border-[var(--color-border)] p-2"
                 >
                   <div className="flex items-center gap-2">
                     <Circle
@@ -288,6 +290,7 @@ export function NewTaskModal({
                     <input
                       type="text"
                       placeholder="Subtask title"
+                      aria-label={`Subtask ${i + 1} title`}
                       value={row.title}
                       onChange={(e) => updateSubtask(i, "title", e.target.value)}
                       onKeyDown={(e) => handleSubtaskKeyDown(e, row.title)}
@@ -299,27 +302,32 @@ export function NewTaskModal({
                       type="button"
                       onClick={() => removeSubtask(i)}
                       disabled={disabled}
-                      aria-label="Remove subtask"
-                      className="shrink-0 sm:order-last text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                      aria-label={`Remove subtask ${i + 1}`}
+                      className="shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
                     >
                       <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2 sm:contents">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-2">
                     <textarea
                       placeholder="Details…"
+                      aria-label={`Subtask ${i + 1} details`}
                       value={row.description}
                       onChange={(e) => updateSubtask(i, "description", e.target.value)}
                       disabled={disabled}
-                      rows={1}
-                      className="flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+                      rows={2}
+                      className="w-full sm:flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
                     />
                     <input
                       type="date"
+                      aria-label={`Subtask ${i + 1} due date`}
                       value={row.dueAt}
                       onChange={(e) => updateSubtask(i, "dueAt", e.target.value)}
                       disabled={disabled}
-                      className="shrink-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+                      // Safari renders a date input without a picker glyph and sizes it to its own
+                      // text: at `text-xs` it came out 96px, narrower than the value it holds. The
+                      // explicit floor keeps it legible in every engine.
+                      className="w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
                     />
                   </div>
                 </div>
