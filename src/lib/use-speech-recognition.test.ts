@@ -195,4 +195,44 @@ describe("useSpeechRecognition", () => {
     // error should be set.
     expect(result.current.error).toBe("SecurityError: access denied");
   });
+
+  it("prevents a superseded recognizer instance from restarting itself after a concurrent start() call", () => {
+    const instances: MockSpeechRecognition[] = [];
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      const instance = new MockSpeechRecognition();
+      instances.push(instance);
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+
+    // Start the first recognizer instance (instances[0]).
+    act(() => result.current.start());
+    expect(instances.length).toBe(1);
+    expect(result.current.isListening).toBe(true);
+    instances[0]!.start.mockClear();
+
+    // Stop the first instance synchronously and start a second one before the first's onend fires.
+    // This simulates the race: stop() nulls the ref, then start() creates a new instance and
+    // resets stoppedByUserRef to false.
+    act(() => result.current.stop());
+    act(() => result.current.start());
+
+    // Now we have two instances and recognitionRef points to instances[1].
+    expect(instances.length).toBe(2);
+    expect(result.current.isListening).toBe(true);
+    instances[1]!.start.mockClear();
+
+    // Fire the FIRST instance's onend handler (the zombie).
+    // Without the guard, it would restart itself because stoppedByUserRef is now false
+    // and recognitionRef is pointing to instances[1], not instances[0].
+    act(() => instances[0]!.onend?.());
+
+    // Assert the zombie did NOT restart itself.
+    expect(instances[0]!.start).not.toHaveBeenCalled();
+
+    // Assert the second instance's state is undisturbed.
+    expect(instances[1]!.start).not.toHaveBeenCalled();
+    expect(result.current.isListening).toBe(true);
+  });
 });

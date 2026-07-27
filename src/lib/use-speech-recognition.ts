@@ -98,6 +98,10 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
     };
 
     recognition.onend = () => {
+      // Guard against superseded instances: if this recognizer has been replaced by a newer one,
+      // don't restart or touch any state — let the new instance handle everything.
+      if (recognitionRef.current !== recognition) return;
+
       if (!stoppedByUserRef.current) {
         try {
           recognition.start();
