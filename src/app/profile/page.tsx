@@ -41,11 +41,29 @@ export default function ProfilePage() {
   }
 
   if (fetching) {
-    return <p className="text-sm text-[var(--color-text-muted)]">Loading…</p>;
+    // Skeleton rather than a "Loading…" string: it reserves the same space the real content takes,
+    // so the page does not jump when the user arrives. Every other route already does this.
+    return (
+      <main className="max-w-sm p-6" aria-busy="true">
+        <span className="sr-only">Loading your profile…</span>
+        <div className="mb-6 h-7 w-24 animate-pulse rounded-sm bg-[var(--color-border)]" />
+        <div className="mb-6 flex items-center gap-4">
+          <div className="h-14 w-14 animate-pulse rounded-full bg-[var(--color-border)]" />
+          <div className="flex flex-col gap-2">
+            <div className="h-4 w-32 animate-pulse rounded-sm bg-[var(--color-border)]" />
+            <div className="h-4 w-44 animate-pulse rounded-sm bg-[var(--color-border)]" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-4">
+          <div className="h-[38px] animate-pulse rounded-sm bg-[var(--color-border)]" />
+          <div className="h-[38px] animate-pulse rounded-sm bg-[var(--color-border)]" />
+        </div>
+      </main>
+    );
   }
 
   return (
-    <div className="max-w-sm">
+    <main className="max-w-sm p-6">
       <h2 className="mb-6 text-xl font-semibold tracking-tight">Profile</h2>
 
       <div className="flex items-center gap-4 mb-6">
@@ -87,6 +105,6 @@ export default function ProfilePage() {
           {loading ? "Saving…" : "Save changes"}
         </button>
       </form>
-    </div>
+    </main>
   );
 }

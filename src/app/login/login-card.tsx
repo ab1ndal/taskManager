@@ -107,7 +107,7 @@ export function LoginCard() {
   }
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center relative overflow-hidden">
+    <div className="flex min-h-[calc(100dvh-var(--nav-height))] items-center justify-center relative overflow-hidden">
       {/* Pastel blobs */}
       <div
         aria-hidden="true"

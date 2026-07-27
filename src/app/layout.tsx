@@ -5,6 +5,7 @@ import Link from "next/link";
 
 const inter = Inter({ subsets: ["latin"] });
 import { createClient } from "@/lib/supabase/server";
+import { NavLinks } from "@/components/nav-links";
 import { NavUser } from "@/components/nav-user";
 import { Toaster } from "@/components/toaster";
 
@@ -27,19 +28,13 @@ export default async function RootLayout({
     <html lang="en">
       <body className={`${inter.className} min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]`}>
         {user && (
-          <nav className="h-[52px] border-b border-[var(--color-border)] bg-[var(--color-surface)] flex items-center px-5 gap-4">
+          <nav className="h-[var(--nav-height)] border-b border-[var(--color-border)] bg-[var(--color-surface)] flex items-center px-5 gap-4">
             {/* Wordmark */}
             <Link href="/tasks" className="font-semibold text-base tracking-tight flex-shrink-0 hover:opacity-80 transition-opacity duration-150">
               hearth<span className="text-[var(--color-accent)]">.</span>
             </Link>
 
-            {/* Nav links */}
-            <Link href="/tasks" className="text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150 flex-shrink-0">
-              Tasks
-            </Link>
-            <Link href="/workspaces" className="text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150 flex-shrink-0">
-              Workspaces
-            </Link>
+            <NavLinks />
 
             <div className="ml-auto">
               <NavUser
@@ -50,7 +45,12 @@ export default async function RootLayout({
           </nav>
         )}
 
-        <main className="p-6">{children}</main>
+        {/*
+          No <main> here. Each route renders its own, so the page owns its padding and there is
+          exactly one main landmark per document — /tasks used to nest a second <main> inside this
+          one and pay the padding twice.
+        */}
+        {children}
         <Toaster />
       </body>
     </html>

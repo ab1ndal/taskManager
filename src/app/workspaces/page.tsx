@@ -50,8 +50,8 @@ export default async function WorkspacesPage() {
   const joinedIds = new Set((userMembers ?? []).map((m) => m.workspace_id));
 
   return (
-    <div className="max-w-lg">
+    <main className="max-w-lg p-6">
       <WorkspacesClient workspaces={workspaces} joinedIds={joinedIds} />
-    </div>
+    </main>
   );
 }

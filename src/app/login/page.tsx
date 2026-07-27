@@ -3,8 +3,10 @@ import { LoginCard } from "./login-card";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
-      <LoginCard />
-    </Suspense>
+    <main className="p-6">
+      <Suspense fallback={null}>
+        <LoginCard />
+      </Suspense>
+    </main>
   );
 }

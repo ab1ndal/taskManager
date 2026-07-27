@@ -17,6 +17,8 @@
 :root {
   color-scheme: light;
 
+  --nav-height: 52px;
+
   /* Surfaces */
   --color-bg: #faf9f7;
   --color-surface: #ffffff;
