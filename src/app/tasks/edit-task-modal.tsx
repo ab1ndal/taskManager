@@ -1,18 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Circle, CircleCheck, Mic, Square, Trash2 } from "lucide-react";
+import { Circle, CircleCheck, Mic, Pencil, Square, Trash2 } from "lucide-react";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import {
   updateTask,
   getTaskUpdates,
   addTaskUpdate,
   addSubtask,
+  updateSubtask,
   completeTask,
   reopenTask,
   deleteTask,
 } from "./actions";
-import { updateTaskSchema, createTaskUpdateSchema, addSubtaskSchema } from "./schemas";
+import {
+  updateTaskSchema,
+  createTaskUpdateSchema,
+  addSubtaskSchema,
+  updateSubtaskSchema,
+} from "./schemas";
 import { toast } from "@/components/toaster";
 import { Dialog } from "@/components/dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
@@ -74,6 +80,12 @@ export function EditTaskModal({
 
   const [subtasks, setSubtasks] = useState(task.subtasks);
   const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [subtaskDescription, setSubtaskDescription] = useState("");
+  const [subtaskDueAt, setSubtaskDueAt] = useState("");
+  // Which existing subtask is open for editing, and the draft it holds. Null means the list is in
+  // its read-only state.
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [subtaskDraft, setSubtaskDraft] = useState({ title: "", description: "", dueAt: "" });
   const [subtaskError, setSubtaskError] = useState("");
   const [subtaskPending, startSubtaskTransition] = useTransition();
   // A subtask carries its own details and due date, so deleting one is the same destructive weight
@@ -197,8 +209,58 @@ export function EditTaskModal({
     });
   }
 
+  function startEditingSubtask(subtask: Subtask) {
+    setSubtaskError("");
+    setEditingSubtaskId(subtask.id);
+    setSubtaskDraft({
+      title: subtask.title,
+      description: subtask.description ?? "",
+      dueAt: subtask.due_at ? subtask.due_at.slice(0, 10) : "",
+    });
+  }
+
+  /**
+   * Optimistic like the rest of this section: the row shows the edited values immediately and rolls
+   * back to what it held before if the server refuses.
+   */
+  function saveSubtaskEdit(subtask: Subtask) {
+    const parsed = updateSubtaskSchema.safeParse({
+      subtaskId: subtask.id,
+      title: subtaskDraft.title,
+      description: subtaskDraft.description.trim() || undefined,
+      dueAt: subtaskDraft.dueAt || undefined,
+    });
+    if (!parsed.success) {
+      setSubtaskError(parsed.error.issues[0].message);
+      return;
+    }
+    setSubtaskError("");
+
+    const next = {
+      ...subtask,
+      title: parsed.data.title,
+      description: parsed.data.description ?? null,
+      due_at: parsed.data.dueAt ? `${parsed.data.dueAt}T00:00:00Z` : null,
+    };
+    setSubtasks((prev) => prev.map((s) => (s.id === subtask.id ? next : s)));
+    setEditingSubtaskId(null);
+
+    startSubtaskTransition(async () => {
+      const result = await updateSubtask(parsed.data);
+      if (!result.ok) {
+        setSubtasks((prev) => prev.map((s) => (s.id === subtask.id ? subtask : s)));
+        setSubtaskError(result.error);
+      }
+    });
+  }
+
   function handleAddSubtask() {
-    const parsed = addSubtaskSchema.safeParse({ parentTaskId: task.id, title: subtaskTitle });
+    const parsed = addSubtaskSchema.safeParse({
+      parentTaskId: task.id,
+      title: subtaskTitle,
+      description: subtaskDescription.trim() || undefined,
+      dueAt: subtaskDueAt || undefined,
+    });
     if (!parsed.success) {
       setSubtaskError(parsed.error.issues[0].message);
       return;
@@ -206,8 +268,19 @@ export function EditTaskModal({
     setSubtaskError("");
 
     const tempId = crypto.randomUUID();
-    setSubtasks((prev) => [...prev, { id: tempId, title: parsed.data.title, completed_at: null }]);
+    setSubtasks((prev) => [
+      ...prev,
+      {
+        id: tempId,
+        title: parsed.data.title,
+        completed_at: null,
+        description: parsed.data.description ?? null,
+        due_at: parsed.data.dueAt ? `${parsed.data.dueAt}T00:00:00Z` : null,
+      },
+    ]);
     setSubtaskTitle("");
+    setSubtaskDescription("");
+    setSubtaskDueAt("");
 
     startSubtaskTransition(async () => {
       const result = await addSubtask(parsed.data);
@@ -450,7 +523,61 @@ export function EditTaskModal({
         ) : (
           <ul className="flex flex-col mb-2">
             {subtasks.map((s) => (
-              <li key={s.id} className="flex items-center gap-2">
+              <li key={s.id} className="flex flex-col">
+                {editingSubtaskId === s.id ? (
+                  <div className="flex flex-col gap-2 rounded-sm border border-[var(--color-border)] p-2 my-1">
+                    <input
+                      type="text"
+                      aria-label={`Subtask title for "${s.title}"`}
+                      value={subtaskDraft.title}
+                      onChange={(e) =>
+                        setSubtaskDraft((d) => ({ ...d, title: e.target.value }))
+                      }
+                      disabled={subtaskPending}
+                      className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                    />
+                    <textarea
+                      placeholder="Details…"
+                      aria-label={`Subtask details for "${s.title}"`}
+                      value={subtaskDraft.description}
+                      onChange={(e) =>
+                        setSubtaskDraft((d) => ({ ...d, description: e.target.value }))
+                      }
+                      disabled={subtaskPending}
+                      rows={2}
+                      className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+                    />
+                    <input
+                      type="date"
+                      aria-label={`Subtask due date for "${s.title}"`}
+                      value={subtaskDraft.dueAt}
+                      onChange={(e) => setSubtaskDraft((d) => ({ ...d, dueAt: e.target.value }))}
+                      disabled={subtaskPending}
+                      // Safari sizes a date input to its own text and drops the picker glyph; the
+                      // floor keeps the value legible in every engine. Same as the new-task modal.
+                      className="w-full sm:w-auto sm:self-start min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+                    />
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSubtaskId(null)}
+                        disabled={subtaskPending}
+                        className="min-h-11 px-3 text-sm rounded-sm border border-[var(--color-border)] disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveSubtaskEdit(s)}
+                        disabled={!subtaskDraft.title.trim() || subtaskPending}
+                        className="min-h-11 px-3 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
+                      >
+                        Save subtask
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => toggleSubtask(s)}
@@ -471,13 +598,42 @@ export function EditTaskModal({
                     <Circle size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                   )}
                 </button>
-                <span
-                  className={`flex-1 min-w-0 text-sm ${
-                    s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""
-                  }`}
+                <div className="flex-1 min-w-0">
+                  <span
+                    className={`block text-sm ${
+                      s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""
+                    }`}
+                  >
+                    {s.title}
+                  </span>
+                  {/*
+                    A subtask's details and due date were previously invisible once it existed —
+                    they could be typed at creation and never seen again. They render under the
+                    title, muted, and are what the pencil opens for editing.
+                  */}
+                  {s.description && (
+                    <span className="block text-2xs text-[var(--color-text-muted)] truncate">
+                      {s.description}
+                    </span>
+                  )}
+                  {s.due_at && (
+                    <time
+                      dateTime={s.due_at}
+                      className="block text-2xs text-[var(--color-text-muted)]"
+                    >
+                      Due {s.due_at.slice(0, 10)}
+                    </time>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => startEditingSubtask(s)}
+                  disabled={subtaskPending}
+                  aria-label={`Edit "${s.title}"`}
+                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-50 transition-colors"
                 >
-                  {s.title}
-                </span>
+                  <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                </button>
                 <button
                   type="button"
                   onClick={() => setSubtaskToDelete(s)}
@@ -487,24 +643,50 @@ export function EditTaskModal({
                 >
                   <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         )}
-        <div className="flex gap-2">
+        {/*
+          The new-task modal gives a subtask a title, details and a due date. This row took a title
+          only, so a subtask added after creation could never carry the other two — and `addSubtask`
+          accepted them all along. Same three fields, same order, same widths.
+        */}
+        <div className="flex flex-col gap-2">
           <input
             type="text"
             placeholder="New subtask title"
             value={subtaskTitle}
             onChange={(e) => setSubtaskTitle(e.target.value)}
             disabled={subtaskPending}
-            className="flex-1 border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
+            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
+          <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+            <textarea
+              placeholder="Details…"
+              aria-label="New subtask details"
+              value={subtaskDescription}
+              onChange={(e) => setSubtaskDescription(e.target.value)}
+              disabled={subtaskPending}
+              rows={2}
+              className="w-full sm:flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+            />
+            <input
+              type="date"
+              aria-label="New subtask due date"
+              value={subtaskDueAt}
+              onChange={(e) => setSubtaskDueAt(e.target.value)}
+              disabled={subtaskPending}
+              className="w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+            />
+          </div>
           <button
             type="button"
             onClick={handleAddSubtask}
             disabled={!subtaskTitle.trim() || subtaskPending}
-            className="px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
+            className="self-end min-h-11 px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
           >
             Add subtask
           </button>

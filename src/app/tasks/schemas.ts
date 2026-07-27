@@ -72,6 +72,18 @@ export const addSubtaskSchema = z.object({
   dueAt,
 });
 
+/**
+ * A subtask is a task row, so it could go through `updateTaskSchema` — except that schema also
+ * reassigns members, and a subtask's assignees are inherited from its parent rather than chosen.
+ * This one edits the three fields the subtask UI actually owns and leaves assignment alone.
+ */
+export const updateSubtaskSchema = z.object({
+  subtaskId: uuid,
+  title,
+  description,
+  dueAt,
+});
+
 export const taskIdSchema = uuid;
 
 export const reorderTaskSchema = z
@@ -91,6 +103,7 @@ export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 export type ReorderTaskInput = z.input<typeof reorderTaskSchema>;
 export type CreateTaskUpdateInput = z.input<typeof createTaskUpdateSchema>;
 export type AddSubtaskInput = z.input<typeof addSubtaskSchema>;
+export type UpdateSubtaskInput = z.input<typeof updateSubtaskSchema>;
 
 /** Thrown when input fails a schema. Carries per-field messages so the UI can point at the field. */
 export class ValidationError extends Error {

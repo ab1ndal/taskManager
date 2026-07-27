@@ -120,15 +120,21 @@ export default async function TasksPage({
   const { data: subtasksData } = parentTaskIds.length
     ? await supabase
         .from("tasks")
-        .select("id, title, completed_at, parent_task_id")
+        .select("id, title, completed_at, description, due_at, parent_task_id")
         .in("parent_task_id", parentTaskIds)
     : { data: [] };
 
-  const subtasksByParentId: Record<string, { id: string; title: string; completed_at: string | null }[]> = {};
+  const subtasksByParentId: Record<string, RawTask["subtasks"]> = {};
   (subtasksData ?? []).forEach((s) => {
     const pid = s.parent_task_id as string;
     if (!subtasksByParentId[pid]) subtasksByParentId[pid] = [];
-    subtasksByParentId[pid].push({ id: s.id, title: s.title, completed_at: s.completed_at });
+    subtasksByParentId[pid].push({
+      id: s.id,
+      title: s.title,
+      completed_at: s.completed_at,
+      description: s.description ?? null,
+      due_at: s.due_at ?? null,
+    });
   });
 
   // Shape into RawTask[]

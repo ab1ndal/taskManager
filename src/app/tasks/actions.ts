@@ -19,6 +19,7 @@ import {
   reorderTaskSchema,
   createTaskUpdateSchema,
   addSubtaskSchema,
+  updateSubtaskSchema,
 } from "./schemas";
 import { ValidationError } from "./schemas";
 import type {
@@ -27,9 +28,11 @@ import type {
   ReorderTaskInput,
   CreateTaskUpdateInput,
   AddSubtaskInput,
+  UpdateSubtaskInput,
 } from "./schemas";
 import { GENERIC_ERROR } from "./action-result";
 import type { ActionResult } from "./action-result";
+import type { RawTask } from "./bucket-tasks";
 
 // Every exported function in this file is a public endpoint. Each one authenticates the caller and
 // then authorizes them for the specific row named in its arguments — a disabled button or a
@@ -521,7 +524,7 @@ export async function addTaskUpdate(input: CreateTaskUpdateInput): Promise<Actio
 
 export async function addSubtask(
   input: AddSubtaskInput
-): Promise<ActionResult<{ subtask: { id: string; title: string; completed_at: string | null } }>> {
+): Promise<ActionResult<{ subtask: RawTask["subtasks"][number] }>> {
   return run("addSubtask", async () => {
     const { user } = await requireUser();
     const { parentTaskId, title, description, dueAt } = parseInput(addSubtaskSchema, input);
@@ -565,6 +568,44 @@ export async function addSubtask(
     });
 
     revalidatePath("/tasks");
-    return { subtask: { id: subtaskId, title, completed_at: null } };
+    return {
+      subtask: {
+        id: subtaskId,
+        title,
+        completed_at: null,
+        description: description ?? null,
+        due_at: dueAt ? `${dueAt}T00:00:00Z` : null,
+      },
+    };
+  });
+}
+
+/**
+ * Edits a subtask's own three fields. Authorization is the subtask's own assignment row — the same
+ * check every other single-task action makes — and assignment is left alone, since a subtask
+ * inherits its assignees from the parent at creation.
+ */
+export async function updateSubtask(input: UpdateSubtaskInput): Promise<ActionResult> {
+  return run("updateSubtask", async () => {
+    const { user } = await requireUser();
+    const { subtaskId, title, description, dueAt } = parseInput(updateSubtaskSchema, input);
+    await assertTaskAssignee(subtaskId, user.id);
+
+    const admin = createAdminClient();
+
+    assertNoError(
+      "update subtask",
+      await admin
+        .from("tasks")
+        .update({
+          title,
+          description: description ?? null,
+          due_at: dueAt ? `${dueAt}T00:00:00Z` : null,
+        })
+        .eq("id", subtaskId)
+    );
+
+    revalidatePath("/tasks");
+    return {};
   });
 }

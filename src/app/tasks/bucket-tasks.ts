@@ -8,7 +8,13 @@ export type RawTask = {
   member_sort_key: number;
   assignee_count: number;
   member_ids: string[];
-  subtasks: { id: string; title: string; completed_at: string | null }[];
+  subtasks: {
+    id: string;
+    title: string;
+    completed_at: string | null;
+    description: string | null;
+    due_at: string | null;
+  }[];
   rule_id?: string | null;
 };
 

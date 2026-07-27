@@ -3,6 +3,7 @@ jest.mock("./actions", () => ({
   getTaskUpdates: jest.fn(),
   addTaskUpdate: jest.fn(),
   addSubtask: jest.fn(),
+  updateSubtask: jest.fn(),
   completeTask: jest.fn(),
   reopenTask: jest.fn(),
   deleteTask: jest.fn(),
@@ -13,7 +14,14 @@ import React from "react";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EditTaskModal, formatUpdateTime } from "./edit-task-modal";
-import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask, deleteTask } from "./actions";
+import {
+  updateTask,
+  getTaskUpdates,
+  addTaskUpdate,
+  addSubtask,
+  updateSubtask,
+  deleteTask,
+} from "./actions";
 import type { RawTask } from "./bucket-tasks";
 
 beforeAll(() => {
@@ -344,7 +352,7 @@ describe("EditTaskModal — Subtasks", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("shows existing subtasks from the task prop", () => {
-    const taskWithSubtasks = { ...mockTask, subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }] };
+    const taskWithSubtasks = { ...mockTask, subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null, description: null, due_at: null }] };
     jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
 
     render(
@@ -356,7 +364,7 @@ describe("EditTaskModal — Subtasks", () => {
 
   it("optimistically appends a new subtask and calls addSubtask", async () => {
     jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
-    jest.mocked(addSubtask).mockResolvedValue({ ok: true, subtask: { id: "s2", title: "New subtask", completed_at: null } });
+    jest.mocked(addSubtask).mockResolvedValue({ ok: true, subtask: { id: "s2", title: "New subtask", completed_at: null, description: null, due_at: null } });
 
     render(
       <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
@@ -386,10 +394,99 @@ describe("EditTaskModal — Subtasks", () => {
     expect(screen.queryByText("Will fail")).not.toBeInTheDocument();
   });
 
+  it("sends the details and due date typed alongside a new subtask title", async () => {
+    jest.mocked(addSubtask).mockResolvedValue({
+      ok: true,
+      subtask: { id: "s2", title: "New subtask", completed_at: null, description: "Some detail", due_at: "2026-08-01T00:00:00Z" },
+    });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await userEvent.type(screen.getByPlaceholderText(/new subtask title/i), "New subtask");
+    await userEvent.type(screen.getByLabelText(/new subtask details/i), "Some detail");
+    fireEvent.change(screen.getByLabelText(/new subtask due date/i), {
+      target: { value: "2026-08-01" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: /^add subtask$/i }));
+
+    await waitFor(() =>
+      expect(addSubtask).toHaveBeenCalledWith({
+        parentTaskId: mockTask.id,
+        title: "New subtask",
+        description: "Some detail",
+        dueAt: "2026-08-01",
+      })
+    );
+  });
+
+  it("edits an existing subtask's title, details and due date", async () => {
+    jest.mocked(updateSubtask).mockResolvedValue({ ok: true });
+    const taskWithSubtasks = {
+      ...mockTask,
+      subtasks: [
+        { id: "c0000000-0000-4000-8000-000000000009", title: "Existing subtask", completed_at: null, description: "Old detail", due_at: "2026-08-02T00:00:00Z" },
+      ],
+    };
+
+    render(
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    // The values a subtask already holds have to be visible before they can be edited — they were
+    // write-once at creation before this.
+    expect(screen.getByText("Old detail")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /edit "existing subtask"/i }));
+
+    const detailsField = screen.getByLabelText(/subtask details for "existing subtask"/i);
+    expect(detailsField).toHaveValue("Old detail");
+    expect(screen.getByLabelText(/subtask due date for "existing subtask"/i)).toHaveValue("2026-08-02");
+
+    await userEvent.clear(detailsField);
+    await userEvent.type(detailsField, "New detail");
+    await userEvent.click(screen.getByRole("button", { name: /save subtask/i }));
+
+    await waitFor(() =>
+      expect(updateSubtask).toHaveBeenCalledWith({
+        subtaskId: "c0000000-0000-4000-8000-000000000009",
+        title: "Existing subtask",
+        description: "New detail",
+        dueAt: "2026-08-02",
+      })
+    );
+    expect(await screen.findByText("New detail")).toBeInTheDocument();
+  });
+
+  it("rolls a failed subtask edit back to the values it held", async () => {
+    jest.mocked(updateSubtask).mockResolvedValue({ ok: false, error: "Nope" });
+    const taskWithSubtasks = {
+      ...mockTask,
+      subtasks: [
+        { id: "c0000000-0000-4000-8000-000000000009", title: "Existing subtask", completed_at: null, description: "Old detail", due_at: null },
+      ],
+    };
+
+    render(
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /edit "existing subtask"/i }));
+    const titleField = screen.getByLabelText(/subtask title for "existing subtask"/i);
+    await userEvent.clear(titleField);
+    await userEvent.type(titleField, "Renamed");
+    await userEvent.click(screen.getByRole("button", { name: /save subtask/i }));
+
+    await screen.findByText("Nope");
+    expect(screen.getByText("Existing subtask")).toBeInTheDocument();
+    expect(screen.queryByText("Renamed")).not.toBeInTheDocument();
+  });
+
   it("asks for confirmation before deleting a subtask", async () => {
     const taskWithSubtasks = {
       ...mockTask,
-      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }],
+      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null, description: null, due_at: null }],
     };
 
     render(
@@ -407,7 +504,7 @@ describe("EditTaskModal — Subtasks", () => {
     jest.mocked(deleteTask).mockResolvedValue({ ok: true });
     const taskWithSubtasks = {
       ...mockTask,
-      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }],
+      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null, description: null, due_at: null }],
     };
 
     render(
@@ -424,7 +521,7 @@ describe("EditTaskModal — Subtasks", () => {
   it("leaves the subtask in place when the confirmation is cancelled", async () => {
     const taskWithSubtasks = {
       ...mockTask,
-      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }],
+      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null, description: null, due_at: null }],
     };
 
     render(
