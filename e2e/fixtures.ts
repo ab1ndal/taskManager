@@ -8,7 +8,9 @@ import { resolve } from "node:path";
  * dependency is attack surface.
  */
 function loadEnv() {
-  for (const file of [".env.local", ".env"]) {
+  // `.env.test.local` first: the first file to define a key wins, so the test project's values
+  // shadow the development ones rather than the other way round.
+  for (const file of [".env.test.local", ".env.local", ".env"]) {
     let contents: string;
     try {
       contents = readFileSync(resolve(process.cwd(), file), "utf8");
@@ -48,12 +50,42 @@ export const OTHER_USER = {
 
 export const WORKSPACE_NAME = `${E2E_TAG} Household`;
 
+/**
+ * The suite seeds and deletes rows, so it must never be pointed at a project that holds data
+ * someone cares about. `E2E_SUPABASE_URL` names the one project it is allowed to touch, and the
+ * target has to match it exactly.
+ *
+ * This is what makes a bare `npx playwright test` safe: without `scripts/e2e-env.mjs` the process
+ * picks up `.env.local`, and if that is ever a different project than the designated test one, the
+ * run stops here instead of seeding — and `teardown()` deleting by tag never gets the chance to
+ * run against it.
+ */
+function assertTestProject(url: string): void {
+  const allowed = process.env.E2E_SUPABASE_URL;
+
+  if (!allowed) {
+    throw new Error(
+      "E2E_SUPABASE_URL is not set, so there is no designated test project to check against. " +
+        "Run the suite through `npm run test:e2e` (or `node scripts/e2e-env.mjs playwright test`), " +
+        "which loads .env.test.local."
+    );
+  }
+
+  if (url !== allowed) {
+    throw new Error(
+      `Refusing to run: the app is pointed at ${url}, but the designated e2e project is ${allowed}. ` +
+        "This suite seeds and deletes rows — it only ever runs against the test project."
+    );
+  }
+}
+
 export function adminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) {
     throw new Error("NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY must be set to run e2e");
   }
+  assertTestProject(url);
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 

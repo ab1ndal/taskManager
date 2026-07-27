@@ -1,7 +1,11 @@
 node_modules
 .next
-.env.local
+# Every env file except the committed example. Broad on purpose: a new .env.<something> must be
+# ignored by default, not remembered about. `.env.production` was untracked but unignored for a
+# while on 2026-07-27 — one `git add -A` from committing a service-role key.
 .env
+.env.*
+!.env.example
 .worktrees
 .superpowers
 
