@@ -173,3 +173,39 @@ directly in a real browser via Playwright) before spending time wiring the fix i
 out a fix approach this way took a few minutes; discovering it was wrong after fully wiring it into
 `toaster.tsx` (state, refs, effects, CSS resets for the UA popover default styles) took much
 longer and had to be reverted.
+
+## L12 — With the app in `src/`, a root-level `proxy.ts` is silently ignored
+
+**Learned:** 2026-07-27, phase 6.5 verification.
+
+`proxy.ts` (Next 16's rename of `middleware.ts`) sat at the repository root and had been there since
+phase 03, holding both auth redirects. It never ran. Next resolves the proxy file relative to the app
+directory, so with the app under `src/` the root-level file is not discovered. There is no warning:
+the build succeeds, the file type-checks, and nothing in the app misbehaves in a way that points at
+it. `/tasks` rendering empty for a signed-out user looked like an RLS outcome, and was filed as one
+in `STATE.md` for two phases.
+
+**Rule:** `src/proxy.ts` when the app is in `src/`. Verify registration rather than assuming it —
+`next build` prints a `ƒ Proxy (Middleware)` line, and `.next/server/middleware-manifest.json` is
+non-empty, only when the file was actually picked up.
+
+**Why it matters here:** a middleware that is not registered fails open. Every route it was supposed
+to guard is unguarded, and the code reads as though it is protected.
+
+## L13 — jsdom reports every element as 0×0, so layout assertions there always pass
+
+**Learned:** 2026-07-27, phase 6.5 verification.
+
+`06.5-AUDIT.md` recorded "touch targets are 44px throughout". Measured in a real browser, ten
+controls were not — nav links at 20px, the sidebar's New task button at 38, the completed-section
+toggle at 16. The existing jsdom test could not have caught any of it: `getBoundingClientRect()`
+returns all zeros there, so any "is this element big enough" check passes vacuously, as does any
+overlap, overflow or truncation check.
+
+The same blind spot produced the five defects the first visual pass found (dialogs pinned to the
+top-left, an invisible complete circle, a 12px alignment error) and the two the user reported
+afterwards (a collapsed subtask textarea, a 96px date input in Safari).
+
+**Rule:** anything whose failure mode is *geometric* — size, position, overlap, overflow, truncation,
+contrast against what was actually painted — belongs in the Playwright suite under `e2e/`, not in
+jest. Use jest for logic, and do not let a green jsdom test stand in for a claim about layout.
