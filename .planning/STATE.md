@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Phase 5 complete, Phase 4 verification partially deferred, starting Phase 6 planning
-last_updated: "2026-07-26T22:00:00.000Z"
+stopped_at: Phase 6 code landed (manual checks open); Phase 8 folded into 6.5, starting 6.5 brainstorm
+last_updated: "2026-07-26T23:30:00.000Z"
 progress:
-  total_phases: 8
+  total_phases: 7
   completed_phases: 3
   total_plans: 13
   completed_plans: 12
@@ -71,6 +71,7 @@ All work has been landing directly on `main` (not a feature branch) since phase 
 - Phases renumbered 2026-07-25: 4 accessibility, 5 prioritization, 6 updates/speech, 7 recurring, 8 design polish
 - Old "Phase 5: Task and workspace lifecycle" superseded — only workspace deletion remains, and it needs an ownership rule first
 - Phase 6.5 (INSERTED) added 2026-07-26 during Phase 6 brainstorm: task panel UI polish via ui-ux-pro-max, needs its own brainstorm before planning
+- Phase 8 (Design Polish) folded into Phase 6.5 on 2026-07-26 — one polish pass across the whole app instead of a task-panel pass now and a design-system pass three phases later. 6.5 is now "App-Wide UI/UX Polish"; Phase 7 depends on 6.5; there is no Phase 8. Total phases 8 → 7.
 
 ### Blockers/Concerns
 

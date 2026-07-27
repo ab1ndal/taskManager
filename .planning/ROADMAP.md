@@ -18,9 +18,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Accessibility & Mobile** - Touch targets, focus management, dialog semantics, live regions
 - [x] **Phase 5: Task Prioritization** - Drag-to-reorder personal task priority (completed 2026-07-26)
 - [ ] **Phase 6: Task Updates & Speech-to-Text** - Text updates on a task; speech only at the input layer
-- [ ] **Phase 6.5: Task Panel UI Polish** (INSERTED) - Visual polish of the task panel via ui-ux-pro-max
+- [ ] **Phase 6.5: App-Wide UI/UX Polish** (INSERTED) - Task panel polish plus the whole-app design system: dark mode, semantic tokens, icon consolidation, reduced motion (absorbs the former Phase 8)
 - [ ] **Phase 7: Recurring Tasks** - Rule-driven task generation
-- [ ] **Phase 8: Design Polish** - Dark mode, semantic tokens, icon consolidation, reduced motion
 
 **Task Detail & Editing** was the original Phase 3. It was largely built outside the planning loop
 (`edit-task-modal.tsx`, `updateTask`, assignee management), so it is not carried as a separate phase.
@@ -117,12 +116,20 @@ Plans:
   2. Speech-to-text is available at the input layer only — audio is never stored
 **Plans**: TBD
 
-### Phase 6.5: Task Panel UI Polish
-**Goal**: Task panel (edit-task-modal + updates/subtasks sections from Phase 6) reads as
-deliberately designed, not default-styled
+### Phase 6.5: App-Wide UI/UX Polish
+**Goal**: The whole app — not just the task panel — reads as one deliberately designed system in
+light and dark
 **Depends on**: Phase 6
-**Requirements**: raised mid-Phase-6-brainstorm 2026-07-26, not yet mapped to a docs/product.md requirement
-**Success Criteria**: TBD - needs its own brainstorm
+**Requirements**: raised mid-Phase-6-brainstorm 2026-07-26, not yet mapped to a docs/product.md
+requirement; absorbs audit U6, U8-U12 from the former Phase 8
+**Success Criteria** (what must be TRUE):
+  1. Task panel (edit-task-modal + updates/subtasks sections from Phase 6) reads as deliberately
+     designed, not default-styled
+  2. Dark mode works throughout, driven by semantic tokens rather than raw palette classes
+  3. Icons come from one source at consistent sizes
+  4. Animation respects `prefers-reduced-motion`
+  5. Every surface — tasks list, workspaces, login, modals, toasts — shares the same spacing,
+     type, and color scale
 **Plans**: TBD
 
 Plans:
@@ -130,27 +137,21 @@ Plans:
 
 ### Phase 7: Recurring Tasks
 **Goal**: A recurrence rule generates task instances without duplicates
-**Depends on**: Phase 6
+**Depends on**: Phase 6.5
 **Requirements**: TASK-08 (docs/product.md)
 **Success Criteria** (what must be TRUE):
   1. A rule produces the next instance on schedule
   2. The generator is idempotent for a repeated `next_run_at` — a retry cannot double-create
 **Plans**: TBD
 
-### Phase 8: Design Polish
-**Goal**: One coherent visual system across light and dark
-**Depends on**: Phase 7
-**Requirements**: audit U6, U8-U12
-**Success Criteria** (what must be TRUE):
-  1. Dark mode works throughout, driven by semantic tokens rather than raw palette classes
-  2. Icons come from one source at consistent sizes
-  3. Animation respects `prefers-reduced-motion`
-**Plans**: TBD
+### Phase 8: Design Polish — FOLDED INTO PHASE 6.5 (2026-07-26)
+Its goal (one coherent visual system across light and dark) and audit items U6, U8-U12 are now
+success criteria 2-4 of Phase 6.5. Kept here only so the renumbering is traceable.
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7 → 8
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -159,10 +160,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7 �
 | 3. Security Hardening & Failure Visibility | 1/1 | Complete | 2026-07-25 |
 | 4. Accessibility & Mobile | 5/6 | In Progress — 3 of 4 manual checks in 04-06 done or partial, resuming later |  |
 | 5. Task Prioritization | 1/1 | Complete | 2026-07-26 |
-| 6. Task Updates & Speech-to-Text | 0/? | Not started (design spec written) | - |
-| 6.5. Task Panel UI Polish | 0/? | Not started — needs brainstorm | - |
+| 6. Task Updates & Speech-to-Text | 8/8 | Code landed; manual verification checklist still open | - |
+| 6.5. App-Wide UI/UX Polish | 0/? | Not started — needs brainstorm | - |
 | 7. Recurring Tasks | 0/? | Not started | - |
-| 8. Design Polish | 0/? | Not started | - |
+| ~~8. Design Polish~~ | - | Folded into 6.5 (2026-07-26) | - |
 
 **Superseded:** the old "Phase 5: Task and workspace lifecycle" entry. Task deletion, editing, and
 completion all landed — deletion and completion were fixed properly in Phase 3, which also found
