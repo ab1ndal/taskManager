@@ -66,24 +66,118 @@ async function collectPairs(page: Page) {
   });
 }
 
+/** Every text node currently painted, measured against what is behind it. */
+async function contrastFailures(page: Page): Promise<string[]> {
+  const failures: string[] = [];
+  for (const pair of await collectPairs(page)) {
+    const fg = parseRgb(pair.fg);
+    const bg = parseRgb(pair.bg);
+    if (!fg || !bg) continue;
+    const ratio = contrast(fg, bg);
+    const large = pair.size >= 24 || (pair.bold && pair.size >= 18.66);
+    const min = large ? 3 : 4.5;
+    if (ratio < min) failures.push(`"${pair.label}" ${ratio.toFixed(2)}:1 (needs ${min})`);
+  }
+  return failures;
+}
+
+/**
+ * The walk used to run on `/tasks` only, and never with a dialog open — which is exactly where
+ * `--color-surface-sunken` and the status tokens are used. Each surface below is measured in both
+ * schemes.
+ *
+ * `/login` needs a signed-out context: the proxy redirects a signed-in user away from it.
+ */
+const SURFACES = [
+  {
+    name: "/tasks",
+    open: async (page: Page) => {
+      await page.goto("/tasks");
+      await expect(page.getByRole("heading", { name: /Hello,/ })).toBeVisible();
+    },
+  },
+  {
+    name: "/workspaces",
+    open: async (page: Page) => {
+      await page.goto("/workspaces");
+      await expect(page.locator("main")).toBeVisible();
+    },
+  },
+  {
+    name: "/profile",
+    open: async (page: Page) => {
+      await page.goto("/profile");
+      await expect(page.locator("main")).toBeVisible();
+    },
+  },
+  {
+    name: "the new-task dialog",
+    open: async (page: Page) => {
+      await page.goto("/tasks");
+      await page.getByRole("button", { name: "New task" }).first().click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+    },
+  },
+  {
+    // The sunken Updates and Subtasks panels only exist here.
+    name: "the edit-task dialog",
+    open: async (page: Page) => {
+      await page.goto("/tasks");
+      const title = "Today: take the bins out";
+      const direct = page.getByRole("button", { name: `Edit "${title}"` });
+      if (await direct.isVisible()) await direct.click();
+      else {
+        await page.getByRole("button", { name: `More actions for "${title}"` }).click();
+        await page.getByRole("menuitem", { name: "Edit" }).click();
+      }
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      // Wait for the update thread so its timestamps and author names are measured too.
+      await expect(dialog.getByText("Second Member").first()).toBeVisible();
+    },
+  },
+  {
+    name: "the delete confirmation",
+    open: async (page: Page) => {
+      await page.goto("/tasks");
+      const title = "Overdue: pay the water bill";
+      const direct = page.getByRole("button", { name: `Delete "${title}"` });
+      if (await direct.isVisible()) await direct.click();
+      else {
+        await page.getByRole("button", { name: `More actions for "${title}"` }).click();
+        await page.getByRole("menuitem", { name: "Delete" }).click();
+      }
+      await expect(page.getByRole("button", { name: /^Confirm delete/ })).toBeVisible();
+    },
+  },
+] as const;
+
 for (const scheme of ["light", "dark"] as const) {
-  test(`rendered text clears WCAG AA in ${scheme} mode`, async ({ page }) => {
+  for (const surface of SURFACES) {
+    test(`${surface.name} clears WCAG AA in ${scheme} mode`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await surface.open(page);
+
+      const failures = await contrastFailures(page);
+      expect(
+        failures,
+        `contrast failures on ${surface.name} in ${scheme}: ${failures.join(" | ")}`
+      ).toEqual([]);
+    });
+  }
+
+  test(`/login clears WCAG AA in ${scheme} mode`, async ({ browser }) => {
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
     await page.emulateMedia({ colorScheme: scheme });
-    await page.goto("/tasks");
-    await expect(page.getByRole("heading", { name: /Hello,/ })).toBeVisible();
 
-    const failures: string[] = [];
-    for (const pair of await collectPairs(page)) {
-      const fg = parseRgb(pair.fg);
-      const bg = parseRgb(pair.bg);
-      if (!fg || !bg) continue;
-      const ratio = contrast(fg, bg);
-      const large = pair.size >= 24 || (pair.bold && pair.size >= 18.66);
-      const min = large ? 3 : 4.5;
-      if (ratio < min) failures.push(`"${pair.label}" ${ratio.toFixed(2)}:1 (needs ${min})`);
-    }
+    await page.goto("/login");
+    await expect(page.locator("form").getByRole("button", { name: "Sign in" })).toBeVisible();
 
-    expect(failures, `contrast failures in ${scheme}: ${failures.join(" | ")}`).toEqual([]);
+    const failures = await contrastFailures(page);
+    await context.close();
+
+    expect(failures, `contrast failures on /login in ${scheme}: ${failures.join(" | ")}`).toEqual([]);
   });
 }
 

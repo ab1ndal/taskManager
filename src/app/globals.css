@@ -28,7 +28,13 @@
   /* Text */
   --color-text-primary: #1c1a24;
   --color-text-secondary: #6b6878;
-  --color-text-muted: #726f80;
+  /*
+   * Darkened from #726f80, which cleared 4.5:1 on --color-bg and --color-surface but came out at
+   * 4.39:1 on --color-surface-sunken — the panel behind the Updates and Subtasks sections. The
+   * contrast walk only ever ran on /tasks with no dialog open, so the sunken surface was never
+   * measured. It now clears AA on all three light surfaces (4.73:1 on the sunken one).
+   */
+  --color-text-muted: #6d6a7b;
   /*
    * Outline of an idle control — the unchecked complete circle on every task row. It was drawn in
    * --color-border, which is a divider colour at 1.25:1 against the surface: fine for a hairline,
