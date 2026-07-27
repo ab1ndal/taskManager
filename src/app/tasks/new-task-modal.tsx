@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
+import { Circle, X } from "lucide-react";
+import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { createTaskWithSubtasks } from "./actions";
 import { createTaskWithSubtasksSchema } from "./schemas";
 import { toast } from "../../components/toaster";
@@ -268,9 +270,12 @@ export function NewTaskModal({
             <div className="flex flex-col gap-1">
               {subtaskRows.map((row, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-text-muted)] shrink-0" aria-hidden="true">
-                    <circle cx="5" cy="5" r="4" />
-                  </svg>
+                  <Circle
+                    size={ICON_SECONDARY}
+                    strokeWidth={ICON_STROKE}
+                    className="text-[var(--color-text-muted)] shrink-0"
+                    aria-hidden="true"
+                  />
                   <input
                     type="text"
                     placeholder="Subtask title"
@@ -301,9 +306,9 @@ export function NewTaskModal({
                     onClick={() => removeSubtask(i)}
                     disabled={disabled}
                     aria-label="Remove subtask"
-                    className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] text-lg leading-none disabled:opacity-50"
+                    className="shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
                   >
-                    ✕
+                    <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                   </button>
                 </div>
               ))}

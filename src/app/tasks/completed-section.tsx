@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { TaskCard } from "@/components/task-card";
 import type { DeadlineVariant } from "@/components/task-card";
 
@@ -23,18 +25,15 @@ export function CompletedSection({ tasks }: { tasks: CompletedTask[] }) {
     <div className="mt-6">
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
         className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2 hover:text-[var(--color-text-secondary)] transition-colors"
       >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          fill="currentColor"
+        <ChevronRight
+          size={ICON_SECONDARY}
+          strokeWidth={ICON_STROKE}
           className={`transition-transform ${open ? "rotate-90" : ""}`}
           aria-hidden="true"
-        >
-          <path d="M3 2l4 3-4 3V2z" />
-        </svg>
+        />
         {tasks.length} completed
       </button>
 

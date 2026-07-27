@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Circle, CircleCheck, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { completeTask, deleteTask } from "@/app/tasks/actions";
+import { ICON_PRIMARY, ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { toast } from "@/components/toaster";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
@@ -76,14 +78,7 @@ export function TaskCard({
             className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] cursor-grab active:cursor-grabbing"
             {...dragHandleProps}
           >
-            <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
-              <circle cx="2.5" cy="2.5" r="1.5" />
-              <circle cx="7.5" cy="2.5" r="1.5" />
-              <circle cx="2.5" cy="8" r="1.5" />
-              <circle cx="7.5" cy="8" r="1.5" />
-              <circle cx="2.5" cy="13.5" r="1.5" />
-              <circle cx="7.5" cy="13.5" r="1.5" />
-            </svg>
+            <GripVertical size={ICON_PRIMARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>
         )}
 
@@ -99,14 +94,14 @@ export function TaskCard({
           className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
           {completed ? (
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.8" className="text-[var(--color-text-muted)]" />
-              <path d="M5.5 9.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)]" />
-            </svg>
+            <CircleCheck
+              size={ICON_PRIMARY}
+              strokeWidth={ICON_STROKE}
+              className="text-[var(--color-text-muted)]"
+              aria-hidden="true"
+            />
           ) : (
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.8" />
-            </svg>
+            <Circle size={ICON_PRIMARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           )}
         </button>
 
@@ -127,9 +122,7 @@ export function TaskCard({
             aria-label={`Edit "${title}"`}
             className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" />
-            </svg>
+            <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>
         )}
 
@@ -139,9 +132,7 @@ export function TaskCard({
             aria-label={`Delete "${title}"`}
             className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M2 3.5h10M5.5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v4M8.5 6v4M3 3.5l.5 8a.5.5 0 00.5.5h6a.5.5 0 00.5-.5l.5-8" />
-            </svg>
+            <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>
         )}
       </div>
@@ -170,14 +161,14 @@ export function TaskCard({
                 className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
               >
                 {sub.completed_at ? (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" className="text-[var(--color-text-muted)]" />
-                    <path d="M4 7.5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)]" />
-                  </svg>
+                  <CircleCheck
+                    size={ICON_SECONDARY}
+                    strokeWidth={ICON_STROKE}
+                    className="text-[var(--color-text-muted)]"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.5" />
-                  </svg>
+                  <Circle size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 )}
               </button>
               <span className={`text-xs ${sub.completed_at ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-secondary)]"}`}>

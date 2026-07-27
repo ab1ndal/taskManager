@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 
 type Toast = {
   id: number;
@@ -56,7 +58,7 @@ export function Toaster() {
               aria-label={`Close ${t.type} message`}
               className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
             >
-              ✕
+              <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             </button>
           </div>
         ))}
@@ -71,7 +73,7 @@ export function Toaster() {
               aria-label={`Close ${t.type} message`}
               className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
             >
-              ✕
+              <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             </button>
           </div>
         ))}

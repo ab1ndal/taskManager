@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+import { Briefcase, House, LayoutGrid, ListTodo, Plus, Users } from "lucide-react";
+import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { NewTaskModal } from "./new-task-modal";
 import { TabPill } from "./tab-pill";
 import { TaskCard, EmptyState } from "@/components/task-card";
@@ -192,9 +194,7 @@ export function TasksPageClient({
           disabled={!hasWorkspace}
           className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M6 1v10M1 6h10" />
-          </svg>
+          <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           New task
         </button>
         <TabPill href="/tasks" label="My tasks" />
@@ -239,9 +239,7 @@ export function TasksPageClient({
             disabled={!hasWorkspace}
             className="mb-4 w-full flex items-center justify-center gap-1.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-medium rounded-[8px] py-[9px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M6 1v10M1 6h10" />
-            </svg>
+            <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             New task
           </button>
 
@@ -251,22 +249,13 @@ export function TasksPageClient({
           <SidebarLink
             href="/tasks"
             active={!workspaceFilter && !viewFilter}
-            icon={
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                <path d="M2 4h11M2 7.5h7M2 11h5" />
-              </svg>
-            }
+            icon={<ListTodo size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />}
             label="My tasks"
           />
           <SidebarLink
             href="/tasks?view=shared"
             active={viewFilter === "shared"}
-            icon={
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                <circle cx="5.5" cy="5.5" r="3.5" />
-                <circle cx="9.5" cy="9.5" r="3.5" />
-              </svg>
-            }
+            icon={<Users size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />}
             label="Shared"
           />
 
@@ -280,14 +269,9 @@ export function TasksPageClient({
               active={workspaceFilter === ws.kind}
               icon={
                 ws.kind === "household" ? (
-                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                    <path d="M1.5 6L7.5 1.5L13.5 6V13.5a.75.75 0 01-.75.75H2.25A.75.75 0 011.5 13.5V6z" />
-                  </svg>
+                  <House size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 ) : (
-                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                    <rect x="1.5" y="4" width="12" height="9" rx="1.25" />
-                    <path d="M4.5 4V3a.75.75 0 01.75-.75h4.5A.75.75 0 0110.5 3v1" />
-                  </svg>
+                  <Briefcase size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 )
               }
               label={ws.name}
@@ -295,14 +279,7 @@ export function TasksPageClient({
           ))}
           <SidebarLink
             href="/workspaces"
-            icon={
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                <rect x="1.5" y="1.5" width="5" height="5" rx="0.75" />
-                <rect x="8.5" y="1.5" width="5" height="5" rx="0.75" />
-                <rect x="1.5" y="8.5" width="5" height="5" rx="0.75" />
-                <rect x="8.5" y="8.5" width="5" height="5" rx="0.75" />
-              </svg>
-            }
+            icon={<LayoutGrid size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />}
             label="Workspaces"
           />
         </aside>

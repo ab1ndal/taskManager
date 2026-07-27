@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { Mic, Square } from "lucide-react";
+import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
 import { updateTaskSchema, createTaskUpdateSchema, addSubtaskSchema } from "./schemas";
 import { toast } from "@/components/toaster";
@@ -299,9 +301,22 @@ export function EditTaskModal({
               aria-label={speech.isListening ? "Stop dictating" : "Dictate update"}
               onClick={() => (speech.isListening ? speech.stop() : speech.start())}
               disabled={updatesPending}
-              className={`px-3 rounded-[8px] border border-[var(--color-border)] text-sm disabled:opacity-50 ${speech.isListening ? "bg-red-50 text-red-600" : ""}`}
+              className={`flex items-center justify-center px-3 rounded-[8px] border text-sm disabled:opacity-50 transition-colors ${
+                speech.isListening
+                  ? "border-red-200 bg-red-50 text-red-600"
+                  : "border-[var(--color-border)]"
+              }`}
             >
-              {speech.isListening ? "●" : "🎤"}
+              {speech.isListening ? (
+                <Square
+                  size={ICON_SECONDARY}
+                  strokeWidth={ICON_STROKE}
+                  fill="currentColor"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Mic size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+              )}
             </button>
           )}
           <button
