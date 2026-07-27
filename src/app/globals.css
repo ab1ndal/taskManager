@@ -167,6 +167,41 @@ dialog {
   margin: auto;
 }
 
+/*
+ * Mobile Safari zooms the whole viewport when a focused text field renders below 16px, and does not
+ * zoom back out afterwards — the page is left scaled and horizontally scrollable. The app's control
+ * type is 14px, which is right on a desktop and a trap on a phone, so the floor is raised where the
+ * pointer is coarse. Checkboxes and radios have no text to zoom toward and keep their own sizing.
+ */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/*
+ * The app is also installed to an iPhone home screen, where it runs standalone: no browser chrome
+ * absorbs the notch or the home indicator, so the page itself has to. `viewport-fit=cover` (set in
+ * the root layout) is what makes these insets resolve to anything.
+ */
+/*
+ * The side and bottom insets are applied once, on the body, so every page inherits them instead of
+ * each layout remembering. They are padding on a border-box element, so they eat into the page
+ * rather than extending it — no new scroll. The top inset is handled by the nav, which is sticky and
+ * has to cover the status bar itself.
+ */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
 @keyframes modal-in {
   from {
     opacity: 0;

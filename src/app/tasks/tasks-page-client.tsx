@@ -241,7 +241,7 @@ export function TasksPageClient({
         inside a padded wrapper, so the page always overflowed by at least the nav height plus the
         padding — even with no tasks — and the sidebar's last item fell below the fold.
       */}
-      <div className="flex min-h-[calc(100dvh-var(--nav-height))]">
+      <div className="flex min-h-[calc(100dvh-var(--nav-height)-env(safe-area-inset-top))]">
         {/* Sidebar — medium screens and up */}
         <aside className="hidden md:flex w-[200px] flex-col bg-[var(--color-surface)] border-r border-[var(--color-border)] p-3 flex-shrink-0">
           <button
