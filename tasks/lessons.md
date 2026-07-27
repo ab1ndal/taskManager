@@ -209,3 +209,31 @@ afterwards (a collapsed subtask textarea, a 96px date input in Safari).
 **Rule:** anything whose failure mode is *geometric* — size, position, overlap, overflow, truncation,
 contrast against what was actually painted — belongs in the Playwright suite under `e2e/`, not in
 jest. Use jest for logic, and do not let a green jsdom test stand in for a claim about layout.
+
+## L14 — There is one Supabase project, and the e2e suite writes to it
+
+**Learned:** 2026-07-27, phase 6.5 followups.
+
+`npm run test:e2e` and `npx playwright test` seed and delete rows in the hosted project
+`xamdgvxziobpptcfymug` — the same database the running app uses. There is no separate test project
+and no local stack (Docker is unavailable, per L9), and nothing in `e2e/fixtures.ts` refuses to run
+against a given URL.
+
+The user has confirmed they are not keeping real tasks in it, so this is development data and a
+mistake there costs nothing irreplaceable. That is the reason the suite is safe to run, not a
+property of the suite.
+
+What actually protects the data today:
+
+- `teardown()` deletes by the workspace name `e2e-phase65 Household` and the two `e2e-phase65@…`
+  user emails. It never issues an unscoped delete.
+- `cleanupUiWrites()` removes the rows individual specs wrote through the UI, scoped to the seeded
+  workspace and to the `E2E `/`Filler ` markers.
+- Two concurrent runs still collide: `seed()` calls `teardown()` first, so a second run deletes the
+  first run's fixtures mid-test. Run the suite once at a time.
+
+**Rule:** anything a spec creates gets a marked, scoped delete — never a `delete()` filtered on
+anything less specific than the seeded workspace plus a marker. Before adding real data to this
+project, close followup F2 first: a separate test project, plus a refusal in `e2e/fixtures.ts` when
+`NEXT_PUBLIC_SUPABASE_URL` is not the designated test one. Today the guard is a convention; it needs
+to become a check.
