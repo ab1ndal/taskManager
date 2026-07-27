@@ -1317,3 +1317,25 @@ git commit -m "docs(phase-06): add manual verification checklist"
   optimistic-then-reconciled array stays one consistent type throughout.
 - **Out-of-scope items from the design spec are not tasked here:** editing/deleting updates or
   subtasks, server transcription API, Phase 6.5 UI polish.
+
+## Known Issue (parked during final-review fix loop, not fixed)
+
+`useSpeechRecognition`'s `stop()` (`src/lib/use-speech-recognition.ts`) does not itself call
+`setIsListening(false)` — it relies on the subsequent `onend` event to do so. The fix-loop's
+instance-identity guard added to `onend` (`if (recognitionRef.current !== recognition) return;`,
+needed to stop a superseded recognizer from resurrecting itself — see git history on this branch)
+means that in a real browser, where `onend` fires *asynchronously* after `stop()` returns and by
+then `recognitionRef.current` has already been nulled by `stop()`, the guard's early return
+prevents `onend` from ever reaching `setIsListening(false)`. Net effect: after tapping the mic
+button to stop dictation, `isListening` can get stuck `true`, and since `edit-task-modal.tsx`
+drives the mic button's UI and `stop()` call off that same state, the button can appear stuck in
+"listening" and further taps become no-ops until the modal is closed and reopened.
+
+Root cause: this hook's test suite's `MockSpeechRecognition.stop()` fires `onend` *synchronously*
+(inside the same call), which does not reproduce real-browser async timing and has repeatedly
+masked bugs in this exact area across three fix-loop rounds on this branch. The correct fix
+(deferred, not applied here) is to make `stop()` own the `isListening` transition directly —
+`setIsListening(false)` inside `stop()` itself, not deferred to `onend` — plus a test using
+asynchronous `onend` timing (e.g. a `setTimeout`-deferred mock) so this class of bug can't hide
+behind synchronous test mocks again. Tracked as a follow-up; not blocking this phase's merge per
+human-partner decision during the final-review fix loop.
