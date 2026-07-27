@@ -80,6 +80,11 @@ All work has been landing directly on `main` (not a feature branch) since phase 
 - `/tasks` has no redirect for signed-out users. Under RLS the page now renders empty rather than leaking, but there is still no middleware
 - Leaked-password protection is disabled in Supabase Auth settings — dashboard toggle, Phase 04, still pending (deferred with the rest of 04-06)
 - Phase 04-06 real-device address-bar-collapse check (U7) still needs an actual phone — devtools/Playwright viewport emulation can't reproduce it
+- Phase 06 manual verification deliberately deferred 2026-07-26 (user's call). Its code is merged to
+  `main` (`bd23423`) with all seven checks in `06-VERIFICATION.md` unrun: dictation across
+  Chrome/Safari/Firefox, microphone permission denial, update and subtask persistence, and the
+  two-member author-name check. None are testable against a mock — they need real browsers. Phase 6.5
+  touches the same edit-modal surface, so run them before 6.5 is signed off, not after.
 
 ### Resolved concerns
 
