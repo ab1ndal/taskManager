@@ -504,3 +504,36 @@ describe("NewTaskModal — Dialog primitive", () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+describe("NewTaskModal — field labelling", () => {
+  // Placeholders vanish the moment typing starts and are not a label to a screen reader. Each of
+  // these resolves only if the visible text is tied to the control by id.
+  it.each([
+    ["Title", "textbox"],
+    ["Details (optional)", "textbox"],
+    ["Due date (optional)", null],
+    ["Workspace", "combobox"],
+  ])("associates the %s label with its control", (labelText) => {
+    render(
+      <NewTaskModal
+        open
+        workspaces={workspaces}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getByLabelText(labelText)).toBeInTheDocument();
+  });
+
+  it("groups the assignee checkboxes under an Assign to group label", () => {
+    render(
+      <NewTaskModal
+        open
+        workspaces={workspaces}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
+        onClose={() => {}}
+      />
+    );
+    expect(screen.getByRole("group", { name: "Assign to" })).toBeInTheDocument();
+  });
+});

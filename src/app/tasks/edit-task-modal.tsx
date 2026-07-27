@@ -353,30 +353,44 @@ export function EditTaskModal({
       <h3 id="edit-task-modal-title" className="text-base font-semibold mb-4">Edit task</h3>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="text"
-            placeholder="Task title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={pending}
-            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
-          />
-
-          <DictationTextarea
-            field="description"
-            dictation={dictation}
-            dictateLabel="Dictate task details"
-            placeholder="Add details…"
-            value={description}
-            onChange={setDescription}
-            disabled={pending}
-            rows={3}
-            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
-          />
+          {/* Same labelling as the new-task modal: visible text, tied to its control by id. */}
+          <div>
+            <label htmlFor="edit-task-title" className="block text-xs text-[var(--color-text-muted)] mb-1">
+              Title
+            </label>
+            <input
+              id="edit-task-title"
+              type="text"
+              placeholder="Task title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={pending}
+              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
+            />
+          </div>
 
           <div>
-            <label className="block text-xs text-[var(--color-text-muted)] mb-1">Due date (optional)</label>
+            <label htmlFor="edit-task-description" className="block text-xs text-[var(--color-text-muted)] mb-1">
+              Details (optional)
+            </label>
+            <DictationTextarea
+              id="edit-task-description"
+              field="description"
+              dictation={dictation}
+              dictateLabel="Dictate task details"
+              placeholder="Add details…"
+              value={description}
+              onChange={setDescription}
+              disabled={pending}
+              rows={3}
+              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="edit-task-due" className="block text-xs text-[var(--color-text-muted)] mb-1">Due date (optional)</label>
             <input
+              id="edit-task-due"
               type="date"
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
@@ -385,8 +399,8 @@ export function EditTaskModal({
             />
           </div>
 
-          <div>
-            <label className="block text-xs text-[var(--color-text-muted)] mb-1">Assign to</label>
+          <fieldset>
+            <legend className="block text-xs text-[var(--color-text-muted)] mb-1">Assign to</legend>
             <div className="flex flex-col gap-1.5">
               {currentWorkspace?.members.map((m) => (
                 <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -401,7 +415,7 @@ export function EditTaskModal({
                 </label>
               ))}
             </div>
-          </div>
+          </fieldset>
 
           {formError && (
             <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">

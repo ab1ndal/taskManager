@@ -620,3 +620,22 @@ describe("formatUpdateTimestamp", () => {
     expect(formatUpdateTimestamp("not a date")).toBe("");
   });
 });
+
+describe("EditTaskModal — field labelling", () => {
+  it.each([["Title"], ["Details (optional)"], ["Due date (optional)"]])(
+    "associates the %s label with its control",
+    (labelText) => {
+      render(
+        <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+      );
+      expect(screen.getByLabelText(labelText)).toBeInTheDocument();
+    }
+  );
+
+  it("groups the assignee checkboxes under an Assign to group label", () => {
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+    expect(screen.getByRole("group", { name: "Assign to" })).toBeInTheDocument();
+  });
+});
