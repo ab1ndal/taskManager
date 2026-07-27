@@ -3,14 +3,17 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Phase 6 code landed (manual checks open); Phase 8 folded into 6.5, starting 6.5 brainstorm
-last_updated: "2026-07-26T23:30:00.000Z"
+stopped_at: Phase 6.5 followups F1, F3, F4, F5, F7, F8, F9 closed; F2, F6, F10-F13 open
+last_updated: "2026-07-27T00:00:00.000Z"
 progress:
+  # Counted from ROADMAP.md's progress table: phases 1, 2, 3, 5 and 6.5 complete; 4 in progress
+  # (one plan and the deferred manual checks open); 6 code-landed with dictation still manual;
+  # 7 not started.
   total_phases: 7
-  completed_phases: 3
-  total_plans: 13
-  completed_plans: 12
-  percent: 38
+  completed_phases: 5
+  total_plans: 27
+  completed_plans: 26
+  percent: 71
 ---
 
 # Project State
@@ -20,16 +23,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users can create, manage, and complete tasks across household and work workspaces — with frictionless workspace onboarding and full task lifecycle control.
-**Current focus:** Phase 06 — task updates & speech-to-text (planning)
+**Current focus:** Phase 06.5 — app-wide UI/UX polish (followups)
 
 ## Current Position
 
 Phase: 04 (accessibility-mobile) — 3 of 4 manual checks in 04-06 resolved (fully or partial),
 resuming the rest (real-device address-bar check, leaked-password dashboard toggle) later.
 Phase: 05 (task-prioritization) — COMPLETE, all verification checks pass.
-Phase: 06 (task-updates-speech-to-text) — about to start planning.
+Phase: 06 (task-updates-speech-to-text) — code landed; only dictation and mic-permission denial
+still need a human (see followup F10).
+Phase: 06.5 (app-wide-ui-polish) — COMPLETE. Followups F1, F3, F4, F5, F7, F8 and F9 closed
+2026-07-27; F2, F6, F10, F11, F12 and F13 remain open in `06.5-FOLLOWUPS.md`.
+Next: Phase 07 (recurring tasks) — not started, depends on 6.5.
 
-All work has been landing directly on `main` (not a feature branch) since phase 03.
+All work has been landing directly on `main` (not a feature branch) since phase 03, and `main` is
+now pushed to `origin`.
 
 ## Accumulated Context
 
@@ -107,6 +115,12 @@ All work has been landing directly on `main` (not a feature branch) since phase 
 - `npm run test:e2e` builds and runs `e2e/` against the hosted Supabase project. Global setup seeds a
   throwaway workspace, two users and five tasks with the service-role key; teardown deletes all of
   it. Never point it at production data — it deletes by the `e2e-phase65` tag and by workspace name.
+- The suite also holds screenshot baselines (`e2e/screenshots.spec.ts-snapshots/`), captured on
+  chromium and the iPhone profile only. They are platform-suffixed, so a machine with different font
+  rendering regenerates rather than inherits: `npx playwright test screenshots --update-snapshots`.
+- Specs that assert persistence must clean up their own rows (`cleanupUiWrites()` in
+  `e2e/fixtures.ts`). Leftovers are invisible to the spec that wrote them and break every spec that
+  runs later — that is how the screenshot baselines passed alone and failed in a full run.
 
 ### Quick Tasks Completed
 
@@ -116,6 +130,6 @@ All work has been landing directly on `main` (not a feature branch) since phase 
 
 ## Session Continuity
 
-Last session: 2026-07-25T23:13:27.240Z
-Stopped at: Phase 4 UI-SPEC approved
-Resume file: .planning/phases/04-accessibility-mobile/04-UI-SPEC.md
+Last session: 2026-07-27
+Stopped at: Phase 6.5 followups — seven closed, six open
+Resume file: .planning/phases/06.5-app-wide-ui-polish/06.5-FOLLOWUPS.md

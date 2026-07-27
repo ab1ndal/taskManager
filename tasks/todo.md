@@ -1,156 +1,69 @@
 # Todo
 
-Working phase: **03 — Security Hardening & Failure Visibility**
-Plan: `.planning/phases/03-security-hardening/03-PLAN.md`
-Research: `.planning/phases/03-security-hardening/03-RESEARCH.md`
-Audit: `.planning/AUDIT-2026-07-25.md`
+Working phase: **06.5 — App-Wide UI/UX Polish (followups)**
+Followups: `.planning/phases/06.5-app-wide-ui-polish/06.5-FOLLOWUPS.md`
+State: `.planning/STATE.md`
+Lessons: `tasks/lessons.md`
 
-Started 2026-07-25 on branch `main` @ `5d3c743`.
+Session 2026-07-27 on branch `main`, starting at `2726965`. This file held Phase 03's todo until
+now; that phase is complete and its content survives in `.planning/phases/03-security-hardening/`,
+in `STATE.md`'s blockers, and in `lessons.md` (L1–L11).
 
-## Environment — resolved 2026-07-25
+## Done — 2026-07-27
 
-- Secret key rotated by the user. `.env` holds all three variables under the correct names
-  (`SUPABASE_SECRET_KEY`, no `NEXT_PUBLIC_` prefix) and is gitignored.
-- Migration 007 **applied to the hosted project** `xamdgvxziobpptcfymug` (task-manager) via the
-  Supabase MCP server, not the CLI. `supabase link` succeeded but `db push` needs
-  `SUPABASE_DB_PASSWORD` — the CLI's passwordless login-role fallback fails on this project with
-  "permission denied to alter role".
-- **Remote migration history contains only `20260725220330 rls_security_definer`.** Migrations
-  001-006 were applied out-of-band before the CLI was ever used, so they are absent from
-  `supabase_migrations.schema_migrations`. Do **not** run `supabase db push` without repairing that
-  history first — it would try to replay 001-006 against a schema that already has them.
-- Local Docker/`supabase start` still unavailable, and there is still no `supabase/config.toml`
-  beyond what `link` generated. Verification of DB behaviour is done by running SQL as the
-  `authenticated` role with `set local request.jwt.claims`, which is how 007 and Task 3 were checked.
+- [x] **F3** — subtask delete goes through `DeleteConfirmDialog`. `09b6dda`.
+      Nested `showModal()` inside the open edit modal: it stacks above it in the top layer, so
+      Escape dismisses only the confirmation. 3 tests in `edit-task-modal.test.tsx`.
+- [x] **F5** — subtask fields symmetric between the two modals. `d5cc3eb`.
+      New `updateSubtask` action + schema; the subtasks query and `RawTask` now carry `description`
+      and `due_at`; the edit modal's add row matches the new-task modal and existing subtasks are
+      editable behind a pencil. 3 tests.
+- [x] **F4** — `RowMenu` roving focus per the ARIA APG menu-button pattern. `bed3fa8`.
+      Implemented rather than dropping the roles. New `src/components/__tests__/row-menu.test.tsx`,
+      7 tests.
+- [x] **F7** — `e2e/drag-reorder.spec.ts`. `e752d88`.
+      Pointer (mouse, and a dispatched touch sequence past the 120ms long-press threshold on the
+      iPhone profile) and keyboard paths; the new order survives a reload; each test restores the
+      seeded order. Passing in all four browsers.
+- [x] **F8** — contrast walk parameterised over four routes and three dialogs. `d95fb70`.
+      Caught a real defect: `--color-text-muted` was 4.39:1 on `--color-surface-sunken`, the panel
+      behind Updates and Subtasks. Darkened `#726f80` → `#6d6a7b` (4.73:1).
+- [x] **F9** — screenshot baselines. `ceff361`.
+      Task list, both dialogs (including the edit dialog scrolled to Subtasks), workspace card;
+      both schemes; chromium and iphone only.
+- [x] **e2e fixture drift** — `task-flow.spec.ts` calls `cleanupUiWrites()` in `afterAll`.
+      `d1da8d0`. The baselines passed alone and failed in a full run: the persistence specs leave
+      rows behind by design and the iPhone project runs last, so it saw four projects' worth.
+- [x] **F1** — `main` pushed to `origin`.
+- [x] **F13** — `STATE.md` position block and progress counts refreshed.
 
-## Done
+Verified: `npx tsc --noEmit` clean, 245 jest tests pass, full Playwright suite 187 passed /
+38 skipped (the screenshot specs skip on webkit and firefox by design).
 
-- [x] **Task 2** — `SUPABASE_SECRET_KEY` + `import "server-only"` + `.env.example`. `e44da0e`.
-      Installed the `server-only` package — it was missing, and `tsc` did not catch it because
-      Next's ambient types declare the module. The build would have failed.
-      **Still needs the user to rotate the key in the Supabase dashboard.**
-- [x] **Task 1 (authoring)** — `supabase/migrations/007_rls_security_definer.sql` written.
-      Apply + verify still blocked on the environment above.
-- [x] **Task 4** — `requireUser()` + per-row authorization in all five remaining task actions. `5cf8987`.
-      `createTask` deleted rather than guarded — no callers, `createTaskWithSubtasks` supersedes it.
-      The mock-builder extraction did not land as a separate commit as planned; `actions.ts` was
-      already rewritten when the work resumed, so splitting it would have been artificial.
-      Verified: `npx tsc --noEmit` clean, 125 tests pass, lint down to the pre-existing 2 errors +
-      3 warnings (the dead `supabase` binding at `actions.ts:102` is gone).
+## Open followups — full statement of each in `06.5-FOLLOWUPS.md`
 
-## Discovered during Task 1 — changes Task 4
+- **F2** — `npm run test:e2e` writes to the hosted Supabase project. Needs a separate test project
+  (or a local stack, blocked on Docker per L9) plus a refusal in `e2e/fixtures.ts` when the target
+  URL is not the designated test project. Highest-value item left.
+- **F10** — dictation and mic-permission denial still need a human in Chrome and Safari.
+- **F6** — reopening a parent leaves its subtasks completed. Deliberate; watch in real use.
+- **F11** — no service worker, so the installed app needs the network for every load. Decide whether
+  offline is in scope; if yes it is its own slice, not a config flag.
+- **F12** — icons are placeholder art. Needs real artwork at 192, 512, maskable 512 and 180.
 
-**`INSERT ... RETURNING` breaks under the new `tasks_select` policy.** Postgres must SELECT a row to
-return it, and `tasks_select` requires an assignment row that does not exist yet at insert time. So
-`createTask` / `createTaskWithSubtasks`, which both do `.insert().select().single()`, will fail once
-007 is applied.
+## Still open from earlier phases
 
-Fix in Task 4: pre-generate ids with `crypto.randomUUID()` and drop the `.select()`, rather than
-widening the SELECT policy. Widening it would contradict `docs/product.md` — "Tasks not assigned to
-the current user must not be shown."
-
-Same trap applies to any future insert-then-return on `task_assignments` and `task_updates`.
-
-- [x] **Task 5** — zod 4 schemas in `src/app/tasks/schemas.ts`, parsed after `requireUser()`, and
-      reused by both modals before their optimistic close. `23ae4cb`.
-      Zod 4 API: top-level `z.uuid()` / `z.iso.date()`, `z.flattenError()`. Not the v3 method forms.
-      `memberIds` requires ≥1 in create *and* update — an empty list makes the task invisible to
-      everyone, not merely unassigned.
-      All test fixtures now use real UUIDs; `"t-1"`-style ids fail validation.
-      Verified: `npx tsc --noEmit` clean, 134 tests pass, lint unchanged.
-
-- [x] **Task 1 (apply + verify)** — 007 live on the hosted project. Verified: policies all scoped to
-      `authenticated` and expressed through `private.*` helpers; all five helpers are
-      `SECURITY DEFINER` with `search_path=''` and **not** executable by `anon`; no 42P17. Two users
-      queried under their own JWT claims see 12 and 1 tasks out of 13 — isolation holds.
-- [x] **Task 6** — actions return `{ ok, error }`, every Supabase error checked, failures toasted,
-      optimistic row rolled back, `error.tsx` + `loading.tsx` added. `7d8081a`.
-      Also replaced the `initialTasks` sync effect with a render-time adjustment — that was the
-      second `set-state-in-effect` lint error.
-- [x] **Task 3** — `/tasks` reads through the user client. `094b4a3`. Verified by replaying the
-      page's query chain as the `authenticated` role: same counts as service-role for that user.
-
-## In progress
-
-- [ ] **Task 7** — completing a parent completes its subtasks; re-enable the button.
-
-## Lint findings, deferred
-
-`npm run lint` reports 1 error + 3 warnings, all pre-existing. Both original `set-state-in-effect`
-errors are gone (Task 4 removed the dead binding, Task 6 removed the tasks-page effect).
-
-- `react-hooks/set-state-in-effect` at `login-card.tsx:26` — belongs to Phase 04.
-- Unused `currentMemberIds` (`edit-task-modal.tsx:16`), unused `memberIdByWorkspaceId`
-  (`tasks-page-client.tsx:44`) — the latter is reserved for drag-to-reorder, Phase 05.
-- Unused `workspaceData` (`workspaces/actions.test.ts:99`).
-
-## Next
-
-- [ ] **Task 7** — Completing a parent task completes its subtasks; re-enable the disabled button.
-- [ ] **Task 8** — Phase wrap-up: reconcile `.planning/STATE.md`, renumber `ROADMAP.md`.
-
-### Surfaced during Task 3, not yet done
-
-`src/app/workspaces/page.tsx` and all three actions in `src/app/workspaces/actions.ts` still use the
-service-role client. All three actions *are* authenticated and scoped to `user.id`, so this is not
-the S1 hole — but every comment justifying the admin client there is now stale: 007 gives
-`workspaces_select` (true), so `RETURNING` and the directory read both work, and
-`workspace_members_delete_self` now exists for `leaveWorkspace`. Port them to the user client and
-move `workspaces/actions.test.ts` onto `src/test/supabase-fake.ts` while doing it.
-
-### Production advisories worth a look (from `get_advisors` after 007)
-
-- `public.rls_auto_enable()` is a `SECURITY DEFINER` function in the exposed schema, callable by
-  `anon`. It is Supabase platform-provided (an event-trigger function, not ours — nothing in
-  `supabase/migrations/` creates it) and returns `event_trigger`, so an RPC call cannot do anything
-  useful. Left alone deliberately.
-- `task_rules` has RLS enabled and no policies — deny-all, which is the safe direction. Phase 07.
-- `workspaces_insert` is `with check (true)`: any signed-in user can create a workspace. Deliberate,
-  matches the public-directory decision.
-- Leaked-password protection is disabled in Auth settings. Dashboard toggle, Phase 04.
-
-## Deferred to later phases
-
-Not in scope for phase 03. Recorded so they are not rediscovered.
-
-**Phase 04 — Accessibility & mobile** (audit U1–U5, U7)
-- Touch targets in `task-card.tsx` are bare 14–18px SVGs, far under the 44px minimum, on the
-  primary mobile surface
-- No `focus-visible` styling on any button or link — inputs only
-- Modals lack `role="dialog"`, `aria-modal`, focus trap, Escape-to-close, focus restore
-- Toaster has no `aria-live` / `role="status"`
-- Dead All/Household/Work pills in `layout.tsx:44-54`; nav renders for signed-out users on `/login`
-- `min-h-[calc(100vh-52px)]` should be `100dvh`; the neighbouring `-m-6` cancels layout padding
-
-**Phase 05 — Drag-to-reorder**
-- `reorderTask()` exists and is tested with zero UI callers; `@hello-pangea/dnd` installed, imported
-  nowhere. Fix audit C3 (global, racy `max + 1000` sort keys; N+1 inserts) before wiring the UI.
-  Needs a keyboard alternative.
-
-**Phase 06 — Task updates + speech-to-text**
-- `task_updates` table exists, no code. Web Speech API at the input layer only. Never persist audio.
-
-**Phase 07 — Recurring tasks**
-- `task_rules` + `tasks.rule_id` exist, no generator. pg_cron. Generator must be idempotent for a
-  repeated `next_run_at`.
-
-**Phase 08 — Design polish** (audit U6, U8–U12)
-- Dark mode via a second `@theme` block; semantic tokens for deadline + toast surfaces (raw
-  `bg-red-50` etc. leak into `task-card.tsx:9-11` and `toaster.tsx:44`); `lucide-react` migration to
-  replace one-off inline SVGs at 5 different sizes and 4 stroke widths; `prefers-reduced-motion`
-  guard; loading skeletons
-
-**Housekeeping**
-- `.planning/STATE.md` is stale — says phase 02 complete 2026-03-27, but `9f1ab80`, `93eb2fc`,
-  `5d3c743` landed outside the GSD loop and are unrecorded
-- `ROADMAP.md` needs renumbering — "Phase 3: Task Detail & Editing" is already largely built
-- Orphan pre-reconcile history is tagged `orphan/local-planning-2026-03-23`; `stash@{0}` holds
-  `.planning` edits from that dead lineage and should almost certainly be dropped
+- Phase 04 — the real-device address-bar-collapse check (U7) needs an actual phone; leaked-password
+  protection is a Supabase dashboard toggle and is still off.
+- Phase 07 (recurring tasks) is next and has not started. `task_rules` and `tasks.rule_id` exist
+  with no generator; `task_rules` has RLS enabled and no policies, which is deny-all — the safe
+  direction. The generator must be idempotent for a repeated `next_run_at`.
 
 ## Resume commands
 
 ```bash
 cd /Users/abindal/dev/taskManager
 npx tsc --noEmit && npx jest
-git log --oneline -5
+npm run build && npx playwright test          # writes to the hosted Supabase project — see F2
+git log --oneline -8
 ```
