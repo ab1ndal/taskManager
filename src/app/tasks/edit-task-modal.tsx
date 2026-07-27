@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { Circle, CircleCheck, Mic, Pencil, Square, Trash2 } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { Circle, CircleCheck, Pencil, Trash2 } from "lucide-react";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import {
   updateTask,
@@ -22,7 +22,8 @@ import {
 import { toast } from "@/components/toaster";
 import { Dialog } from "@/components/dialog";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
-import { useSpeechRecognition } from "@/lib/use-speech-recognition";
+import { useDictation } from "@/lib/use-dictation";
+import { DictationTextarea } from "@/components/dictation-textarea";
 import type { RawTask } from "./bucket-tasks";
 import type { TaskUpdate } from "./actions";
 
@@ -45,6 +46,23 @@ export function formatUpdateTime(iso: string, now: Date = new Date()): string {
   if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m ago`;
   if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
   return then.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/**
+ * The exact moment an update was posted, for the `title` behind the relative label. "3h ago" cannot
+ * be pinned to a time, and past a day the relative label degrades to a bare date with no clock at
+ * all — which is not enough to order two updates from the same afternoon.
+ */
+export function formatUpdateTimestamp(iso: string): string {
+  const then = new Date(iso);
+  if (Number.isNaN(then.getTime())) return "";
+  return then.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function EditTaskModal({
@@ -72,11 +90,6 @@ export function EditTaskModal({
   const [updateDraft, setUpdateDraft] = useState("");
   const [updateError, setUpdateError] = useState("");
   const [updatesPending, startUpdateTransition] = useTransition();
-  // Text committed before the current dictation utterance started. Each SpeechRecognition
-  // interim/final event carries the FULL transcript for the utterance so far, not a delta, so the
-  // draft is rendered as `base + live utterance text` rather than accumulated across events.
-  const dictationBaseRef = useRef("");
-  const updatesListRef = useRef<HTMLUListElement>(null);
 
   const [subtasks, setSubtasks] = useState(task.subtasks);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -101,6 +114,17 @@ export function EditTaskModal({
     setUpdatesLoadError("");
   }
 
+  // One controller for the whole modal: the update composer, the task description and both subtask
+  // description fields share a single recognizer, and claiming it from one field releases the rest.
+  const dictation = useDictation();
+  const { stop: stopDictation } = dictation;
+
+  // A closed modal keeps its component mounted (it renders null), so without this a session left
+  // running when the dialog closes holds the microphone open with no visible control to stop it.
+  useEffect(() => {
+    if (!open) stopDictation();
+  }, [open, stopDictation]);
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -113,23 +137,6 @@ export function EditTaskModal({
       cancelled = true;
     };
   }, [open, task.id]);
-
-  // Newest update is appended at the bottom of a max-h-40 scroller, so without this the one the
-  // user just posted lands out of view.
-  useEffect(() => {
-    const list = updatesListRef.current;
-    if (list) list.scrollTop = list.scrollHeight;
-  }, [updates.length]);
-
-  const speech = useSpeechRecognition((transcript, isFinal) => {
-    // `transcript` is the FULL text of the current utterance so far, not a delta — so it replaces
-    // (rather than appends to) whatever the previous event in this utterance rendered. Only a
-    // final result gets folded into the committed base.
-    const base = dictationBaseRef.current;
-    const combined = base ? `${base} ${transcript}` : transcript;
-    if (isFinal) dictationBaseRef.current = combined;
-    setUpdateDraft(combined);
-  });
 
   function handleAddUpdate() {
     const parsed = createTaskUpdateSchema.safeParse({ taskId: task.id, updateText: updateDraft });
@@ -149,10 +156,9 @@ export function EditTaskModal({
     // Submitting consumes the draft, so an in-flight dictation has nothing left to append to —
     // and the mic button is disabled while the submit transition runs, which would leave the
     // recognizer live with no way to stop it. End the session here instead.
-    if (speech.isListening) speech.stop();
+    dictation.stop();
 
     setUpdates((prev) => [...prev, optimisticUpdate]);
-    dictationBaseRef.current = "";
     setUpdateDraft("");
 
     startUpdateTransition(async () => {
@@ -356,10 +362,13 @@ export function EditTaskModal({
             className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
 
-          <textarea
+          <DictationTextarea
+            field="description"
+            dictation={dictation}
+            dictateLabel="Dictate task details"
             placeholder="Add details…"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
             disabled={pending}
             rows={3}
             className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
@@ -426,90 +435,6 @@ export function EditTaskModal({
       */}
       <section className="mt-6 rounded-md bg-[var(--color-surface-sunken)] p-3">
         <div className="flex items-baseline justify-between gap-2 mb-2">
-          <h4 className="text-sm font-semibold">Updates</h4>
-          <p className="text-2xs text-[var(--color-text-muted)]">Posts immediately</p>
-        </div>
-        {updatesLoadError && (
-          <p role="alert" className="mb-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
-            {updatesLoadError}
-          </p>
-        )}
-        {updates.length === 0 && !updatesLoadError ? (
-          <p className="mb-3 text-sm text-[var(--color-text-muted)]">
-            No updates yet. Add the first one below.
-          </p>
-        ) : (
-          <ul ref={updatesListRef} className="flex flex-col gap-2 mb-3 max-h-40 overflow-y-auto">
-            {updates.map((u) => (
-              <li key={u.id} className="text-sm">
-                <span className="font-medium">{u.authorName}</span>{" "}
-                <time dateTime={u.createdAt} className="text-2xs text-[var(--color-text-muted)]">
-                  {formatUpdateTime(u.createdAt)}
-                </time>
-                <p>{u.updateText}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex gap-2">
-          <textarea
-            placeholder="Add an update…"
-            value={updateDraft}
-            onChange={(e) => {
-              dictationBaseRef.current = e.target.value;
-              setUpdateDraft(e.target.value);
-            }}
-            disabled={updatesPending}
-            rows={2}
-            className="flex-1 border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
-          />
-          {speech.isSupported && (
-            <button
-              type="button"
-              aria-label={speech.isListening ? "Stop dictating" : "Dictate update"}
-              onClick={() => (speech.isListening ? speech.stop() : speech.start())}
-              disabled={updatesPending}
-              className={`flex items-center justify-center px-3 rounded-sm border text-sm disabled:opacity-50 transition-colors ${
-                speech.isListening
-                  ? "border-[var(--color-danger-border)] bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]"
-                  : "border-[var(--color-border)]"
-              }`}
-            >
-              {speech.isListening ? (
-                <Square
-                  size={ICON_SECONDARY}
-                  strokeWidth={ICON_STROKE}
-                  fill="currentColor"
-                  aria-hidden="true"
-                />
-              ) : (
-                <Mic size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
-              )}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={handleAddUpdate}
-            disabled={!updateDraft.trim() || updatesPending}
-            className="px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
-          >
-            Add update
-          </button>
-        </div>
-        {updateError && (
-          <p role="alert" className="mt-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
-            {updateError}
-          </p>
-        )}
-        {speech.error && (
-          <p role="alert" className="mt-2 text-sm text-[var(--color-danger-text)]">
-            {speech.error}
-          </p>
-        )}
-      </section>
-
-      <section className="mt-4 rounded-md bg-[var(--color-surface-sunken)] p-3">
-        <div className="flex items-baseline justify-between gap-2 mb-2">
           <h4 className="text-sm font-semibold">Subtasks</h4>
           <p className="text-2xs text-[var(--color-text-muted)]">Saves immediately</p>
         </div>
@@ -536,13 +461,14 @@ export function EditTaskModal({
                       disabled={subtaskPending}
                       className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
                     />
-                    <textarea
+                    <DictationTextarea
+                      field={`subtask-${s.id}`}
+                      dictation={dictation}
+                      dictateLabel={`Dictate details for "${s.title}"`}
                       placeholder="Details…"
                       aria-label={`Subtask details for "${s.title}"`}
                       value={subtaskDraft.description}
-                      onChange={(e) =>
-                        setSubtaskDraft((d) => ({ ...d, description: e.target.value }))
-                      }
+                      onChange={(value) => setSubtaskDraft((d) => ({ ...d, description: value }))}
                       disabled={subtaskPending}
                       rows={2}
                       className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
@@ -664,14 +590,18 @@ export function EditTaskModal({
             className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
           <div className="flex flex-col sm:flex-row sm:items-start gap-2">
-            <textarea
+            <DictationTextarea
+              field="subtask-new"
+              dictation={dictation}
+              dictateLabel="Dictate subtask details"
               placeholder="Details…"
               aria-label="New subtask details"
               value={subtaskDescription}
-              onChange={(e) => setSubtaskDescription(e.target.value)}
+              onChange={setSubtaskDescription}
               disabled={subtaskPending}
               rows={2}
-              className="w-full sm:flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+              wrapperClassName="w-full sm:flex-1 min-w-0"
+              className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
             />
             <input
               type="date"
@@ -694,6 +624,76 @@ export function EditTaskModal({
         {subtaskError && (
           <p role="alert" className="mt-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
             {subtaskError}
+          </p>
+        )}
+      </section>
+
+      {/*
+        Updates sit last and below Subtasks: subtasks are the structure of the task and belong
+        directly under its fields, while updates are a log that only grows. The list used to be a
+        160px inner scroller nested inside a scrollable dialog — two scroll regions competing for
+        the same gesture — so it now runs at full height and scrolls with the modal body.
+      */}
+      <section className="mt-4 rounded-md bg-[var(--color-surface-sunken)] p-3">
+        <div className="flex items-baseline justify-between gap-2 mb-2">
+          <h4 className="text-sm font-semibold">Updates</h4>
+          <p className="text-2xs text-[var(--color-text-muted)]">Posts immediately</p>
+        </div>
+        {updatesLoadError && (
+          <p role="alert" className="mb-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+            {updatesLoadError}
+          </p>
+        )}
+        {updates.length === 0 && !updatesLoadError ? (
+          <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+            No updates yet. Add the first one below.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2 mb-3">
+            {updates.map((u) => (
+              <li key={u.id} className="text-sm">
+                <span className="font-medium">{u.authorName}</span>{" "}
+                {/*
+                  The relative label answers "is this recent?" at a glance; the title carries the
+                  exact date and time, which is the only way to place an update older than a day.
+                */}
+                <time
+                  dateTime={u.createdAt}
+                  title={formatUpdateTimestamp(u.createdAt)}
+                  className="text-2xs text-[var(--color-text-muted)]"
+                >
+                  {formatUpdateTime(u.createdAt)}
+                </time>
+                <p>{u.updateText}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex gap-2">
+          <DictationTextarea
+            field="update"
+            dictation={dictation}
+            dictateLabel="Dictate update"
+            placeholder="Add an update…"
+            value={updateDraft}
+            onChange={setUpdateDraft}
+            disabled={updatesPending}
+            rows={2}
+            wrapperClassName="flex-1 min-w-0"
+            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={handleAddUpdate}
+            disabled={!updateDraft.trim() || updatesPending}
+            className="self-start min-h-11 px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
+          >
+            Add update
+          </button>
+        </div>
+        {updateError && (
+          <p role="alert" className="mt-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+            {updateError}
           </p>
         )}
       </section>

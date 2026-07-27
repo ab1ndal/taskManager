@@ -64,6 +64,74 @@ describe("TaskCard", () => {
     render(<TaskCard {...baseProps} />);
     expect(screen.queryByText("Shared")).not.toBeInTheDocument();
   });
+
+  describe("opening the task from the card", () => {
+    const subtasks = [{ id: "s-1", title: "Milk", completed_at: null }];
+
+    it("opens the task when the card body is pressed", () => {
+      const onEdit = jest.fn();
+      render(<TaskCard {...baseProps} onEdit={onEdit} />);
+
+      fireEvent.click(screen.getByText("Buy groceries"));
+
+      expect(onEdit).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the complete toggle as a one-press complete, not an open", () => {
+      const onEdit = jest.fn();
+      (completeTask as jest.Mock).mockResolvedValue({ ok: true });
+      render(<TaskCard {...baseProps} onEdit={onEdit} />);
+
+      fireEvent.click(screen.getByRole("button", { name: 'Mark "Buy groceries" complete' }));
+
+      expect(completeTask).toHaveBeenCalledWith("t-1");
+      expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it("leaves a subtask's complete toggle alone too", () => {
+      const onEdit = jest.fn();
+      (completeTask as jest.Mock).mockResolvedValue({ ok: true });
+      render(<TaskCard {...baseProps} onEdit={onEdit} subtasks={subtasks} />);
+
+      fireEvent.click(screen.getByRole("button", { name: 'Mark "Milk" complete' }));
+
+      expect(completeTask).toHaveBeenCalledWith("s-1");
+      expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it("does not open from the drag handle, whose press starts a drag", () => {
+      const onEdit = jest.fn();
+      render(
+        <TaskCard {...baseProps} onEdit={onEdit} dragHandleProps={{ "aria-roledescription": "drag handle" } as React.HTMLAttributes<HTMLButtonElement>} />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: 'Reorder "Buy groceries"' }));
+
+      expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it("does not open behind the delete confirmation, which renders inside the card", () => {
+      const onEdit = jest.fn();
+      render(<TaskCard {...baseProps} onEdit={onEdit} />);
+
+      fireEvent.click(screen.getByRole("button", { name: 'Delete "Buy groceries"' }));
+      // Queried through the DOM rather than by role: `showModal` is mocked, so the dialog never
+      // gets its `open` attribute and its contents stay out of the accessibility tree here.
+      const cancel = Array.from(document.querySelectorAll("dialog button")).find(
+        (b) => b.textContent === "Cancel"
+      );
+      fireEvent.click(cancel!);
+
+      expect(onEdit).not.toHaveBeenCalled();
+    });
+
+    it("stays inert on a completed card, which has no edit to open", () => {
+      render(<TaskCard {...baseProps} completed />);
+
+      // No handler to assert against, so assert the affordance: nothing invites a press.
+      expect(screen.getByText("Buy groceries").closest("div.group")).not.toHaveClass("cursor-pointer");
+    });
+  });
 });
 
 describe("EmptyState", () => {

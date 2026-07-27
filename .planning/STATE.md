@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Phase 6.5 followups F1, F3, F4, F5, F7, F8, F9 closed; F2, F6, F10-F13 open
+stopped_at: Phase 6.5 followups F1-F10, F13-F18 closed; F11, F12, F19 open; F20 (production signup email) and F21 (Google sign-in) newly raised
 last_updated: "2026-07-27T00:00:00.000Z"
 progress:
   # Counted from ROADMAP.md's progress table: phases 1, 2, 3, 5 and 6.5 complete; 4 in progress
@@ -30,10 +30,12 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 Phase: 04 (accessibility-mobile) — 3 of 4 manual checks in 04-06 resolved (fully or partial),
 resuming the rest (real-device address-bar check, leaked-password dashboard toggle) later.
 Phase: 05 (task-prioritization) — COMPLETE, all verification checks pass.
-Phase: 06 (task-updates-speech-to-text) — code landed; only dictation and mic-permission denial
-still need a human (see followup F10).
-Phase: 06.5 (app-wide-ui-polish) — COMPLETE. Followups F1, F3, F4, F5, F7, F8 and F9 closed
-2026-07-27; F2, F6, F10, F11, F12 and F13 remain open in `06.5-FOLLOWUPS.md`.
+Phase: 06 (task-updates-speech-to-text) — COMPLETE. The last two manual checks (dictation, mic
+permission denial) were run by hand 2026-07-27 in Chrome, Safari and Firefox and passed; see F10.
+Phase: 06.5 (app-wide-ui-polish) — COMPLETE. Followups F1-F10 and F13-F18 closed 2026-07-27.
+Still open: F11 (offline/service worker), F12 (real icons), F19 (perceived latency, unmeasured),
+plus F20 (production signup email never arrives) and F21 (Google sign-in), both raised outside the
+6.5 pass — all in `06.5-FOLLOWUPS.md`.
 Next: Phase 07 (recurring tasks) — not started, depends on 6.5.
 
 All work has been landing directly on `main` (not a feature branch) since phase 03, and `main` is
@@ -96,11 +98,11 @@ now pushed to `origin`.
   `e2e/auth-routing.spec.ts`
 - Leaked-password protection is disabled in Supabase Auth settings — dashboard toggle, Phase 04, still pending (deferred with the rest of 04-06)
 - Phase 04-06 real-device address-bar-collapse check (U7) still needs an actual phone — devtools/Playwright viewport emulation can't reproduce it
-- Phase 06 manual verification: mostly closed 2026-07-27 by the `e2e/` Playwright suite, which drives
-  the real signed-in app in Chromium, WebKit, Firefox and an iPhone profile. Update and subtask
-  persistence and the two-member author-name check now run automatically. Dictation and microphone
-  permission denial remain manual — Chromium's fake-device flags do not drive the Web Speech API,
-  which is a cloud service in Chrome and absent in Firefox.
+- ~~Phase 06 manual verification incomplete~~ — closed 2026-07-27. The `e2e/` Playwright suite
+  covers update and subtask persistence and the two-member author-name check across Chromium,
+  WebKit, Firefox and an iPhone profile; dictation and microphone-permission denial stay manual
+  (Chromium's fake-device flags do not drive the Web Speech API, a cloud service in Chrome and
+  absent in Firefox) and were run by hand in Chrome, Safari and Firefox. All passed — F10.
 
 ### Resolved concerns
 
