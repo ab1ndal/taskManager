@@ -47,7 +47,7 @@ export function Dialog({
       aria-labelledby={ariaLabelledBy}
       className={
         className ??
-        "rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto backdrop:bg-black/40"
+        "rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto backdrop:bg-[var(--color-scrim)]"
       }
     >
       {children}

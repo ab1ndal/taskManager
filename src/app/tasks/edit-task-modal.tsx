@@ -199,7 +199,7 @@ export function EditTaskModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={pending}
-            className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
 
           <textarea
@@ -208,7 +208,7 @@ export function EditTaskModal({
             onChange={(e) => setDescription(e.target.value)}
             disabled={pending}
             rows={3}
-            className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none disabled:opacity-50"
+            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
           />
 
           <div>
@@ -218,7 +218,7 @@ export function EditTaskModal({
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
               disabled={pending}
-              className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-[var(--color-surface)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
             />
           </div>
 
@@ -241,7 +241,7 @@ export function EditTaskModal({
           </div>
 
           {formError && (
-            <p role="alert" className="rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+            <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
               {formError}
             </p>
           )}
@@ -251,14 +251,14 @@ export function EditTaskModal({
               type="button"
               onClick={onClose}
               disabled={pending}
-              className="px-4 py-2 text-sm rounded-[8px] border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || selectedMemberIds.length === 0 || pending}
-              className="px-4 py-2 text-sm font-medium rounded-[8px] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Save
             </button>
@@ -268,7 +268,7 @@ export function EditTaskModal({
       <div className="mt-6 border-t border-[var(--color-border)] pt-4">
         <h4 className="text-sm font-semibold mb-2">Updates</h4>
         {updatesLoadError && (
-          <p role="alert" className="mb-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p role="alert" className="mb-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
             {updatesLoadError}
           </p>
         )}
@@ -293,7 +293,7 @@ export function EditTaskModal({
             }}
             disabled={updatesPending}
             rows={2}
-            className="flex-1 border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none disabled:opacity-50"
+            className="flex-1 border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
           />
           {speech.isSupported && (
             <button
@@ -301,9 +301,9 @@ export function EditTaskModal({
               aria-label={speech.isListening ? "Stop dictating" : "Dictate update"}
               onClick={() => (speech.isListening ? speech.stop() : speech.start())}
               disabled={updatesPending}
-              className={`flex items-center justify-center px-3 rounded-[8px] border text-sm disabled:opacity-50 transition-colors ${
+              className={`flex items-center justify-center px-3 rounded-sm border text-sm disabled:opacity-50 transition-colors ${
                 speech.isListening
-                  ? "border-red-200 bg-red-50 text-red-600"
+                  ? "border-[var(--color-danger-border)] bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]"
                   : "border-[var(--color-border)]"
               }`}
             >
@@ -323,18 +323,18 @@ export function EditTaskModal({
             type="button"
             onClick={handleAddUpdate}
             disabled={!updateDraft.trim() || updatesPending}
-            className="px-4 rounded-[8px] bg-[var(--color-accent)] text-white text-sm disabled:opacity-40"
+            className="px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
           >
             Add update
           </button>
         </div>
         {updateError && (
-          <p role="alert" className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p role="alert" className="mt-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
             {updateError}
           </p>
         )}
         {speech.error && (
-          <p role="alert" className="mt-2 text-sm text-red-600">
+          <p role="alert" className="mt-2 text-sm text-[var(--color-danger-text)]">
             {speech.error}
           </p>
         )}
@@ -358,19 +358,19 @@ export function EditTaskModal({
             value={subtaskTitle}
             onChange={(e) => setSubtaskTitle(e.target.value)}
             disabled={subtaskPending}
-            className="flex-1 border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+            className="flex-1 border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
           <button
             type="button"
             onClick={handleAddSubtask}
             disabled={!subtaskTitle.trim() || subtaskPending}
-            className="px-4 rounded-[8px] bg-[var(--color-accent)] text-white text-sm disabled:opacity-40"
+            className="px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
           >
             Add subtask
           </button>
         </div>
         {subtaskError && (
-          <p role="alert" className="mt-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+          <p role="alert" className="mt-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
             {subtaskError}
           </p>
         )}

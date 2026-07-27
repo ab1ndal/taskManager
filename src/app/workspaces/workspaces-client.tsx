@@ -45,7 +45,7 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
         </h2>
         <button
           onClick={() => setModalOpen(true)}
-          className="text-sm font-semibold px-4 py-2 rounded-[8px] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors duration-150"
+          className="text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors duration-150"
         >
           Create Workspace
         </button>
@@ -78,13 +78,13 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
       {/* Create Workspace Modal */}
       {modalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-scrim)]"
           onClick={(e) => {
             if (e.target === e.currentTarget) setModalOpen(false);
           }}
         >
           <div
-            className="w-full max-w-sm mx-4 rounded-[12px] bg-[var(--color-surface)] border border-[var(--color-border)] shadow-[var(--shadow-login)] p-6"
+            className="w-full max-w-sm mx-4 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] shadow-[var(--shadow-login)] p-6"
             style={{
               animation: "modal-in 150ms ease-out both",
             }}
@@ -107,7 +107,7 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Home, Acme Corp"
                   required
-                  className="w-full rounded-[8px] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-transparent"
+                  className="w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]"
                 />
               </div>
 
@@ -143,14 +143,14 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                 <button
                   type="button"
                   onClick={() => { setModalOpen(false); setFormError(null); }}
-                  className="text-sm font-semibold px-4 py-2 rounded-[8px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
+                  className="text-sm font-semibold px-4 py-2 rounded-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending || !name.trim()}
-                  className="text-sm font-semibold px-4 py-2 rounded-[8px] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
+                  className="text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
                 >
                   {isPending ? "Creating..." : "Create"}
                 </button>

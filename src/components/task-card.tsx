@@ -9,15 +9,20 @@ import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
 export type DeadlineVariant = "red" | "yellow" | "green";
 
+/**
+ * Deadline urgency reads through the status tokens rather than raw palette classes, so it survives
+ * the theme swap. The old pairings (#D4A017 on amber-50, #4A9B6F on emerald-50) sat at roughly
+ * 2.3:1 and 3.1:1 — below AA for text this small.
+ */
 const deadlineStyles: Record<DeadlineVariant, string> = {
-  red: "bg-red-50 text-[var(--color-deadline-red)]",
-  yellow: "bg-amber-50 text-[var(--color-deadline-yellow)]",
-  green: "bg-emerald-50 text-[var(--color-deadline-green)]",
+  red: "bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]",
+  yellow: "bg-[var(--color-warning-surface)] text-[var(--color-warning-text)]",
+  green: "bg-[var(--color-success-surface)] text-[var(--color-success-text)]",
 };
 
 export function DeadlineBadge({ variant, label }: { variant: DeadlineVariant; label: string }) {
   return (
-    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${deadlineStyles[variant]}`}>
+    <span className={`text-2xs font-medium px-2 py-0.5 rounded-full ${deadlineStyles[variant]}`}>
       {label}
     </span>
   );
@@ -25,7 +30,7 @@ export function DeadlineBadge({ variant, label }: { variant: DeadlineVariant; la
 
 export function SharedBadge() {
   return (
-    <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]">
+    <span className="text-2xs font-medium px-2 py-0.5 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]">
       Shared
     </span>
   );
@@ -67,7 +72,7 @@ export function TaskCard({
 
   return (
     <div
-      className={`bg-[var(--color-surface)] rounded-[11px] border border-[var(--color-border)] px-4 py-3 transition-opacity ${pending ? "opacity-40" : ""}`}
+      className={`bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-4 py-3 transition-opacity ${pending ? "opacity-40" : ""}`}
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <div className="flex items-center gap-3">
@@ -112,7 +117,7 @@ export function TaskCard({
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {deadline && deadlineVariant && <DeadlineBadge variant={deadlineVariant} label={deadline} />}
             {shared && <SharedBadge />}
-            <span className="text-[11px] text-[var(--color-text-muted)]">{workspace}</span>
+            <span className="text-xs text-[var(--color-text-muted)]">{workspace}</span>
           </div>
         </div>
 
@@ -130,7 +135,7 @@ export function TaskCard({
           <button
             onClick={() => setDeleteConfirmOpen(true)}
             aria-label={`Delete "${title}"`}
-            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-red-500 transition-colors"
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger-text)] transition-colors"
           >
             <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>

@@ -67,14 +67,14 @@ export default function ProfilePage() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="rounded-[8px] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm outline-none focus:border-[var(--color-accent)] focus:ring-[3px] focus:ring-[var(--color-accent)]/10 focus:bg-white"
+            className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
             placeholder="Your name"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-[var(--color-text-secondary)]">Email</label>
-          <p className="rounded-[8px] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm text-[var(--color-text-muted)]">
+          <p className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm text-[var(--color-text-muted)]">
             {email}
           </p>
         </div>
@@ -82,7 +82,7 @@ export default function ProfilePage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-fit rounded-[8px] bg-[var(--color-accent)] px-5 py-[10px] text-sm font-medium text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-50 transition-colors"
+          className="w-fit rounded-sm bg-[var(--color-accent)] px-5 py-[10px] text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 transition-colors"
         >
           {loading ? "Saving…" : "Save changes"}
         </button>

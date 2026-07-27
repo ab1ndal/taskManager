@@ -1,39 +1,191 @@
 @import "tailwindcss";
 
-@keyframes modal-in {
-  from { opacity: 0; transform: scale(0.97); }
-  to   { opacity: 1; transform: scale(1); }
+/* ---------------------------------------------------------------------------
+ * Colour tokens.
+ *
+ * These live in plain `:root` rather than `@theme` on purpose. Components address
+ * them as `var(--color-x)` arbitrary values, and a non-inline `@theme` block can
+ * only hold static values — it cannot be re-pointed by a media query, which is
+ * what dark mode needs. Declaring them here keeps every existing `var(--color-x)`
+ * call site working while letting the whole palette swap under one rule.
+ *
+ * Every token is semantic: name what it is for, never what colour it is. A
+ * component that reaches past this layer for `bg-red-50` is a surface dark mode
+ * cannot follow.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --color-bg: #faf9f7;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f4f2f7;
+  --color-border: #e8e4f0;
+
+  /* Text */
+  --color-text-primary: #1c1a24;
+  --color-text-secondary: #6b6878;
+  --color-text-muted: #726f80;
+  --color-text-on-accent: #ffffff;
+  /*
+   * Sits on a saturated status fill (danger/warning solids). Those fills keep the same value in
+   * both themes, so this token does too — unlike --color-text-on-accent, which flips.
+   */
+  --color-text-on-solid: #ffffff;
+
+  /* Brand */
+  --color-accent: #7c5cbf;
+  --color-accent-hover: #6a4dad;
+  --color-accent-subtle: #ede8f8;
+  --color-accent-text: #5b3fa8;
+  --color-focus: #7c5cbf;
+
+  /* Status — each surface/text pair is contrast-checked against the other */
+  --color-danger-surface: #fef2f2;
+  --color-danger-text: #b3261e;
+  --color-danger-border: #f6cdcb;
+  --color-danger-solid: #dc2626;
+  --color-danger-solid-hover: #b91c1c;
+
+  --color-warning-surface: #fffbeb;
+  --color-warning-text: #8a5a00;
+  --color-warning-solid: #b45309;
+
+  --color-success-surface: #ecfdf5;
+  --color-success-text: #0f6b4f;
+
+  /* Workspace kinds */
+  --color-kind-household-surface: #e8e7fd;
+  --color-kind-household-text: #4338ca;
+  --color-kind-work-surface: #e0f2fe;
+  --color-kind-work-text: #0369a1;
+
+  /* Inverted surface — toasts */
+  --color-inverse-surface: #26232f;
+  --color-inverse-text: #f6f5f9;
+
+  /* Scrim behind modals */
+  --color-scrim: rgb(28 26 36 / 0.45);
+
+  /* Elevation */
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.05), 0 1px 8px rgb(124 92 191 / 0.05);
+  --shadow-login: 0 8px 32px rgb(124 92 191 / 0.14), 0 2px 8px rgb(0 0 0 / 0.06);
 }
 
-@theme {
-  /* Colors */
-  --color-bg: #FAF9F7;
-  --color-surface: #FFFFFF;
-  --color-border: #E8E4F0;
-  --color-text-primary: #1C1A24;
-  --color-text-secondary: #6B6878;
-  --color-text-muted: #A09CB0;
-  --color-accent: #7C5CBF;
-  --color-accent-hover: #6A4DAD;
-  --color-accent-subtle: #EDE8F8;
-  --color-accent-text: #5B3FA8;
-  --color-focus: #7C5CBF;
-  --color-deadline-red: #E05252;
-  --color-deadline-yellow: #D4A017;
-  --color-deadline-green: #4A9B6F;
+/*
+ * Dark mode. Not an inversion: surfaces are warm near-blacks (never #000, which
+ * flattens depth), the accent lightens so it still reads as the same purple
+ * against a dark field, and every status pair is re-tuned rather than reused —
+ * #b3261e on a dark surface is unreadable.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
 
-  /* Radius */
+    --color-bg: #16151c;
+    --color-surface: #1f1d28;
+    --color-surface-sunken: #14131a;
+    --color-border: #322e42;
+
+    --color-text-primary: #edebf2;
+    --color-text-secondary: #a8a4b8;
+    --color-text-muted: #9591a6;
+    --color-text-on-accent: #17131f;
+
+    --color-accent: #a78be0;
+    --color-accent-hover: #b9a2ea;
+    --color-accent-subtle: #2b2438;
+    --color-accent-text: #c9b4ef;
+    --color-focus: #a78be0;
+
+    --color-danger-surface: #3a1f22;
+    --color-danger-text: #fca5a5;
+    --color-danger-border: #5c2e31;
+    --color-danger-solid: #dc2626;
+    --color-danger-solid-hover: #ef4444;
+
+    --color-warning-surface: #3a2e17;
+    --color-warning-text: #fcd34d;
+    --color-warning-solid: #a16207;
+
+    --color-success-surface: #14301f;
+    --color-success-text: #6ee7b7;
+
+    --color-kind-household-surface: #2b2b4d;
+    --color-kind-household-text: #c7c4fb;
+    --color-kind-work-surface: #14344a;
+    --color-kind-work-text: #a5d8fb;
+
+    --color-inverse-surface: #ece9f4;
+    --color-inverse-text: #1c1a24;
+
+    --color-scrim: rgb(0 0 0 / 0.6);
+
+    --shadow-card: 0 1px 3px rgb(0 0 0 / 0.4), 0 1px 8px rgb(0 0 0 / 0.25);
+    --shadow-login: 0 8px 32px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.3);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Shape and type scale. Static, so `@theme` is the right home — these generate
+ * the `rounded-*` and `text-*` utilities.
+ *
+ * Radius has exactly three steps: sm for controls (inputs, buttons, badges,
+ * toasts), md for cards and grouped containers, lg for dialogs and the login
+ * card. The pre-6.5 codebase had eight literal radii.
+ *
+ * text-2xs (11px) exists only for uppercase micro-labels, where the caps carry
+ * legibility. Body copy never goes below text-xs (12px).
+ * ------------------------------------------------------------------------- */
+
+@theme {
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
 
-  /* Shadows */
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 1px 8px rgba(124,92,191,0.05);
-  --shadow-login: 0 8px 32px rgba(124,92,191,0.14), 0 2px 8px rgba(0,0,0,0.06);
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
 }
 
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible,
-textarea:focus-visible, [tabindex]:focus-visible {
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/*
+ * One focus treatment for the whole app. Components must not add their own
+ * `focus:ring-*` — before 6.5 there were three competing styles, so the same
+ * keyboard action looked different depending on which screen you were on.
+ */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/*
+ * Motion here is decoration — nothing conveys meaning through animation alone —
+ * so reduced-motion collapses it entirely rather than substituting a gentler
+ * variant.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

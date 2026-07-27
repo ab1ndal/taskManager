@@ -27,7 +27,7 @@ export default function TasksError({
       </p>
       <button
         onClick={reset}
-        className="rounded-[8px] bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-accent-hover)]"
+        className="rounded-sm bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-text-on-accent)] transition-colors hover:bg-[var(--color-accent-hover)]"
       >
         Try again
       </button>

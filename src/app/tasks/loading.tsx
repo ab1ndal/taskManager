@@ -11,7 +11,7 @@ export default function TasksLoading() {
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className="h-[62px] animate-pulse rounded-[11px] border border-[var(--color-border)] bg-[var(--color-surface)]"
+            className="h-[62px] animate-pulse rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]"
           />
         ))}
       </div>

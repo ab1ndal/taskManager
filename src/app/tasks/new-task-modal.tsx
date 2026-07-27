@@ -167,7 +167,7 @@ export function NewTaskModal({
       <Dialog
         open={open}
         onClose={onClose}
-        className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm text-center backdrop:bg-black/40"
+        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm text-center backdrop:bg-[var(--color-scrim)]"
       >
         <p className="text-sm text-[var(--color-text-secondary)] mb-4">
           You must join a workspace before creating tasks.
@@ -200,7 +200,7 @@ export function NewTaskModal({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             disabled={disabled}
-            className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
 
           <textarea
@@ -209,7 +209,7 @@ export function NewTaskModal({
             onChange={(e) => setDescription(e.target.value)}
             disabled={disabled}
             rows={3}
-            className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none disabled:opacity-50"
+            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
           />
 
           <div>
@@ -221,7 +221,7 @@ export function NewTaskModal({
               value={dueAt}
               onChange={(e) => setDueAt(e.target.value)}
               disabled={disabled}
-              className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-[var(--color-surface)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
             />
           </div>
 
@@ -233,7 +233,7 @@ export function NewTaskModal({
               value={workspaceId}
               onChange={(e) => handleWorkspaceChange(e.target.value)}
               disabled={disabled}
-              className="w-full border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-[var(--color-surface)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
             >
               {workspaces.map((w) => (
                 <option key={w.id} value={w.id}>
@@ -284,7 +284,7 @@ export function NewTaskModal({
                     onKeyDown={(e) => handleSubtaskKeyDown(e, row.title)}
                     disabled={disabled}
                     ref={i === subtaskRows.length - 1 ? lastSubtaskRef : undefined}
-                    className="flex-1 border border-[var(--color-border)] rounded-[8px] px-2 py-1 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+                    className="flex-1 border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
                   />
                   <textarea
                     placeholder="Details…"
@@ -292,14 +292,14 @@ export function NewTaskModal({
                     onChange={(e) => updateSubtask(i, "description", e.target.value)}
                     disabled={disabled}
                     rows={1}
-                    className="flex-1 border border-[var(--color-border)] rounded-[8px] px-2 py-1 text-xs bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none disabled:opacity-50"
+                    className="flex-1 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
                   />
                   <input
                     type="date"
                     value={row.dueAt}
                     onChange={(e) => updateSubtask(i, "dueAt", e.target.value)}
                     disabled={disabled}
-                    className="border border-[var(--color-border)] rounded-[8px] px-2 py-1 text-xs bg-[var(--color-surface)] focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] disabled:opacity-50"
+                    className="border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
                   />
                   <button
                     type="button"
@@ -324,7 +324,7 @@ export function NewTaskModal({
           </div>
 
           {formError && (
-            <p role="alert" className="rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+            <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
               {formError}
             </p>
           )}
@@ -334,14 +334,14 @@ export function NewTaskModal({
               type="button"
               onClick={onClose}
               disabled={disabled}
-              className="px-4 py-2 text-sm rounded-[8px] border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || selectedMemberIds.length === 0 || pending}
-              className="px-4 py-2 text-sm font-medium rounded-[8px] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {pending ? "Adding…" : "Add task"}
             </button>

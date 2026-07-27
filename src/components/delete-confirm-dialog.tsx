@@ -23,7 +23,7 @@ export function DeleteConfirmDialog({
       onClose={onCancel}
       initialFocusSelector="[data-cancel-button]"
       ariaLabelledBy="delete-confirm-title"
-      className="rounded-[14px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto backdrop:bg-black/40"
+      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto backdrop:bg-[var(--color-scrim)]"
     >
       <h3 id="delete-confirm-title" className="text-base font-semibold mb-2">
         Delete &quot;{taskTitle}&quot;?
@@ -35,7 +35,7 @@ export function DeleteConfirmDialog({
           data-cancel-button
           onClick={onCancel}
           aria-label="Cancel delete"
-          className="min-h-11 px-4 py-2 text-sm rounded-[8px] border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors"
+          className="min-h-11 px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors"
         >
           Cancel
         </button>
@@ -43,7 +43,7 @@ export function DeleteConfirmDialog({
           type="button"
           onClick={onConfirm}
           aria-label={`Confirm delete "${taskTitle}"`}
-          className="min-h-11 px-4 py-2 text-sm font-medium rounded-[8px] bg-red-600 text-white hover:bg-red-700 transition-colors"
+          className="min-h-11 px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-danger-solid)] text-[var(--color-text-on-solid)] hover:bg-[var(--color-danger-solid-hover)] transition-colors"
         >
           Delete
         </button>

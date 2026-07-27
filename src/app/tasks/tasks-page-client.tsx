@@ -112,7 +112,7 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2 px-2 py-[7px] rounded-[8px] text-sm font-medium ${
+      className={`flex items-center gap-2 px-2 py-[7px] rounded-sm text-sm font-medium ${
         active
           ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
           : "text-[var(--color-text-secondary)] hover:bg-[var(--color-accent-subtle)]/50"
@@ -192,7 +192,7 @@ export function TasksPageClient({
         <button
           onClick={() => setModalOpen(true)}
           disabled={!hasWorkspace}
-          className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           New task
@@ -237,13 +237,13 @@ export function TasksPageClient({
           <button
             onClick={() => setModalOpen(true)}
             disabled={!hasWorkspace}
-            className="mb-4 w-full flex items-center justify-center gap-1.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-white text-sm font-medium rounded-[8px] py-[9px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mb-4 w-full flex items-center justify-center gap-1.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-on-accent)] text-sm font-medium rounded-sm py-[9px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             New task
           </button>
 
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1">
             Views
           </p>
           <SidebarLink
@@ -259,7 +259,7 @@ export function TasksPageClient({
             label="Shared"
           />
 
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1 mt-4">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1 mt-4">
             Spaces
           </p>
           {workspaces.map((ws) => (
@@ -286,7 +286,7 @@ export function TasksPageClient({
 
         <main className="flex-1 p-6 overflow-auto">
           {workspaces.length === 0 && (
-            <div className="mb-6 rounded-[8px] border border-[var(--color-accent-text)] bg-[var(--color-accent-subtle)] px-4 py-3">
+            <div className="mb-6 rounded-sm border border-[var(--color-accent-text)] bg-[var(--color-accent-subtle)] px-4 py-3">
               <p className="text-sm text-[var(--color-accent-text)]">
                 You&apos;re not in any workspace yet.{" "}
                 <a
@@ -328,7 +328,7 @@ export function TasksPageClient({
                   if (!sectionTasks.length) return null;
                   return (
                     <div key={key} className="mb-6">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
+                      <p className="text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
                         {key}
                       </p>
                       {/* type={key} makes dnd treat each bucket as its own drag universe, so a
