@@ -1,0 +1,84 @@
+name: Repair Supabase Migration History
+
+# One-off, manual. Production's `supabase_migrations.schema_migrations` records a single row,
+# `20260725220330 rls_security_definer` — migrations 001-006 were applied out-of-band before the CLI
+# was ever used against this project, and 007 was applied through the Supabase MCP server under a
+# timestamped name that no local file matches (tasks/lessons.md L9).
+#
+# The consequence is that `deploy-migrations.yml` cannot work: `supabase db push` would try to
+# replay 001 against a schema that already has those tables. It fails rather than corrupting
+# anything, but production migrations do not deploy.
+#
+# This job rewrites that bookkeeping ONLY. `migration repair` writes to the history table; it never
+# runs migration SQL and never touches application data. After it, remote history says 001-009 are
+# applied — which is the truth — and a `db push` has nothing pending.
+#
+# It runs here rather than from a laptop because the production database password lives in this
+# repository's secrets and nowhere else.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type REPAIR to confirm this writes to the production migration history'
+        required: true
+        default: ''
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: ${{ inputs.confirm != 'REPAIR' }}
+        run: |
+          echo "::error::Refusing to run: type REPAIR in the confirm input."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link production project
+        run: supabase link --project-ref xamdgvxziobpptcfymug
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: History before
+        run: supabase migration list --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # Every one of these is already applied to production — the project was the only one that
+      # existed while phases 1 through 6.5 were built against it.
+      - name: Mark 001-009 as applied
+        run: supabase migration repair --status applied 001 002 003 004 005 006 007 008 009
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # The MCP-applied row for 007. Its SQL is present in the schema and is now accounted for by the
+      # local 007 file above, so the duplicate entry — which matches no local migration — goes.
+      # `reverted` edits the history table only; it does not undo anything.
+      - name: Drop the orphaned 20260725220330 row
+        run: supabase migration repair --status reverted 20260725220330
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: History after
+        run: supabase migration list --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      # Proves the deploy path is unblocked: nothing pending means the next real migration is the
+      # only thing a push will apply.
+      - name: Confirm nothing is pending
+        run: supabase db push --dry-run
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

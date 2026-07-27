@@ -27,6 +27,16 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # Logged before the push so a history mismatch reads as "remote is missing 001-006" rather
+      # than as an opaque failure on a `create table` that already exists. If this ever shows local
+      # migrations the remote does not have but the schema does, run repair-migration-history.yml
+      # rather than letting the push replay them. See tasks/lessons.md L9.
+      - name: Show migration history
+        run: supabase migration list --linked
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
       - name: Push pending migrations
         run: supabase db push
         env:
