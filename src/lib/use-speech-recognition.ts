@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 interface SpeechRecognitionResultLike {
   0: { transcript: string };
@@ -39,6 +39,15 @@ function getConstructor(): SpeechRecognitionConstructor | null {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
+/** Whether the constructor exists never changes after load, so there is nothing to subscribe to. */
+function subscribeToNothing() {
+  return () => {};
+}
+
+function getIsSupported() {
+  return getConstructor() !== null;
+}
+
 /**
  * Wraps the browser's SpeechRecognition API. Chrome ends a session on silence even with
  * `continuous: true`, so `onend` auto-restarts unless `stop()` was called explicitly — tracked via
@@ -46,17 +55,22 @@ function getConstructor(): SpeechRecognitionConstructor | null {
  * callback would be stale by the time the callback reads them.
  */
 export function useSpeechRecognition(onResult: (transcript: string, isFinal: boolean) => void) {
-  const [isSupported, setIsSupported] = useState(false);
+  // Support is a browser-only fact, so it is read through useSyncExternalStore with a `false`
+  // server snapshot: the server and the first client render agree (no mic button), then the client
+  // re-renders with the real value. Reading it during render instead would mismatch hydration.
+  const isSupported = useSyncExternalStore(subscribeToNothing, getIsSupported, () => false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const stoppedByUserRef = useRef(true);
   const onResultRef = useRef(onResult);
-  onResultRef.current = onResult;
 
+  // Kept in an effect rather than assigned during render: writing a ref while rendering is unsafe
+  // (and lint-flagged). Recognition events can only arrive after the effect has run, so the
+  // callback the handler reads is always the latest one.
   useEffect(() => {
-    setIsSupported(getConstructor() !== null);
-  }, []);
+    onResultRef.current = onResult;
+  }, [onResult]);
 
   const start = useCallback(() => {
     const Ctor = getConstructor();

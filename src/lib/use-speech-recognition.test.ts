@@ -126,14 +126,9 @@ describe("useSpeechRecognition", () => {
 
   it("guards against concurrent start() calls and does not create a second instance", () => {
     let instanceCount = 0;
-    let firstInstance: MockSpeechRecognition | null = null;
     (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
       instanceCount++;
-      const instance = new MockSpeechRecognition();
-      if (instanceCount === 1) {
-        firstInstance = instance;
-      }
-      return instance;
+      return new MockSpeechRecognition();
     });
 
     const { result } = renderHook(() => useSpeechRecognition(() => {}));
