@@ -52,10 +52,23 @@ in `STATE.md`'s blockers, and in `lessons.md` (L1–L11).
 Verified: `npx tsc --noEmit` clean, 245 jest tests pass, full Playwright suite 187 passed /
 38 skipped (the screenshot specs skip on webkit and firefox by design).
 
+- [x] **F10** — dictation and mic-permission denial run by hand in Chrome, Safari and Firefox.
+      All five checks in `06-VERIFICATION.md` pass: the mid-sentence pause survives (auto-restart),
+      a blocked mic shows "Microphone access was denied" with no restart loop, Safari's
+      `webkitSpeechRecognition` path works, Firefox renders no mic button. Five observations from
+      the run are raised as F15–F19.
+
 ## Open followups — full statement of each in `06.5-FOLLOWUPS.md`
 
-- **F10** — dictation and mic-permission denial still need a human in Chrome and Safari. Highest-value
-  item left.
+- **F17** — Subtasks belong above Updates; updates should scroll with the modal, not in a 160px
+  inner box, and should carry an exact date and time, not only "3h ago".
+- **F16** — dictation only exists on the update composer. Wanted on the task and subtask
+  description fields. One recognizer at a time, so it needs a shared session with an owning field.
+- **F18** — a task opens only through the row menu. Clicking the card should open it, without
+  breaking the checkbox, drag handle or menu, and reachable by keyboard.
+- **F15** — the dictation textarea does not scroll, so spoken text lands out of sight past two lines.
+- **F19** — updates take 1–2s to render on open and a new task is not editable until the server
+  revalidates. Measure against a production build before fixing — `next dev` compiles per route.
 - **F6** — reopening a parent leaves its subtasks completed. Deliberate; watch in real use.
 - **F11** — no service worker, so the installed app needs the network for every load. Decide whether
   offline is in scope; if yes it is its own slice, not a config flag.
@@ -65,6 +78,7 @@ Verified: `npx tsc --noEmit` clean, 245 jest tests pass, full Playwright suite 1
 
 - Phase 04 — the real-device address-bar-collapse check (U7) needs an actual phone; leaked-password
   protection is a Supabase dashboard toggle and is still off.
+- Phase 06 — closed 2026-07-27 with F10. Nothing manual left.
 - Phase 07 (recurring tasks) is next and has not started. `task_rules` and `tasks.rule_id` exist
   with no generator; `task_rules` has RLS enabled and no policies, which is deny-all — the safe
   direction. The generator must be idempotent for a repeated `next_run_at`.

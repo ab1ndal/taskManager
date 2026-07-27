@@ -7,6 +7,8 @@ import { createTaskWithSubtasks } from "./actions";
 import { createTaskWithSubtasksSchema } from "./schemas";
 import { toast } from "../../components/toaster";
 import { Dialog } from "@/components/dialog";
+import { DictationTextarea } from "@/components/dictation-textarea";
+import { useDictation } from "@/lib/use-dictation";
 import type { RawTask } from "./bucket-tasks";
 
 type WorkspaceMember = { id: string; display_name: string };
@@ -45,6 +47,9 @@ export function NewTaskModal({
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
   const lastSubtaskRef = useRef<HTMLInputElement>(null);
+  // One recognizer for the whole form: the task details field and every subtask's details field
+  // share it, and claiming it from one field releases whichever held it.
+  const dictation = useDictation();
 
   const currentWorkspace = workspaces.find((w) => w.id === workspaceId);
 
@@ -82,6 +87,9 @@ export function NewTaskModal({
   }
 
   function resetForm() {
+    // The fields a session could be dictating into are about to be cleared, so end it here rather
+    // than leaving the recognizer live against a form that no longer exists on screen.
+    dictation.stop();
     setTitle("");
     setDescription("");
     setDueAt("");
@@ -203,10 +211,13 @@ export function NewTaskModal({
             className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
 
-          <textarea
+          <DictationTextarea
+            field="description"
+            dictation={dictation}
+            dictateLabel="Dictate task details"
             placeholder="Add details…"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={setDescription}
             disabled={disabled}
             rows={3}
             className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
@@ -309,14 +320,18 @@ export function NewTaskModal({
                     </button>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-start gap-2">
-                    <textarea
+                    <DictationTextarea
+                      field={`subtask-${i}`}
+                      dictation={dictation}
+                      dictateLabel={`Dictate subtask ${i + 1} details`}
                       placeholder="Details…"
                       aria-label={`Subtask ${i + 1} details`}
                       value={row.description}
-                      onChange={(e) => updateSubtask(i, "description", e.target.value)}
+                      onChange={(value) => updateSubtask(i, "description", value)}
                       disabled={disabled}
                       rows={2}
-                      className="w-full sm:flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+                      wrapperClassName="w-full sm:flex-1 min-w-0"
+                      className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
                     />
                     <input
                       type="date"

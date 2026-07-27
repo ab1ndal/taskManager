@@ -13,7 +13,7 @@ jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams
 import React from "react";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EditTaskModal, formatUpdateTime } from "./edit-task-modal";
+import { EditTaskModal, formatUpdateTime, formatUpdateTimestamp } from "./edit-task-modal";
 import {
   updateTask,
   getTaskUpdates,
@@ -229,6 +229,52 @@ describe("EditTaskModal — Updates", () => {
     );
 
     expect(await screen.findByText("Could not load updates")).toBeInTheDocument();
+  });
+
+  it("puts Subtasks above Updates — structure first, then the log", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    const headings = (await screen.findAllByRole("heading", { level: 4 })).map((h) => h.textContent);
+    expect(headings).toEqual(["Subtasks", "Updates"]);
+  });
+
+  it("gives each update an exact timestamp behind its relative label", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({
+      ok: true,
+      updates: [
+        { id: "u1", authorName: "Alice", createdAt: "2026-07-26T09:00:00Z", updateText: "Ordered it" },
+      ],
+    });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await screen.findByText("Ordered it");
+    const time = document.querySelector("time[dateTime='2026-07-26T09:00:00Z']");
+    // Without this, an update older than a day reads as a bare "Jul 26" with no time at all.
+    expect(time).toHaveAttribute("title", formatUpdateTimestamp("2026-07-26T09:00:00Z"));
+  });
+
+  it("lets the update list grow with the modal instead of scrolling inside its own box", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({
+      ok: true,
+      updates: [
+        { id: "u1", authorName: "Alice", createdAt: "2026-07-26T09:00:00Z", updateText: "Ordered it" },
+      ],
+    });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    const list = (await screen.findByText("Ordered it")).closest("ul");
+    // A 160px scroller nested inside a scrollable dialog put two scroll regions under one gesture.
+    expect(list?.className).not.toMatch(/max-h-40|overflow-y-auto/);
   });
 
   describe("dictation transcript handling", () => {
@@ -558,5 +604,19 @@ describe("formatUpdateTime", () => {
 
   it("returns an empty string rather than 'NaN' for an unparseable timestamp", () => {
     expect(formatUpdateTime("not a date", now)).toBe("");
+  });
+});
+
+describe("formatUpdateTimestamp", () => {
+  it("carries a clock time, which the relative label drops entirely past a day", () => {
+    const formatted = formatUpdateTimestamp("2026-07-26T12:34:00.000Z");
+    expect(formatted).toMatch(/Jul/);
+    expect(formatted).toMatch(/2026/);
+    // Locale and timezone decide the digits, so assert the shape rather than the value.
+    expect(formatted).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("returns an empty string rather than 'Invalid Date' for an unparseable timestamp", () => {
+    expect(formatUpdateTimestamp("not a date")).toBe("");
   });
 });
