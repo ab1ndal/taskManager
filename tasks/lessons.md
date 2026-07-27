@@ -100,17 +100,28 @@ both cases.
 **Rule:** treat `docs/db.md` as intent, not as a description of the live schema. Verify against
 `supabase/migrations/` before assuming an index exists.
 
-## L9 — This project's remote database has almost no CLI migration history
+## L9 — The PRODUCTION database has almost no CLI migration history
 
-Applied 2026-07-25. The hosted project is `xamdgvxziobpptcfymug` (task-manager). Migrations 001-006
-were applied out-of-band, so `supabase_migrations.schema_migrations` was **empty** until 007 was
-applied through the Supabase MCP server, which recorded a single row:
-`20260725220330 rls_security_definer`.
+Applies to `xamdgvxziobpptcfymug` (task-manager, production) **only** — not to `mcdpiuiayfljzvnhtqto`
+(task-manager-dev), which was created empty on 2026-07-27 and took all nine migrations through a
+clean `supabase db push`, so its history is complete. See L14 for which project is which.
 
-**Rule:** never run `supabase db push` here without first repairing the history — it would try to
-replay 001-006 against a schema that already has them. `supabase link` works, but `db push` needs
-`SUPABASE_DB_PASSWORD`: the CLI's passwordless login-role fallback fails on this project with
-"permission denied to alter role".
+Learned 2026-07-25. On production, migrations 001-006 were applied out-of-band, so
+`supabase_migrations.schema_migrations` was **empty** until 007 was applied through the Supabase MCP
+server, which recorded a single row: `20260725220330 rls_security_definer`.
+
+**Rule:** never run `supabase db push` against production without first repairing the history — it
+would try to replay 001-006 against a schema that already has them. `supabase link` works, but
+`db push` needs `SUPABASE_DB_PASSWORD`: the CLI's passwordless login-role fallback fails on this
+project with "permission denied to alter role".
+
+**This is not hypothetical any more.** `.github/workflows/deploy-migrations.yml` links
+`xamdgvxziobpptcfymug` and runs `supabase db push` on every push to `main` that touches
+`supabase/migrations/**`. Until the history is repaired, the first such push fails — 001 issues bare
+`create table`, so the run aborts rather than corrupting anything, but production migrations do not
+deploy. Repair with `supabase migration repair --status applied <version>` for each migration
+production already has, confirmed against `supabase migration list --linked`, before relying on that
+workflow.
 
 **How to verify DB behaviour without Docker or a password** — run SQL as the querying role:
 
@@ -210,30 +221,35 @@ afterwards (a collapsed subtask textarea, a 96px date input in Safari).
 contrast against what was actually painted — belongs in the Playwright suite under `e2e/`, not in
 jest. Use jest for logic, and do not let a green jsdom test stand in for a claim about layout.
 
-## L14 — There is one Supabase project, and the e2e suite writes to it
+## L14 — Two Supabase projects: which one each thing talks to
 
-**Learned:** 2026-07-27, phase 6.5 followups.
+**Established:** 2026-07-27, closing followup F2.
 
-`npm run test:e2e` and `npx playwright test` seed and delete rows in the hosted project
-`xamdgvxziobpptcfymug` — the same database the running app uses. There is no separate test project
-and no local stack (Docker is unavailable, per L9), and nothing in `e2e/fixtures.ts` refuses to run
-against a given URL.
+| Project | Ref | Reached by | Migrations arrive via |
+|---|---|---|---|
+| `task-manager` (production) | `xamdgvxziobpptcfymug` | deployed app only — Vercel/GitHub env vars, and `.env.production` locally | the `deploy-migrations` GitHub workflow on push to `main` |
+| `task-manager-dev` | `mcdpiuiayfljzvnhtqto` | `npm run dev`, all local work, and the whole e2e suite — via `.env.local` | `supabase db push` from a local checkout linked to this ref |
 
-The user has confirmed they are not keeping real tasks in it, so this is development data and a
-mistake there costs nothing irreplaceable. That is the reason the suite is safe to run, not a
-property of the suite.
+`task-manager-dev` mirrors production's schema; it is the only project a developer or a test run
+writes to. `.env.local` overrides `.env.production` in a production build too, so a local
+`next build && playwright test` reaches dev, not production — including the browser bundle, where
+`NEXT_PUBLIC_*` values are inlined at build time rather than read at runtime.
 
-What actually protects the data today:
+**The guard is an absence.** `E2E_SUPABASE_URL` lives only in `.env.local` and declares "this project
+is disposable". `e2e/fixtures.ts` refuses to build a client when it is unset or disagrees with
+`NEXT_PUBLIC_SUPABASE_URL`, so a run that picked up production env — CI, Vercel, `.env.production` —
+fails before it seeds. Verified by running with the production URL forced: the run aborts in global
+setup with "Refusing to run".
 
-- `teardown()` deletes by the workspace name `e2e-phase65 Household` and the two `e2e-phase65@…`
-  user emails. It never issues an unscoped delete.
-- `cleanupUiWrites()` removes the rows individual specs wrote through the UI, scoped to the seeded
-  workspace and to the `E2E `/`Filler ` markers.
-- Two concurrent runs still collide: `seed()` calls `teardown()` first, so a second run deletes the
-  first run's fixtures mid-test. Run the suite once at a time.
+Scoping still matters, because dev is shared with everyday local work: `teardown()` deletes only the
+`e2e-phase65 Household` workspace and the two `e2e-phase65@…` users, and `cleanupUiWrites()` deletes
+only rows carrying the `E2E `/`Filler ` markers inside that workspace. Two concurrent runs still
+collide — `seed()` calls `teardown()` first — so run the suite once at a time.
 
-**Rule:** anything a spec creates gets a marked, scoped delete — never a `delete()` filtered on
-anything less specific than the seeded workspace plus a marker. Before adding real data to this
-project, close followup F2 first: a separate test project, plus a refusal in `e2e/fixtures.ts` when
-`NEXT_PUBLIC_SUPABASE_URL` is not the designated test one. Today the guard is a convention; it needs
-to become a check.
+**Rule:** anything a spec creates gets a marked, scoped delete, never a filter looser than "seeded
+workspace plus marker". And keep `E2E_SUPABASE_URL` out of every environment except `.env.local` —
+adding it to CI or Vercel silently disarms the only thing standing between the suite and real data.
+
+**Gotcha for a second machine:** `supabase projects api-keys` prints the `sb_secret_…` key masked
+(41 chars, 401s on every request). Use the legacy `service_role` key, or copy the real secret from
+the dashboard.

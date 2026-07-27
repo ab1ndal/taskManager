@@ -83,7 +83,11 @@ now pushed to `origin`.
 
 ### Blockers/Concerns
 
-- Remote migration history holds only `20260725220330 rls_security_definer`; 001-006 were applied out-of-band. `supabase db push` would try to replay them (tasks/lessons.md L9)
+- **Production** migration history holds only `20260725220330 rls_security_definer`; 001-006 were
+  applied out-of-band, so `supabase db push` would try to replay them (tasks/lessons.md L9). This now
+  blocks `.github/workflows/deploy-migrations.yml`, which pushes to production on every migration
+  change landing on `main` — tracked as followup F14. `task-manager-dev` is unaffected: it took all
+  nine cleanly on 2026-07-27 and its history is complete.
 - No local Supabase stack: Docker unavailable, and `db push` needs `SUPABASE_DB_PASSWORD`. DB verification is done by running SQL as the `authenticated` role with `set local request.jwt.claims`
 - ~~`/tasks` has no redirect for signed-out users~~ — resolved 2026-07-27. The proxy existed but was
   never registered: Next resolves `proxy.ts` relative to the app dir, so a root-level file is ignored
@@ -112,9 +116,12 @@ now pushed to `origin`.
 
 ### Verification tooling
 
-- `npm run test:e2e` builds and runs `e2e/` against the hosted Supabase project. Global setup seeds a
-  throwaway workspace, two users and five tasks with the service-role key; teardown deletes all of
-  it. Never point it at production data — it deletes by the `e2e-phase65` tag and by workspace name.
+- `npm run test:e2e` builds and runs `e2e/` against **`task-manager-dev`** (`mcdpiuiayfljzvnhtqto`),
+  the second project created 2026-07-27. Production (`xamdgvxziobpptcfymug`) is reached only by a
+  deployment. Global setup seeds a workspace, two users and five tasks with the service-role key;
+  teardown deletes them by the `e2e-phase65` tag and by workspace name. `E2E_SUPABASE_URL` in
+  `.env.local` declares the project disposable, and `e2e/fixtures.ts` refuses to run without it —
+  see `tasks/lessons.md` L14.
 - The suite also holds screenshot baselines (`e2e/screenshots.spec.ts-snapshots/`), captured on
   chromium and the iPhone profile only. They are platform-suffixed, so a machine with different font
   rendering regenerates rather than inherits: `npx playwright test screenshots --update-snapshots`.

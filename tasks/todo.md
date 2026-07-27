@@ -36,15 +36,23 @@ in `STATE.md`'s blockers, and in `lessons.md` (L1–L11).
       rows behind by design and the iPhone project runs last, so it saw four projects' worth.
 - [x] **F1** — `main` pushed to `origin`.
 - [x] **F13** — `STATE.md` position block and progress counts refreshed.
+- [x] **F2** — the suite runs against a second project, `task-manager-dev`
+      (`mcdpiuiayfljzvnhtqto`), created and migrated 2026-07-27. `.env.local` points local
+      development and the suite at it; production is reached only by a deployment. The refusal in
+      `e2e/fixtures.ts` keys on `E2E_SUPABASE_URL`, which exists only in `.env.local` — verified by
+      forcing the production URL and watching the run abort before seeding. Full suite green against
+      the new project: 187 passed, 38 skipped.
 
 Verified: `npx tsc --noEmit` clean, 245 jest tests pass, full Playwright suite 187 passed /
 38 skipped (the screenshot specs skip on webkit and firefox by design).
 
 ## Open followups — full statement of each in `06.5-FOLLOWUPS.md`
 
-- **F2** — `npm run test:e2e` writes to the hosted Supabase project. Needs a separate test project
-  (or a local stack, blocked on Docker per L9) plus a refusal in `e2e/fixtures.ts` when the target
-  URL is not the designated test project. Highest-value item left.
+- **F14** — production's migration history holds only 007, and
+  `.github/workflows/deploy-migrations.yml` runs `supabase db push` against it on every migration
+  change landing on `main`. The first such push fails (it aborts on 001's bare `create table`, so
+  nothing is corrupted, but migrations stop deploying). Needs `migration list --linked` then
+  `migration repair --status applied` per already-applied migration. Highest-value item left.
 - **F10** — dictation and mic-permission denial still need a human in Chrome and Safari.
 - **F6** — reopening a parent leaves its subtasks completed. Deliberate; watch in real use.
 - **F11** — no service worker, so the installed app needs the network for every load. Decide whether
