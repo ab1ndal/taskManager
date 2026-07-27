@@ -28,10 +28,12 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
         setName("");
         setKind("household");
       } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "Failed to create workspace. Please try again.";
-        setFormError(msg);
-        toast("Failed to create workspace. Please try again.", "error");
+        // Inline only. This fires while the dialog is open, and a toast behind an open dialog is
+        // inert — the same reason the task modals report inline. Reporting both also told the user
+        // about one failure twice, in two different wordings.
+        setFormError(
+          err instanceof Error ? err.message : "Failed to create workspace. Please try again."
+        );
       }
     });
   };
@@ -61,16 +63,10 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {workspaces.map((ws, i) => (
-            <div
-              key={ws.id}
-              style={{ animationDelay: `${i * 30}ms` }}
-            >
-              <WorkspaceCard
-                workspace={ws}
-                initialJoined={joinedIds.has(ws.id)}
-              />
-            </div>
+          {/* The wrapper div existed only to carry a staggered animationDelay for an animation that
+              was never declared. */}
+          {workspaces.map((ws) => (
+            <WorkspaceCard key={ws.id} workspace={ws} initialJoined={joinedIds.has(ws.id)} />
           ))}
         </div>
       )}
