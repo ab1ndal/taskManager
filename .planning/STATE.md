@@ -77,14 +77,17 @@ All work has been landing directly on `main` (not a feature branch) since phase 
 
 - Remote migration history holds only `20260725220330 rls_security_definer`; 001-006 were applied out-of-band. `supabase db push` would try to replay them (tasks/lessons.md L9)
 - No local Supabase stack: Docker unavailable, and `db push` needs `SUPABASE_DB_PASSWORD`. DB verification is done by running SQL as the `authenticated` role with `set local request.jwt.claims`
-- `/tasks` has no redirect for signed-out users. Under RLS the page now renders empty rather than leaking, but there is still no middleware
+- ~~`/tasks` has no redirect for signed-out users~~ — resolved 2026-07-27. The proxy existed but was
+  never registered: Next resolves `proxy.ts` relative to the app dir, so a root-level file is ignored
+  when the app lives in `src/`. Moved to `src/proxy.ts`; both redirect directions are covered by
+  `e2e/auth-routing.spec.ts`
 - Leaked-password protection is disabled in Supabase Auth settings — dashboard toggle, Phase 04, still pending (deferred with the rest of 04-06)
 - Phase 04-06 real-device address-bar-collapse check (U7) still needs an actual phone — devtools/Playwright viewport emulation can't reproduce it
-- Phase 06 manual verification deliberately deferred 2026-07-26 (user's call). Its code is merged to
-  `main` (`bd23423`) with all seven checks in `06-VERIFICATION.md` unrun: dictation across
-  Chrome/Safari/Firefox, microphone permission denial, update and subtask persistence, and the
-  two-member author-name check. None are testable against a mock — they need real browsers. Phase 6.5
-  touches the same edit-modal surface, so run them before 6.5 is signed off, not after.
+- Phase 06 manual verification: mostly closed 2026-07-27 by the `e2e/` Playwright suite, which drives
+  the real signed-in app in Chromium, WebKit, Firefox and an iPhone profile. Update and subtask
+  persistence and the two-member author-name check now run automatically. Dictation and microphone
+  permission denial remain manual — Chromium's fake-device flags do not drive the Web Speech API,
+  which is a cloud service in Chrome and absent in Firefox.
 
 ### Resolved concerns
 
@@ -98,6 +101,12 @@ All work has been landing directly on `main` (not a feature branch) since phase 
   of toasting; a `<dialog>.showModal()` makes all other top-layer content (including popovers)
   inert, so a separate toast can never be interactive over an open modal. See
   `tasks/lessons.md` L11.
+
+### Verification tooling
+
+- `npm run test:e2e` builds and runs `e2e/` against the hosted Supabase project. Global setup seeds a
+  throwaway workspace, two users and five tasks with the service-role key; teardown deletes all of
+  it. Never point it at production data — it deletes by the `e2e-phase65` tag and by workspace name.
 
 ### Quick Tasks Completed
 
