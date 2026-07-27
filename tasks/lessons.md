@@ -34,9 +34,14 @@ of the admin client needs an authorization check above it and a comment saying w
 
 ## L3 — `NEXT_PUBLIC_` on a secret is a live hazard even when it isn't leaking yet
 
-`admin.ts` reads `NEXT_PUBLIC_SUPABASE_SECRET_KEY`. It is not currently in the browser bundle, since
-`admin.ts` is only imported from server files — but Next inlines any `NEXT_PUBLIC_` value into every
-bundle that references it, so one careless import publishes the service-role key to every visitor.
+`admin.ts` used to read `NEXT_PUBLIC_SUPABASE_SECRET_KEY`. It was never actually in the browser
+bundle, since `admin.ts` is only imported from server files — but Next inlines any `NEXT_PUBLIC_`
+value into every bundle that references it, so one careless import would have published the
+service-role key to every visitor.
+
+Renamed to `SUPABASE_SECRET_KEY` on 2026-07-25. The Vercel side of that rename was missed and only
+completed on 2026-07-27 — see L15. The key was rotated then, because it had carried the prefix for
+119 days.
 
 **Rule:** secrets never carry the `NEXT_PUBLIC_` prefix. Server-only modules get
 `import "server-only"` so a client import fails the build instead of leaking silently.
@@ -258,3 +263,47 @@ adding it to CI or Vercel silently disarms the only thing standing between the s
 **Gotcha for a second machine:** `supabase projects api-keys` prints the `sb_secret_…` key masked
 (41 chars, 401s on every request). Use the legacy `service_role` key, or copy the real secret from
 the dashboard.
+
+## L15 — An env var rename is only half done until every environment has it
+
+The 2026-07-25 rename of `NEXT_PUBLIC_SUPABASE_SECRET_KEY` to `SUPABASE_SECRET_KEY` was applied to
+`admin.ts`, `.env.example` and `.env.local`. Vercel kept the old name on Production, Preview and
+Development. Every `createAdminClient()` path therefore threw from that deploy until 2026-07-27:
+`/workspaces` rendered a bare Next error digest, and all twelve call sites in `tasks/actions.ts`
+returned "Something went wrong. Please try again."
+
+Local everything stayed green — tests, typecheck, build, e2e — because `.env.local` was correct. The
+failure existed only where the env differed, and nothing in the repo could detect it.
+
+Two things made it expensive to find. The generic catch in `actions.ts` made a permanent config error
+look transient, and it went unnoticed for two days because nobody had exercised an authenticated page
+on production since the deploy.
+
+**Rule:** renaming or adding a server env var means updating Vercel in the same change —
+`vercel env ls production --project task-manager --scope abhinav-bindals-projects` to see what is
+actually there, and remember env changes need a redeploy to take effect. When production behaves
+unlike local, read the Vercel runtime logs (`vercel logs <domain>`) before theorising; the digest in
+the browser error means nothing on its own, and the log line named the missing variable outright.
+
+## L16 — Supabase answers a duplicate signup with success, not an error
+
+`auth.signUp()` on an email that already has a confirmed account returns `error === null` and an
+obfuscated user object. No email is sent. This is deliberate anti-enumeration: the response is
+indistinguishable from a real signup so the form cannot be used to discover which addresses have
+accounts. Confirmed in the Supabase JS spec.
+
+Treating `error === null` as "signup succeeded" therefore tells the user to check mail that was never
+sent, with no route to recovery. That was the whole of F20 — reported as "the confirmation email never
+arrives", which sent the first look at SMTP, the wrong place.
+
+The only tell is `data.user.identities` being empty. `login-card.tsx` uses it to offer Sign in and
+Reset your password. That reveals the address is registered, which the owner accepted on 2026-07-27 for
+this personal app. The signal is not part of the documented contract, so the branch degrades to the
+generic message if a future auth-js stops emptying the array.
+
+Related: `signUp()` also needs an explicit `emailRedirectTo`. Without one the link inherits the
+project's Site URL — the app root, where nothing exchanges the `code` — so even a delivered link
+leaves the user signed out.
+
+**Rule:** for any Supabase auth call, ask what the deliberately-ambiguous response looks like before
+treating a null error as success.
