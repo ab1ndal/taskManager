@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { createWorkspace } from "./actions";
 import { toast } from "@/components/toaster";
 import { WorkspaceCard, type WorkspaceCardData } from "./workspace-card";
+import { Dialog } from "@/components/dialog";
 
 interface WorkspacesClientProps {
   workspaces: WorkspaceCardData[];
@@ -71,23 +72,28 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
         </div>
       )}
 
-      {/* Create Workspace Modal */}
+      {/*
+        Was a hand-rolled `fixed inset-0` overlay with a click-outside handler: no role="dialog",
+        no aria-modal, no focus trap, no Escape, no focus restore — none of the guarantees Phase 04
+        built into the shared Dialog, which is backed by a native <dialog>.showModal().
+      */}
       {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-scrim)]"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setModalOpen(false);
+        <Dialog
+          open={modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+            setFormError(null);
           }}
+          initialFocusSelector="#ws-name"
+          ariaLabelledBy="create-workspace-title"
+          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-login)] p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto backdrop:bg-[var(--color-scrim)]"
         >
-          <div
-            className="w-full max-w-sm mx-4 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] shadow-[var(--shadow-login)] p-6"
-            style={{
-              animation: "modal-in 150ms ease-out both",
-            }}
+          <h3
+            id="create-workspace-title"
+            className="text-base font-semibold text-[var(--color-text-primary)] mb-4"
           >
-            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-4">
-              Create Workspace
-            </h3>
+            Create Workspace
+          </h3>
             <form onSubmit={handleCreate} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label
@@ -131,8 +137,15 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                 </div>
               </div>
 
+              {/* --color-deadline-red was deleted with the old palette; this was resolving to
+                  nothing and rendering the error in the inherited text colour. */}
               {formError && (
-                <p className="text-xs text-[var(--color-deadline-red)]">{formError}</p>
+                <p
+                  role="alert"
+                  className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]"
+                >
+                  {formError}
+                </p>
               )}
 
               <div className="flex gap-2 justify-end pt-1">
@@ -148,12 +161,11 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                   disabled={isPending || !name.trim()}
                   className="text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
                 >
-                  {isPending ? "Creating..." : "Create"}
+                  {isPending ? "Creating…" : "Create"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Dialog>
       )}
     </>
   );
