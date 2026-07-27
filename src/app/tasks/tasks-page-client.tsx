@@ -113,7 +113,7 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2 px-2 py-[7px] rounded-sm text-sm font-medium ${
+      className={`flex items-center gap-2 min-h-11 px-2 rounded-sm text-sm font-medium ${
         active
           ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
           : "text-[var(--color-text-secondary)] hover:bg-[var(--color-accent-subtle)]/50"
@@ -198,7 +198,7 @@ export function TasksPageClient({
         <button
           onClick={() => setModalOpen(true)}
           disabled={!hasWorkspace}
-          className="shrink-0 whitespace-nowrap flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 whitespace-nowrap flex items-center gap-1 min-h-11 px-3 rounded-full text-sm font-medium bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           New task
@@ -247,7 +247,7 @@ export function TasksPageClient({
           <button
             onClick={() => setModalOpen(true)}
             disabled={!hasWorkspace}
-            className="mb-4 w-full flex items-center justify-center gap-1.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-on-accent)] text-sm font-medium rounded-sm py-[9px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mb-4 w-full flex items-center justify-center gap-1.5 min-h-11 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-on-accent)] text-sm font-medium rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             New task

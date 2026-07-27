@@ -26,7 +26,7 @@ export function CompletedSection({ tasks }: { tasks: CompletedTask[] }) {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex items-center gap-2 text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2 hover:text-[var(--color-text-secondary)] transition-colors"
+        className="flex items-center gap-2 min-h-11 text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
       >
         <ChevronRight
           size={ICON_SECONDARY}

@@ -25,14 +25,14 @@ export function NavUser({ name, email }: { name: string; email: string }) {
     <div className="flex items-center gap-3">
       <Link
         href="/profile"
-        className="hidden sm:inline text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors"
+        className="hidden sm:inline-flex items-center min-h-11 text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors"
       >
         {name || email}
       </Link>
       <Avatar name={name} email={email} size="sm" />
       <button
         onClick={handleLogout}
-        className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+        className="inline-flex items-center min-h-11 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
       >
         Sign out
       </button>

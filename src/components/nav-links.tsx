@@ -27,7 +27,9 @@ export function NavLinks() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`flex-shrink-0 text-sm font-medium transition-colors duration-150 ${
+            // A 20px-tall text link is a 20px touch target. The nav is 52px tall, so the full 44px
+            // minimum fits without changing how the bar looks.
+            className={`flex-shrink-0 inline-flex items-center min-h-11 text-sm font-medium transition-colors duration-150 ${
               active
                 ? "text-[var(--color-text-primary)]"
                 : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"

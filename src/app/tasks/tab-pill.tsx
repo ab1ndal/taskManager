@@ -22,7 +22,7 @@ export function TabPill({
   return (
     <Link
       href={href}
-      className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+      className={`shrink-0 inline-flex items-center min-h-11 whitespace-nowrap px-3 rounded-full text-sm font-medium transition-colors ${
         active
           ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
           : "text-[var(--color-text-secondary)] hover:bg-[var(--color-accent-subtle)]/50"
