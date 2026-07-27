@@ -3,6 +3,9 @@ jest.mock("./actions", () => ({
   getTaskUpdates: jest.fn(),
   addTaskUpdate: jest.fn(),
   addSubtask: jest.fn(),
+  completeTask: jest.fn(),
+  reopenTask: jest.fn(),
+  deleteTask: jest.fn(),
 }));
 jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 
@@ -10,7 +13,7 @@ import React from "react";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EditTaskModal, formatUpdateTime } from "./edit-task-modal";
-import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
+import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask, deleteTask } from "./actions";
 import type { RawTask } from "./bucket-tasks";
 
 beforeAll(() => {
@@ -381,6 +384,58 @@ describe("EditTaskModal — Subtasks", () => {
 
     await screen.findByText("Something went wrong");
     expect(screen.queryByText("Will fail")).not.toBeInTheDocument();
+  });
+
+  it("asks for confirmation before deleting a subtask", async () => {
+    const taskWithSubtasks = {
+      ...mockTask,
+      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }],
+    };
+
+    render(
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /delete "existing subtask"/i }));
+
+    expect(deleteTask).not.toHaveBeenCalled();
+    expect(screen.getByText(/Delete "Existing subtask"\?/)).toBeInTheDocument();
+    expect(screen.getByText("Existing subtask")).toBeInTheDocument();
+  });
+
+  it("deletes the subtask once the confirmation is accepted", async () => {
+    jest.mocked(deleteTask).mockResolvedValue({ ok: true });
+    const taskWithSubtasks = {
+      ...mockTask,
+      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }],
+    };
+
+    render(
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /delete "existing subtask"/i }));
+    await userEvent.click(screen.getByRole("button", { name: /confirm delete "existing subtask"/i }));
+
+    await waitFor(() => expect(deleteTask).toHaveBeenCalledWith("s1"));
+    expect(screen.queryByText("Existing subtask")).not.toBeInTheDocument();
+  });
+
+  it("leaves the subtask in place when the confirmation is cancelled", async () => {
+    const taskWithSubtasks = {
+      ...mockTask,
+      subtasks: [{ id: "s1", title: "Existing subtask", completed_at: null }],
+    };
+
+    render(
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /delete "existing subtask"/i }));
+    await userEvent.click(screen.getByRole("button", { name: /cancel delete/i }));
+
+    expect(deleteTask).not.toHaveBeenCalled();
+    expect(screen.getByText("Existing subtask")).toBeInTheDocument();
   });
 });
 

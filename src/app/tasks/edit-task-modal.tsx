@@ -15,12 +15,14 @@ import {
 import { updateTaskSchema, createTaskUpdateSchema, addSubtaskSchema } from "./schemas";
 import { toast } from "@/components/toaster";
 import { Dialog } from "@/components/dialog";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { useSpeechRecognition } from "@/lib/use-speech-recognition";
 import type { RawTask } from "./bucket-tasks";
 import type { TaskUpdate } from "./actions";
 
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
+type Subtask = RawTask["subtasks"][number];
 
 /**
  * Update timestamps are read at a glance to answer "is this recent?", which a full
@@ -74,6 +76,9 @@ export function EditTaskModal({
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [subtaskError, setSubtaskError] = useState("");
   const [subtaskPending, startSubtaskTransition] = useTransition();
+  // A subtask carries its own details and due date, so deleting one is the same destructive weight
+  // as deleting a task — it goes through the same confirmation rather than firing on first click.
+  const [subtaskToDelete, setSubtaskToDelete] = useState<Subtask | null>(null);
 
   // Reset during render (not in an effect) when the modal is pointed at a different task, so the
   // previous task's updates never render against the new one while the refetch is in flight.
@@ -148,8 +153,6 @@ export function EditTaskModal({
       setUpdates((prev) => prev.map((u) => (u.id === tempId ? result.update : u)));
     });
   }
-
-  type Subtask = { id: string; title: string; completed_at: string | null };
 
   /**
    * Optimistic, then reconciled: the row flips immediately and rolls back to its previous state if
@@ -477,7 +480,7 @@ export function EditTaskModal({
                 </span>
                 <button
                   type="button"
-                  onClick={() => removeSubtask(s)}
+                  onClick={() => setSubtaskToDelete(s)}
                   disabled={subtaskPending}
                   aria-label={`Delete "${s.title}"`}
                   className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger-text)] disabled:opacity-50 transition-colors"
@@ -512,6 +515,20 @@ export function EditTaskModal({
           </p>
         )}
       </section>
+
+      {/*
+        Nested inside the open edit modal on purpose: a second `showModal()` stacks above the first
+        in the top layer, so the confirmation is the topmost dialog and Escape dismisses only it.
+      */}
+      <DeleteConfirmDialog
+        open={subtaskToDelete !== null}
+        taskTitle={subtaskToDelete?.title ?? ""}
+        onConfirm={() => {
+          if (subtaskToDelete) removeSubtask(subtaskToDelete);
+          setSubtaskToDelete(null);
+        }}
+        onCancel={() => setSubtaskToDelete(null)}
+      />
     </Dialog>
   );
 }
