@@ -16,7 +16,9 @@ const config: Config = {
     "**/*.test.ts",
     "**/*.test.tsx",
   ],
-  testPathIgnorePatterns: ["/node_modules/", "/.next/"],
+  // e2e specs are `.spec.ts` and belong to Playwright — they import `@playwright/test`, which has
+  // no jsdom equivalent.
+  testPathIgnorePatterns: ["/node_modules/", "/.next/", "/e2e/"],
 };
 
 export default config;

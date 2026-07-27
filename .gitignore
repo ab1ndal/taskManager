@@ -13,3 +13,8 @@ supabase/.temp
 
 # Agent worktrees
 .claude/worktrees
+
+# Playwright
+e2e/.auth
+playwright-report
+test-results
