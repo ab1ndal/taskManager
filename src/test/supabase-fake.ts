@@ -154,9 +154,15 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
     if (this.orderBy) {
       const { column, ascending } = this.orderBy;
       result.sort((a, b) => {
-        const x = a[column] as number;
-        const y = b[column] as number;
-        return ascending ? x - y : y - x;
+        const x = a[column];
+        const y = b[column];
+        // Postgres orders text and timestamp columns too, so subtraction alone (NaN for strings,
+        // i.e. no reordering at all) would let a missing ORDER BY pass unnoticed in tests.
+        const delta =
+          typeof x === "number" && typeof y === "number"
+            ? x - y
+            : String(x).localeCompare(String(y));
+        return ascending ? delta : -delta;
       });
     }
     if (this.limitN !== null) result = result.slice(0, this.limitN);

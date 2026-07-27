@@ -47,6 +47,15 @@ export function EditTaskModal({
   const [subtaskError, setSubtaskError] = useState("");
   const [subtaskPending, startSubtaskTransition] = useTransition();
 
+  // Reset during render (not in an effect) when the modal is pointed at a different task, so the
+  // previous task's updates never render against the new one while the refetch is in flight.
+  const [loadedTaskId, setLoadedTaskId] = useState(task.id);
+  if (loadedTaskId !== task.id) {
+    setLoadedTaskId(task.id);
+    setUpdates([]);
+    setUpdatesLoadError("");
+  }
+
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -85,6 +94,11 @@ export function EditTaskModal({
       createdAt: new Date().toISOString(),
       updateText: parsed.data.updateText,
     };
+    // Submitting consumes the draft, so an in-flight dictation has nothing left to append to —
+    // and the mic button is disabled while the submit transition runs, which would leave the
+    // recognizer live with no way to stop it. End the session here instead.
+    if (speech.isListening) speech.stop();
+
     setUpdates((prev) => [...prev, optimisticUpdate]);
     dictationBaseRef.current = "";
     setUpdateDraft("");

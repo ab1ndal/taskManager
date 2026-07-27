@@ -228,7 +228,10 @@ describe("EditTaskModal — Updates", () => {
       onend: (() => void) | null = null;
       onerror: ((event: { error: string }) => void) | null = null;
       start = jest.fn();
-      stop = jest.fn(() => this.onend?.());
+      // Deferred like a real browser's `end` event, which fires after `stop()` has returned.
+      stop = jest.fn(() => {
+        queueMicrotask(() => this.onend?.());
+      });
     }
 
     let instance: MockSpeechRecognition | null = null;
@@ -265,6 +268,70 @@ describe("EditTaskModal — Updates", () => {
 
       expect(screen.getByPlaceholderText(/add an update/i)).toHaveValue("hello world today");
     });
+
+    it("ends the dictation session when the update is submitted", async () => {
+      jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+      jest.mocked(addTaskUpdate).mockResolvedValue({
+        ok: true,
+        update: { id: "u3", authorName: "Alice", createdAt: "2026-07-26T12:00:00Z", updateText: "dictated text" },
+      });
+
+      render(
+        <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+      );
+
+      await screen.findByPlaceholderText(/add an update/i);
+      await userEvent.click(screen.getByRole("button", { name: /dictate update/i }));
+      await act(async () => fireResult("dictated text", true));
+
+      await userEvent.click(screen.getByRole("button", { name: /^add update$/i }));
+
+      // Otherwise the recognizer keeps running against a draft that has already been submitted,
+      // while the mic button is disabled by the in-flight transition and cannot stop it.
+      expect(instance!.stop).toHaveBeenCalled();
+      expect(await screen.findByRole("button", { name: /dictate update/i })).toBeInTheDocument();
+    });
+  });
+
+  it("drops the previous task's updates when the modal switches to a different task", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({
+      ok: true,
+      updates: [
+        { id: "u1", authorName: "Alice", createdAt: "2026-07-26T09:00:00Z", updateText: "First task update" },
+      ],
+    });
+
+    const { rerender } = render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+    await screen.findByText("First task update");
+
+    // Second task's updates never resolve, so the only thing that can clear the first task's list
+    // is the switch itself.
+    jest.mocked(getTaskUpdates).mockReturnValue(new Promise(() => {}));
+    const otherTask = { ...mockTask, id: "c0000000-0000-4000-8000-000000000002", title: "Other task" };
+    rerender(
+      <EditTaskModal open task={otherTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    expect(screen.queryByText("First task update")).not.toBeInTheDocument();
+  });
+
+  it("clears a previous load error when the modal switches to a different task", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: false, error: "Could not load updates" });
+
+    const { rerender } = render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+    await screen.findByText("Could not load updates");
+
+    jest.mocked(getTaskUpdates).mockReturnValue(new Promise(() => {}));
+    const otherTask = { ...mockTask, id: "c0000000-0000-4000-8000-000000000002", title: "Other task" };
+    rerender(
+      <EditTaskModal open task={otherTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    expect(screen.queryByText("Could not load updates")).not.toBeInTheDocument();
   });
 });
 

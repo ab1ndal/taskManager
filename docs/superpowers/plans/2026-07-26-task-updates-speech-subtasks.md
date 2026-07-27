@@ -1329,6 +1329,19 @@ afterwards`) failed under the async mock before the fix and pass after it. This 
 `stop()` / `abort()` directly, never from the `end` handler, which is reserved for deciding whether
 to auto-restart. Original write-up follows.
 
+Three smaller findings from the same re-review were fixed alongside it:
+
+- **Dictation outlived its draft.** `handleAddUpdate` cleared the draft but left the recognizer
+  running, and the mic button is disabled for the duration of the submit transition, so there was
+  no way to stop it. Submitting now ends the session.
+- **Updates leaked across tasks.** The modal stays mounted between tasks, so the previous task's
+  updates rendered against the new one until its fetch resolved. `updates` / `updatesLoadError` now
+  reset during render when `task.id` changes.
+- **`getTaskUpdates` re-sorted in JS** what the SQL `ORDER BY created_at` already ordered. Removed.
+  The redundancy was load-bearing only for the test fake, whose `order()` compared with `x - y`
+  (`NaN` for timestamp strings, so it never reordered); the fake now compares strings
+  lexicographically, which is what caught this.
+
 ## Known Issue (parked during final-review fix loop, then fixed — see above)
 
 `useSpeechRecognition`'s `stop()` (`src/lib/use-speech-recognition.ts`) does not itself call

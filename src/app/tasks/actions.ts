@@ -395,9 +395,7 @@ export async function getTaskUpdates(rawTaskId: string): Promise<ActionResult<{ 
 
     assertNoError("load updates", { error: updatesError });
 
-    const sortedRows = (rows ?? []).sort((a, b) =>
-      (a.created_at as string).localeCompare(b.created_at as string)
-    );
+    const sortedRows = rows ?? [];
 
     const memberIds = [...new Set(sortedRows.map((r) => r.member_id as string))];
 
