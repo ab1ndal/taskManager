@@ -5,10 +5,24 @@ import { X } from "lucide-react";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 
 type Toast = {
-  id: number;
+  id: string;
   message: string;
   type: "success" | "warning" | "error";
 };
+
+/**
+ * Errors linger far longer than confirmations — they carry something the user has to read and act
+ * on — but they no longer stay forever. An error that only the close button could clear meant a
+ * failed action from ten minutes ago was still stacked on screen.
+ */
+const DISMISS_MS: Record<Toast["type"], number> = {
+  success: 3500,
+  warning: 6000,
+  error: 10000,
+};
+
+/** Beyond this, the oldest toast in a lane is dropped rather than growing the stack off-screen. */
+const MAX_PER_LANE = 3;
 
 // Call from any client component: toast("message") or toast("message", "error") or toast("message", "warning")
 export function toast(message: string, type: "success" | "warning" | "error" = "success") {
@@ -38,21 +52,29 @@ export function Toaster() {
   const [assertiveToasts, setAssertiveToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
+    const timers = new Set<ReturnType<typeof setTimeout>>();
+
     function handler(e: Event) {
       const { message, type } = (e as CustomEvent<{ message: string; type: Toast["type"] }>).detail;
-      const id = Date.now();
-      if (type === "error") {
-        setAssertiveToasts((prev) => [...prev, { id, message, type }]);
-        return;
-      }
-      setPoliteToasts((prev) => [...prev, { id, message, type }]);
-      setTimeout(
-        () => setPoliteToasts((prev) => prev.filter((t) => t.id !== id)),
-        3500
-      );
+      // Was `Date.now()`, which collides when two toasts fire in the same millisecond — two React
+      // children with the same key.
+      const id = crypto.randomUUID();
+      const setLane = type === "error" ? setAssertiveToasts : setPoliteToasts;
+
+      setLane((prev) => [...prev, { id, message, type }].slice(-MAX_PER_LANE));
+
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        setLane((prev) => prev.filter((t) => t.id !== id));
+      }, DISMISS_MS[type]);
+      timers.add(timer);
     }
+
     window.addEventListener("app:toast", handler);
-    return () => window.removeEventListener("app:toast", handler);
+    return () => {
+      window.removeEventListener("app:toast", handler);
+      timers.forEach(clearTimeout);
+    };
   }, []);
 
   return (

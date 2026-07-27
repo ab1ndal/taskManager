@@ -65,21 +65,41 @@ describe("Toaster", () => {
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
   });
 
-  it("does not auto-dismiss an error toast", () => {
+  it("keeps an error toast well past the success lifetime, then dismisses it", () => {
     render(<Toaster />);
 
     act(() => {
       toast("Failed to save", "error");
     });
 
+    // Still present long after a success toast would have gone — an error carries something the
+    // user has to read and act on.
     act(() => {
       jest.advanceTimersByTime(3500);
     });
+    expect(screen.getByRole("alert")).toHaveTextContent("Failed to save");
+
+    // But it does not stay forever. Before this it could only be cleared by its close button, so a
+    // failure from ten minutes ago was still stacked on screen.
     act(() => {
-      jest.advanceTimersByTime(60000);
+      jest.advanceTimersByTime(10000);
+    });
+    expect(screen.getByRole("alert")).toBeEmptyDOMElement();
+  });
+
+  it("caps each lane so a burst of toasts cannot grow off-screen", () => {
+    render(<Toaster />);
+
+    act(() => {
+      toast("First", "error");
+      toast("Second", "error");
+      toast("Third", "error");
+      toast("Fourth", "error");
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Failed to save");
+    const lane = screen.getByRole("alert");
+    expect(lane).not.toHaveTextContent("First");
+    expect(lane).toHaveTextContent("Fourth");
   });
 
   it("renders a 44px dismiss button with a type-scoped aria-label that removes the toast on click", () => {
