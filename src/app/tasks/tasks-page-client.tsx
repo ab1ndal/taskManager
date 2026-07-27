@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { Briefcase, House, LayoutGrid, ListTodo, Plus, Users } from "lucide-react";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
@@ -141,6 +142,7 @@ export function TasksPageClient({
   initialTasks: RawTask[];
   userName?: string;
 }) {
+  const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [localTasks, setLocalTasks] = useState<RawTask[]>(initialTasks);
   const [optimisticTaskIds, setOptimisticTaskIds] = useState<Set<string>>(new Set());
@@ -184,6 +186,10 @@ export function TasksPageClient({
 
   const { overdue, today, upcoming, completed } = bucketTasks(filtered);
   const hasAnyTasks = overdue.length + today.length + upcoming.length + completed.length > 0;
+  // `hasAnyTasks` is computed from the *filtered* list, so an empty "Shared" tab used to render the
+  // same "No tasks yet. Add one to get started." as a genuinely empty account. Distinguish them.
+  const isFiltered = Boolean(workspaceFilter || viewFilter);
+  const emptyVariant = !hasAnyTasks && isFiltered && localTasks.length > 0 ? "no-matches" : "no-tasks";
 
   return (
     <>
@@ -230,8 +236,12 @@ export function TasksPageClient({
         />
       )}
 
-      {/* Main layout */}
-      <div className="flex min-h-dvh">
+      {/*
+        Height is the viewport minus the nav, not a full dvh. `min-h-dvh` sat below a 52px nav
+        inside a padded wrapper, so the page always overflowed by at least the nav height plus the
+        padding — even with no tasks — and the sidebar's last item fell below the fold.
+      */}
+      <div className="flex min-h-[calc(100dvh-var(--nav-height))]">
         {/* Sidebar — medium screens and up */}
         <aside className="hidden md:flex w-[200px] flex-col bg-[var(--color-surface)] border-r border-[var(--color-border)] p-3 flex-shrink-0">
           <button
@@ -307,7 +317,10 @@ export function TasksPageClient({
           )}
 
           {!hasAnyTasks ? (
-            <EmptyState />
+            <EmptyState
+              variant={emptyVariant}
+              onClearFilter={emptyVariant === "no-matches" ? () => router.push("/tasks") : undefined}
+            />
           ) : (
             <>
               <DragDropContext

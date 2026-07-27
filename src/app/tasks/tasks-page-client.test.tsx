@@ -33,7 +33,11 @@ jest.mock("@/components/task-card", () => ({
 
 jest.mock("next/link", () => ({ __esModule: true, default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 
-jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSearchParams()) }));
+const pushMock = jest.fn();
+jest.mock("next/navigation", () => ({
+  useSearchParams: jest.fn(() => new URLSearchParams()),
+  useRouter: jest.fn(() => ({ push: pushMock })),
+}));
 
 const workspaces = [
   {

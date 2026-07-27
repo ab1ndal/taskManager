@@ -72,7 +72,7 @@ export function TaskCard({
 
   return (
     <div
-      className={`bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-4 py-3 transition-opacity ${pending ? "opacity-40" : ""}`}
+      className={`group bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-4 py-3 transition-opacity ${pending ? "opacity-40" : ""}`}
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       <div className="flex items-center gap-3">
@@ -121,11 +121,18 @@ export function TaskCard({
           </div>
         </div>
 
+        {/*
+          Edit and delete stay rendered at every viewport rather than appearing on hover: hover is
+          not available on touch, and hiding a destructive action behind it makes the row's
+          capabilities undiscoverable. They are de-emphasised instead — dimmed until the row is
+          hovered or something inside it takes focus — so four grey glyphs stop competing with the
+          task title while remaining tappable and visible to a keyboard user the moment they arrive.
+        */}
         {!completed && onEdit && (
           <button
             onClick={onEdit}
             aria-label={`Edit "${title}"`}
-            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-accent)] transition-[opacity,color]"
           >
             <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>
@@ -135,7 +142,7 @@ export function TaskCard({
           <button
             onClick={() => setDeleteConfirmOpen(true)}
             aria-label={`Delete "${title}"`}
-            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger-text)] transition-colors"
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-danger-text)] transition-[opacity,color]"
           >
             <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>
@@ -152,9 +159,16 @@ export function TaskCard({
         }}
       />
 
-      {/* Subtasks */}
+      {/*
+        The old `ml-7` put each subtask's mark at an arbitrary offset, reading as a floating dot
+        rather than a nested item. `ml-11` is the width of one control, so the subtask toggles line
+        up directly under the parent's complete button and the nesting is legible as a column.
+
+        The button stays a full 44x44 despite holding a 16px glyph. Phase 04 established that
+        minimum and it is the one thing here not to trade for tighter rhythm.
+      */}
       {(subtasks ?? []).length > 0 && (
-        <div className="mt-2 ml-7 flex flex-col gap-1">
+        <div className="mt-1 ml-11 flex flex-col">
           {(subtasks ?? []).map((sub) => (
             <div key={sub.id} className="flex items-center gap-2">
               <button
@@ -187,7 +201,18 @@ export function TaskCard({
   );
 }
 
-export function EmptyState() {
+/**
+ * Two different nothings. `variant="no-tasks"` means the user genuinely has none and the useful
+ * thing to say is "add one". `variant="no-matches"` means a filter emptied the list — telling that
+ * user to add a task is wrong, so they get a way back to the full list instead.
+ */
+export function EmptyState({
+  variant = "no-tasks",
+  onClearFilter,
+}: {
+  variant?: "no-tasks" | "no-matches";
+  onClearFilter?: () => void;
+} = {}) {
   return (
     <div className="flex flex-col items-center gap-3 py-16 text-center">
       <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">
@@ -204,11 +229,30 @@ export function EmptyState() {
         <path d="M24 46h16" stroke="var(--color-border)" strokeWidth="2" strokeLinecap="round" />
         <path d="M27 51h10" stroke="var(--color-border)" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
-      <p className="text-sm text-[var(--color-text-muted)]">
-        No tasks yet.
-        <br />
-        Add one to get started.
-      </p>
+      {variant === "no-tasks" ? (
+        <p className="text-sm text-[var(--color-text-muted)]">
+          No tasks yet.
+          <br />
+          Add one to get started.
+        </p>
+      ) : (
+        <>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            Nothing matches this view.
+            <br />
+            Your other tasks are still here.
+          </p>
+          {onClearFilter && (
+            <button
+              type="button"
+              onClick={onClearFilter}
+              className="text-sm font-medium text-[var(--color-accent)] hover:underline"
+            >
+              Show all tasks
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
