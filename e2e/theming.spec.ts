@@ -132,8 +132,10 @@ const SURFACES = [
       }
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible();
-      // Wait for the update thread so its timestamps and author names are measured too.
-      await expect(dialog.getByText("Second Member").first()).toBeVisible();
+      // Waited on by update text, not the author name: "Second Member" is also an assignee
+      // checkbox label, so it is present before the thread has loaded and would let the walk run
+      // without ever measuring an update's own timestamp and author.
+      await expect(dialog.getByText("Bins were collected early today.")).toBeVisible();
     },
   },
   {
