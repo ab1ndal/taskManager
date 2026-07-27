@@ -134,6 +134,48 @@ describe("useSpeechRecognition", () => {
     expect(result.current.error).toBe("InvalidStateError: recognition already started");
   });
 
+  it("allows starting a second session after stop() — does not silently no-op", () => {
+    let instanceCount = 0;
+    let lastInstance: MockSpeechRecognition | null = null;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instanceCount++;
+      lastInstance = new MockSpeechRecognition();
+      return lastInstance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+
+    act(() => result.current.start());
+    expect(instanceCount).toBe(1);
+    expect(result.current.isListening).toBe(true);
+
+    act(() => result.current.stop());
+    expect(result.current.isListening).toBe(false);
+
+    act(() => result.current.start());
+    expect(instanceCount).toBe(2);
+    expect(result.current.isListening).toBe(true);
+  });
+
+  it("treats a not-allowed error as terminal and does not loop-restart via onend", () => {
+    let instance: MockSpeechRecognition | null = null;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instance = new MockSpeechRecognition();
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+    act(() => result.current.start());
+    instance!.start.mockClear();
+
+    act(() => instance!.onerror?.({ error: "not-allowed" }));
+    act(() => instance!.onend?.());
+
+    expect(instance!.start).not.toHaveBeenCalled();
+    expect(result.current.isListening).toBe(false);
+    expect(result.current.error).toBe("Microphone access was denied");
+  });
+
   it("does not set isListening when the initial start() call throws", () => {
     let instance: MockSpeechRecognition | null = null;
     (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {

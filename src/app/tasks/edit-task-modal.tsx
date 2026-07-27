@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
 import { updateTaskSchema, createTaskUpdateSchema, addSubtaskSchema } from "./schemas";
 import { toast } from "@/components/toaster";
@@ -33,9 +33,14 @@ export function EditTaskModal({
   const [formError, setFormError] = useState("");
 
   const [updates, setUpdates] = useState<TaskUpdate[]>([]);
+  const [updatesLoadError, setUpdatesLoadError] = useState("");
   const [updateDraft, setUpdateDraft] = useState("");
   const [updateError, setUpdateError] = useState("");
   const [updatesPending, startUpdateTransition] = useTransition();
+  // Text committed before the current dictation utterance started. Each SpeechRecognition
+  // interim/final event carries the FULL transcript for the utterance so far, not a delta, so the
+  // draft is rendered as `base + live utterance text` rather than accumulated across events.
+  const dictationBaseRef = useRef("");
 
   const [subtasks, setSubtasks] = useState(task.subtasks);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -46,7 +51,9 @@ export function EditTaskModal({
     if (!open) return;
     let cancelled = false;
     getTaskUpdates(task.id).then((result) => {
-      if (!cancelled && result.ok) setUpdates(result.updates);
+      if (cancelled) return;
+      if (result.ok) setUpdates(result.updates);
+      else setUpdatesLoadError(result.error);
     });
     return () => {
       cancelled = true;
@@ -54,7 +61,13 @@ export function EditTaskModal({
   }, [open, task.id]);
 
   const speech = useSpeechRecognition((transcript, isFinal) => {
-    setUpdateDraft((prev) => (isFinal ? `${prev}${transcript} ` : prev.replace(/\s*$/, "") + " " + transcript));
+    // `transcript` is the FULL text of the current utterance so far, not a delta — so it replaces
+    // (rather than appends to) whatever the previous event in this utterance rendered. Only a
+    // final result gets folded into the committed base.
+    const base = dictationBaseRef.current;
+    const combined = base ? `${base} ${transcript}` : transcript;
+    if (isFinal) dictationBaseRef.current = combined;
+    setUpdateDraft(combined);
   });
 
   function handleAddUpdate() {
@@ -73,6 +86,7 @@ export function EditTaskModal({
       updateText: parsed.data.updateText,
     };
     setUpdates((prev) => [...prev, optimisticUpdate]);
+    dictationBaseRef.current = "";
     setUpdateDraft("");
 
     startUpdateTransition(async () => {
@@ -237,6 +251,11 @@ export function EditTaskModal({
 
       <div className="mt-6 border-t border-[var(--color-border)] pt-4">
         <h4 className="text-sm font-semibold mb-2">Updates</h4>
+        {updatesLoadError && (
+          <p role="alert" className="mb-2 rounded-[8px] bg-red-50 px-3 py-2 text-sm text-red-600">
+            {updatesLoadError}
+          </p>
+        )}
         <ul className="flex flex-col gap-2 mb-3 max-h-40 overflow-y-auto">
           {updates.map((u) => (
             <li key={u.id} className="text-sm">
@@ -252,7 +271,10 @@ export function EditTaskModal({
           <textarea
             placeholder="Add an update…"
             value={updateDraft}
-            onChange={(e) => setUpdateDraft(e.target.value)}
+            onChange={(e) => {
+              dictationBaseRef.current = e.target.value;
+              setUpdateDraft(e.target.value);
+            }}
             disabled={updatesPending}
             rows={2}
             className="flex-1 border border-[var(--color-border)] rounded-[8px] px-3 py-2 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] resize-none disabled:opacity-50"

@@ -7,7 +7,7 @@ jest.mock("./actions", () => ({
 jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 
 import React from "react";
-import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EditTaskModal } from "./edit-task-modal";
 import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
@@ -208,6 +208,63 @@ describe("EditTaskModal — Updates", () => {
 
     await screen.findByPlaceholderText(/add an update/i);
     expect(screen.queryByRole("button", { name: /dictate/i })).not.toBeInTheDocument();
+  });
+
+  it("shows an inline error when loading updates fails, instead of rendering silently as empty", async () => {
+    jest.mocked(getTaskUpdates).mockResolvedValue({ ok: false, error: "Could not load updates" });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+    );
+
+    expect(await screen.findByText("Could not load updates")).toBeInTheDocument();
+  });
+
+  describe("dictation transcript handling", () => {
+    class MockSpeechRecognition {
+      continuous = false;
+      interimResults = false;
+      onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: { error: string }) => void) | null = null;
+      start = jest.fn();
+      stop = jest.fn(() => this.onend?.());
+    }
+
+    let instance: MockSpeechRecognition | null = null;
+
+    beforeEach(() => {
+      instance = null;
+      (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+        instance = new MockSpeechRecognition();
+        return instance;
+      });
+    });
+
+    afterEach(() => {
+      delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
+    });
+
+    function fireResult(transcript: string, isFinal: boolean) {
+      instance!.onresult?.({ results: [{ 0: { transcript }, isFinal }] });
+    }
+
+    it("replaces (not appends) interim transcripts, committing only the final result to the draft", async () => {
+      jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
+
+      render(
+        <EditTaskModal open task={mockTask} workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />
+      );
+
+      await screen.findByPlaceholderText(/add an update/i);
+      await userEvent.click(screen.getByRole("button", { name: /dictate update/i }));
+
+      await act(async () => fireResult("hello", false));
+      await act(async () => fireResult("hello world", false));
+      await act(async () => fireResult("hello world today", true));
+
+      expect(screen.getByPlaceholderText(/add an update/i)).toHaveValue("hello world today");
+    });
   });
 });
 

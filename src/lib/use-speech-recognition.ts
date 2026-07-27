@@ -76,7 +76,25 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
     };
 
     recognition.onerror = (event) => {
-      if (event.error === "not-allowed") setError("Microphone access was denied");
+      // Terminal errors: no retry can succeed (permission denied, or no mic to capture from), so
+      // mark this as a user-stopped session up front — otherwise onend's restart branch fires
+      // immediately after, fails the same way, and loops forever.
+      if (
+        event.error === "not-allowed" ||
+        event.error === "service-not-allowed" ||
+        event.error === "audio-capture"
+      ) {
+        stoppedByUserRef.current = true;
+        setIsListening(false);
+      }
+
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setError("Microphone access was denied");
+      } else if (event.error === "audio-capture") {
+        setError("No microphone was found");
+      } else {
+        setError(`Speech recognition error: ${event.error}`);
+      }
     };
 
     recognition.onend = () => {
@@ -88,6 +106,7 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
         }
         return;
       }
+      recognitionRef.current = null;
       setIsListening(false);
     };
 
@@ -105,6 +124,7 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
   const stop = useCallback(() => {
     stoppedByUserRef.current = true;
     recognitionRef.current?.stop();
+    recognitionRef.current = null;
   }, []);
 
   useEffect(() => {
