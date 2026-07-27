@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { cleanupUiWrites } from "./fixtures";
 
 /**
  * Both lists render optimistically, so the row appears before the write lands. Reloading on the
@@ -39,7 +40,15 @@ function serverAction(page: Page, marker: string) {
  *
  * Dictation itself still needs a human — Chromium's fake-device flags do not drive the Web Speech
  * API, which is a cloud service in Chrome and absent in Firefox.
+ *
+ * These are the only specs that leave rows behind: asserting persistence means writing something
+ * that persists. They clean up after themselves so the specs that run later — the screenshot
+ * baselines above all — see the fixtures global setup created and nothing else.
  */
+
+test.afterAll(async () => {
+  await cleanupUiWrites();
+});
 
 test("an update posted in the edit modal persists across a reload", async ({ page }) => {
   await page.goto("/tasks");

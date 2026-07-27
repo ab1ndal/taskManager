@@ -189,6 +189,48 @@ export async function seed(): Promise<SeedResult> {
 }
 
 /**
+ * Removes the rows a spec wrote through the UI, leaving the seeded fixtures exactly as `seed` left
+ * them. Specs that assert persistence necessarily create rows, and those rows are then visible to
+ * every spec that runs after them — which is how the screenshot baselines failed in a full run
+ * while passing on their own: the iPhone project runs last and saw four projects' worth of extra
+ * subtasks and updates.
+ *
+ * Scoped to the seeded workspace and to the markers those specs use, so it cannot reach anything
+ * else even if the prefixes ever appear elsewhere.
+ */
+export async function cleanupUiWrites(): Promise<void> {
+  const admin = adminClient();
+
+  const { data: ws } = await admin.from("workspaces").select("id").eq("name", WORKSPACE_NAME);
+  const workspaceIds = (ws ?? []).map((w) => w.id);
+  if (!workspaceIds.length) return;
+
+  const { data: tasks } = await admin
+    .from("tasks")
+    .select("id")
+    .in("workspace_id", workspaceIds);
+  const taskIds = (tasks ?? []).map((t) => t.id);
+
+  if (taskIds.length) {
+    for (const prefix of ["E2E update", "Filler"]) {
+      const { error } = await admin
+        .from("task_updates")
+        .delete()
+        .in("task_id", taskIds)
+        .like("update_text", `${prefix}%`);
+      if (error) throw error;
+    }
+  }
+
+  const { error: taskErr } = await admin
+    .from("tasks")
+    .delete()
+    .in("workspace_id", workspaceIds)
+    .like("title", "E2E subtask%");
+  if (taskErr) throw taskErr;
+}
+
+/**
  * Deletes only what the harness created. Workspace delete cascades to members, tasks, assignments
  * and updates; the auth users are removed separately since they are not owned by the workspace.
  */
