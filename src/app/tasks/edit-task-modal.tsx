@@ -414,14 +414,14 @@ export function EditTaskModal({
               type="button"
               onClick={onClose}
               disabled={pending}
-              className="px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
+              className="min-h-11 px-4 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || selectedMemberIds.length === 0 || pending}
-              className="px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="min-h-11 px-4 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Save
             </button>
@@ -431,9 +431,14 @@ export function EditTaskModal({
       {/*
         Updates and Subtasks write the moment their button is pressed, while everything above is
         staged behind Save. Nothing used to mark that difference, so Cancel looked like it would
-        undo a posted update. They now sit on the sunken surface with an explicit note.
+        undo a posted update. The per-section "Saves immediately" / "Posts immediately" note carries
+        that on its own — these sat on the sunken surface as well until 2026-07-27, which read as a
+        heavy lavender box against the rest of the form.
+
+        The separation is now structural rather than a fill: a hairline rule and a heading open each
+        section, which reads as hierarchy instead of as two competing panels.
       */}
-      <section className="mt-6 rounded-md bg-[var(--color-surface-sunken)] p-3">
+      <section className="mt-6 border-t border-[var(--color-border)] pt-5">
         <div className="flex items-baseline justify-between gap-2 mb-2">
           <h4 className="text-sm font-semibold">Subtasks</h4>
           <p className="text-2xs text-[var(--color-text-muted)]">Saves immediately</p>
@@ -634,7 +639,7 @@ export function EditTaskModal({
         160px inner scroller nested inside a scrollable dialog — two scroll regions competing for
         the same gesture — so it now runs at full height and scrolls with the modal body.
       */}
-      <section className="mt-4 rounded-md bg-[var(--color-surface-sunken)] p-3">
+      <section className="mt-6 border-t border-[var(--color-border)] pt-5">
         <div className="flex items-baseline justify-between gap-2 mb-2">
           <h4 className="text-sm font-semibold">Updates</h4>
           <p className="text-2xs text-[var(--color-text-muted)]">Posts immediately</p>

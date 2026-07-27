@@ -30,9 +30,12 @@
   --color-text-secondary: #6b6878;
   /*
    * Darkened from #726f80, which cleared 4.5:1 on --color-bg and --color-surface but came out at
-   * 4.39:1 on --color-surface-sunken — the panel behind the Updates and Subtasks sections. The
+   * 4.39:1 on --color-surface-sunken — then the panel behind the Updates and Subtasks sections. The
    * contrast walk only ever ran on /tasks with no dialog open, so the sunken surface was never
    * measured. It now clears AA on all three light surfaces (4.73:1 on the sunken one).
+   *
+   * Those two panels lost their fill on 2026-07-27, so --color-surface-sunken is currently unused by
+   * any component. Kept as a token, and the darker muted text kept with it — it clears AA either way.
    */
   --color-text-muted: #6d6a7b;
   /*

@@ -83,8 +83,9 @@ async function contrastFailures(page: Page): Promise<string[]> {
 
 /**
  * The walk used to run on `/tasks` only, and never with a dialog open — which is exactly where
- * `--color-surface-sunken` and the status tokens are used. Each surface below is measured in both
- * schemes.
+ * `--color-surface-sunken` was used, alongside the status tokens. That fill is gone as of
+ * 2026-07-27, but the dialogs stay on the list: they hold the densest text in the app. Each surface
+ * below is measured in both schemes.
  *
  * `/login` needs a signed-out context: the proxy redirects a signed-in user away from it.
  */
