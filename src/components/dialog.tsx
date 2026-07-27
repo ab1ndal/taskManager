@@ -33,8 +33,21 @@ export function Dialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Where the press started. A click on a native <dialog> reports the dialog element as its target
+  // both for a real backdrop click and for the end of a text selection that began in a field and
+  // released over the dialog's own padding — so the click target alone cannot tell them apart, and
+  // selecting text to copy used to dismiss the modal. Requiring the press and the release to have
+  // both landed on the dialog separates the two.
+  const pressTarget = useRef<EventTarget | null>(null);
+
+  const handleMouseDown = (event: React.MouseEvent<HTMLDialogElement>) => {
+    pressTarget.current = event.target;
+  };
+
   const handleBackdropClick = (event: React.MouseEvent<HTMLDialogElement>) => {
-    if (event.target === dialogRef.current) {
+    const startedOnDialog = pressTarget.current === dialogRef.current;
+    pressTarget.current = null;
+    if (event.target === dialogRef.current && startedOnDialog) {
       onClose();
     }
   };
@@ -43,6 +56,7 @@ export function Dialog({
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onMouseDown={handleMouseDown}
       onClick={handleBackdropClick}
       aria-labelledby={ariaLabelledBy}
       className={

@@ -65,6 +65,8 @@ describe("Dialog", () => {
       </Dialog>
     );
     const dialogEl = screen.getByRole("dialog", { hidden: true });
+    // A real backdrop click presses and releases on the dialog itself.
+    fireEvent.mouseDown(dialogEl);
     fireEvent.click(dialogEl);
     expect(onClose).toHaveBeenCalled();
   });
@@ -76,6 +78,37 @@ describe("Dialog", () => {
         <h3 id="dialog-title">Title</h3>
       </Dialog>
     );
+    fireEvent.mouseDown(screen.getByText("Title"));
+    fireEvent.click(screen.getByText("Title"));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  // Selecting text in a field and releasing over the dialog's own padding produces a click whose
+  // target is the dialog element. Closing on that threw away the user's edits mid-copy.
+  it("does not call onClose when a drag starts inside the content and ends on the dialog", () => {
+    const onClose = jest.fn();
+    render(
+      <Dialog open onClose={onClose} ariaLabelledBy="dialog-title">
+        <h3 id="dialog-title">Title</h3>
+        <textarea defaultValue="text to select" />
+      </Dialog>
+    );
+    const dialogEl = screen.getByRole("dialog", { hidden: true });
+    fireEvent.mouseDown(screen.getByRole("textbox", { hidden: true }));
+    fireEvent.mouseUp(dialogEl);
+    fireEvent.click(dialogEl);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("does not call onClose when a drag starts on the dialog and ends inside the content", () => {
+    const onClose = jest.fn();
+    render(
+      <Dialog open onClose={onClose} ariaLabelledBy="dialog-title">
+        <h3 id="dialog-title">Title</h3>
+      </Dialog>
+    );
+    const dialogEl = screen.getByRole("dialog", { hidden: true });
+    fireEvent.mouseDown(dialogEl);
     fireEvent.click(screen.getByText("Title"));
     expect(onClose).not.toHaveBeenCalled();
   });

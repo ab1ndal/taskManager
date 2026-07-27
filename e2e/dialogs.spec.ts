@@ -98,3 +98,42 @@ test("closing the dialog restores focus to the control that opened it", async ({
   const restored = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
   expect(restored).toContain("New task");
 });
+
+/**
+ * Selecting text to copy it used to dismiss the modal, losing whatever had been typed. A click on a
+ * native <dialog> reports the dialog element as its target both for a real backdrop click and for
+ * the mouseup that ends a selection drag over the dialog's own padding, so the old target-only
+ * check could not tell them apart. jsdom cannot produce a real selection, so this belongs here.
+ */
+test("selecting text and releasing over the dialog's padding keeps it open", async ({ page }) => {
+  const dialog = await openNewTask(page);
+
+  const details = dialog.getByPlaceholder("Add details…");
+  await details.fill("copy this text out of the modal");
+
+  const field = (await details.boundingBox())!;
+  const box = (await dialog.boundingBox())!;
+
+  // Press inside the field, release on the dialog's padding a few pixels inside its top-left corner.
+  await page.mouse.move(field.x + 8, field.y + field.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 4, box.y + 4, { steps: 10 });
+  await page.mouse.up();
+
+  await expect(dialog, "modal closed while selecting text").toBeVisible();
+  await expect(details).toHaveValue("copy this text out of the modal");
+});
+
+test("a click that starts and ends on the backdrop still closes the dialog", async ({ page }) => {
+  const dialog = await openNewTask(page);
+  const box = (await dialog.boundingBox())!;
+
+  // Well clear of the dialog rect, so this is the backdrop rather than its padding.
+  const x = Math.max(4, box.x / 2);
+  const y = Math.max(4, box.y / 2);
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.up();
+
+  await expect(dialog).toBeHidden();
+});
