@@ -1318,7 +1318,18 @@ git commit -m "docs(phase-06): add manual verification checklist"
 - **Out-of-scope items from the design spec are not tasked here:** editing/deleting updates or
   subtasks, server transcription API, Phase 6.5 UI polish.
 
-## Known Issue (parked during final-review fix loop, not fixed)
+## Resolved: stuck `isListening` after `stop()` (fixed 2026-07-26, after the fix loop)
+
+Fixed by making `stop()` own the listening -> idle transition (`setIsListening(false)` inside
+`stop()` itself), and by changing the test suite's `MockSpeechRecognition.stop()` to fire `onend`
+asynchronously (`queueMicrotask`) so real-browser timing is reproduced. Two existing tests plus one
+new regression test (`clears isListening on stop() even though onend fires asynchronously
+afterwards`) failed under the async mock before the fix and pass after it. This matches how
+`react-speech-recognition`'s `RecognitionManager` handles it: `listening` is set from `start()` /
+`stop()` / `abort()` directly, never from the `end` handler, which is reserved for deciding whether
+to auto-restart. Original write-up follows.
+
+## Known Issue (parked during final-review fix loop, then fixed — see above)
 
 `useSpeechRecognition`'s `stop()` (`src/lib/use-speech-recognition.ts`) does not itself call
 `setIsListening(false)` — it relies on the subsequent `onend` event to do so. The fix-loop's

@@ -127,8 +127,13 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
 
   const stop = useCallback(() => {
     stoppedByUserRef.current = true;
-    recognitionRef.current?.stop();
+    const recognition = recognitionRef.current;
     recognitionRef.current = null;
+    // `stop()` owns the listening -> idle transition instead of deferring it to `onend`: the
+    // browser fires `end` asynchronously, long after `stop()` has returned and cleared the ref, so
+    // by then `onend`'s superseded-instance guard bails out and any state set there never lands.
+    setIsListening(false);
+    recognition?.stop();
   }, []);
 
   useEffect(() => {

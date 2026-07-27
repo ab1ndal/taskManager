@@ -10,7 +10,19 @@ class MockSpeechRecognition {
   onend: (() => void) | null = null;
   onerror: Listener | null = null;
   start = jest.fn();
-  stop = jest.fn(() => this.onend?.());
+  // Real browsers fire `end` asynchronously, after `stop()` has already returned. Firing it
+  // synchronously here would let the hook's `onend` handler observe pre-`stop()` refs and mask
+  // bugs that only appear in a browser.
+  stop = jest.fn(() => {
+    queueMicrotask(() => this.onend?.());
+  });
+}
+
+/** Lets the deferred `onend` from `MockSpeechRecognition.stop()` run. */
+async function flushAsyncEnd() {
+  await act(async () => {
+    await Promise.resolve();
+  });
 }
 
 describe("useSpeechRecognition", () => {
@@ -71,7 +83,7 @@ describe("useSpeechRecognition", () => {
     expect(result.current.isListening).toBe(true);
   });
 
-  it("does not restart after the user explicitly calls stop", () => {
+  it("does not restart after the user explicitly calls stop", async () => {
     let instance: MockSpeechRecognition | null = null;
     (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
       instance = new MockSpeechRecognition();
@@ -80,9 +92,36 @@ describe("useSpeechRecognition", () => {
 
     const { result } = renderHook(() => useSpeechRecognition(() => {}));
     act(() => result.current.start());
+    instance!.start.mockClear();
     act(() => result.current.stop());
 
     expect(result.current.isListening).toBe(false);
+
+    await flushAsyncEnd();
+
+    expect(instance!.start).not.toHaveBeenCalled();
+    expect(result.current.isListening).toBe(false);
+  });
+
+  it("clears isListening on stop() even though onend fires asynchronously afterwards", async () => {
+    let instance: MockSpeechRecognition | null = null;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instance = new MockSpeechRecognition();
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+    act(() => result.current.start());
+    expect(result.current.isListening).toBe(true);
+
+    act(() => result.current.stop());
+    // stop() itself must own the transition — the async onend that follows hits the
+    // superseded-instance guard and returns without touching state.
+    expect(result.current.isListening).toBe(false);
+
+    await flushAsyncEnd();
+    expect(result.current.isListening).toBe(false);
+    expect(instance!.stop).toHaveBeenCalledTimes(1);
   });
 
   it("guards against concurrent start() calls and does not create a second instance", () => {
@@ -134,7 +173,7 @@ describe("useSpeechRecognition", () => {
     expect(result.current.error).toBe("InvalidStateError: recognition already started");
   });
 
-  it("allows starting a second session after stop() — does not silently no-op", () => {
+  it("allows starting a second session after stop() — does not silently no-op", async () => {
     let instanceCount = 0;
     let lastInstance: MockSpeechRecognition | null = null;
     (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
@@ -154,6 +193,11 @@ describe("useSpeechRecognition", () => {
 
     act(() => result.current.start());
     expect(instanceCount).toBe(2);
+    expect(result.current.isListening).toBe(true);
+
+    // The first session's async onend lands after the second session is already live; it must not
+    // knock the new session's state back to idle.
+    await flushAsyncEnd();
     expect(result.current.isListening).toBe(true);
   });
 
