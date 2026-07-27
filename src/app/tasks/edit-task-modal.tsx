@@ -257,7 +257,7 @@ export function EditTaskModal({
                     checked={selectedMemberIds.includes(m.id)}
                     onChange={() => toggleMember(m.id)}
                     disabled={pending}
-                    className="rounded"
+                    className="rounded accent-[var(--color-accent)]"
                   />
                   {m.display_name}
                 </label>

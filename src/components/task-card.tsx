@@ -72,10 +72,16 @@ export function TaskCard({
 
   return (
     <div
-      className={`group bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-4 py-3 transition-opacity ${pending ? "opacity-40" : ""}`}
+      className={`group bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-2 py-3 sm:px-4 transition-opacity ${pending ? "opacity-40" : ""}`}
       style={{ boxShadow: "var(--shadow-card)" }}
     >
-      <div className="flex items-center gap-3">
+      {/*
+        Tighter gutters and gaps below `sm`. Four 44px controls plus 32px of padding and three 12px
+        gaps consumed 244px of a 375px row, leaving the title around 90px. This buys back ~50px.
+        It does not fully solve it — see the note in 06.5-AUDIT.md; the real answer for phones is an
+        overflow menu, which is a bigger change than this pass.
+      */}
+      <div className="flex items-center gap-1 sm:gap-3">
         {dragHandleProps && (
           <button
             type="button"
@@ -96,7 +102,7 @@ export function TaskCard({
           }}
           aria-label={completed ? "Completed" : `Mark "${title}" complete`}
           disabled={completed}
-          className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
+          className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
           {completed ? (
             <CircleCheck
@@ -111,7 +117,13 @@ export function TaskCard({
         </button>
 
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-medium truncate ${completed ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
+          {/*
+            `truncate` clipped the title to a single line, which on a 375px row — after a drag
+            handle, a complete toggle, edit and delete all hold their 44px — left about 90px and
+            rendered "Renew t…". Two lines then ellipsis keeps the row compact while making most
+            titles fully readable.
+          */}
+          <p className={`text-sm font-medium line-clamp-2 ${completed ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
             {title}
           </p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -161,14 +173,15 @@ export function TaskCard({
 
       {/*
         The old `ml-7` put each subtask's mark at an arbitrary offset, reading as a floating dot
-        rather than a nested item. `ml-11` is the width of one control, so the subtask toggles line
-        up directly under the parent's complete button and the nesting is legible as a column.
+        rather than a nested item. `ml-14` is one control width plus the row's gap, which is what
+        actually lands the subtask toggles under the parent's complete button — `ml-11` looked
+        right on paper and was still 12px out once rendered.
 
         The button stays a full 44x44 despite holding a 16px glyph. Phase 04 established that
         minimum and it is the one thing here not to trade for tighter rhythm.
       */}
       {(subtasks ?? []).length > 0 && (
-        <div className="mt-1 ml-11 flex flex-col">
+        <div className="mt-1 ml-14 flex flex-col">
           {(subtasks ?? []).map((sub) => (
             <div key={sub.id} className="flex items-center gap-2">
               <button
@@ -177,7 +190,7 @@ export function TaskCard({
                 }}
                 disabled={!!sub.completed_at}
                 aria-label={sub.completed_at ? "Subtask completed" : `Mark "${sub.title}" complete`}
-                className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-border)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
+                className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
               >
                 {sub.completed_at ? (
                   <CircleCheck

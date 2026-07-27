@@ -29,6 +29,12 @@
   --color-text-primary: #1c1a24;
   --color-text-secondary: #6b6878;
   --color-text-muted: #726f80;
+  /*
+   * Outline of an idle control — the unchecked complete circle on every task row. It was drawn in
+   * --color-border, which is a divider colour at 1.25:1 against the surface: fine for a hairline,
+   * invisible for the row's primary action. WCAG 1.4.11 wants 3:1 for meaningful UI components.
+   */
+  --color-control-idle: #949099;
   --color-text-on-accent: #ffffff;
   /*
    * Sits on a saturated status fill (danger/warning solids). Those fills keep the same value in
@@ -93,6 +99,7 @@
     --color-text-primary: #edebf2;
     --color-text-secondary: #a8a4b8;
     --color-text-muted: #9591a6;
+    --color-control-idle: #6b6682;
     --color-text-on-accent: #17131f;
 
     --color-accent: #a78be0;
@@ -148,6 +155,16 @@
 
   --text-2xs: 0.6875rem;
   --text-2xs--line-height: 1rem;
+}
+
+/*
+ * Tailwind's preflight zeroes `margin` on every element, including <dialog>, which destroys the UA
+ * stylesheet's `margin: auto` — the only thing centring a modal dialog in the viewport. Without
+ * this, every dialog in the app renders pinned to the top-left corner. Caught by screenshotting;
+ * no test covers visual position.
+ */
+dialog {
+  margin: auto;
 }
 
 @keyframes modal-in {
