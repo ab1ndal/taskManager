@@ -161,7 +161,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7
 | 4. Accessibility & Mobile | 5/6 | In Progress — 3 of 4 manual checks in 04-06 done or partial, resuming later |  |
 | 5. Task Prioritization | 1/1 | Complete | 2026-07-26 |
 | 6. Task Updates & Speech-to-Text | 8/8 | Code landed; manual verification checklist still open | - |
-| 6.5. App-Wide UI/UX Polish | 0/? | Not started — needs brainstorm | - |
+| 6.5. App-Wide UI/UX Polish | 6/6 | Code complete; browser pass in both colour schemes still owed | - |
 | 7. Recurring Tasks | 0/? | Not started | - |
 | ~~8. Design Polish~~ | - | Folded into 6.5 (2026-07-26) | - |
 
