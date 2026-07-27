@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:e2e": "node scripts/e2e-env.mjs next build && node scripts/e2e-env.mjs playwright test"
+    "test:e2e": "next build && playwright test"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

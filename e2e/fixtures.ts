@@ -8,9 +8,9 @@ import { resolve } from "node:path";
  * dependency is attack surface.
  */
 function loadEnv() {
-  // `.env.test.local` first: the first file to define a key wins, so the test project's values
-  // shadow the development ones rather than the other way round.
-  for (const file of [".env.test.local", ".env.local", ".env"]) {
+  // Same precedence Next uses: `.env.local` wins over `.env.production`, so the local/test project
+  // is what a local run gets even though `next build` runs in production mode.
+  for (const file of [".env.local", ".env", ".env.production"]) {
     let contents: string;
     try {
       contents = readFileSync(resolve(process.cwd(), file), "utf8");
@@ -51,30 +51,32 @@ export const OTHER_USER = {
 export const WORKSPACE_NAME = `${E2E_TAG} Household`;
 
 /**
- * The suite seeds and deletes rows, so it must never be pointed at a project that holds data
- * someone cares about. `E2E_SUPABASE_URL` names the one project it is allowed to touch, and the
- * target has to match it exactly.
+ * The suite seeds and deletes rows, so it must never run against the production project.
  *
- * This is what makes a bare `npx playwright test` safe: without `scripts/e2e-env.mjs` the process
- * picks up `.env.local`, and if that is ever a different project than the designated test one, the
- * run stops here instead of seeding — and `teardown()` deleting by tag never gets the chance to
- * run against it.
+ * Local development and the tests share one throwaway project (decided 2026-07-27), so there is no
+ * URL difference between "the app" and "the tests" to check. `E2E_SUPABASE_URL` is instead an
+ * explicit declaration, written once in `.env.local`, that says *this project is disposable*. The
+ * production project's env — `.env.production`, and the GitHub and Vercel variables — never carries
+ * it, so a run that picks those up fails here instead of seeding.
+ *
+ * Teardown is still scoped by tag, so ordinary local data in the shared project survives a run: it
+ * deletes the `e2e-phase65 Household` workspace and the two `e2e-phase65@…` users, nothing else.
  */
 function assertTestProject(url: string): void {
   const allowed = process.env.E2E_SUPABASE_URL;
 
   if (!allowed) {
     throw new Error(
-      "E2E_SUPABASE_URL is not set, so there is no designated test project to check against. " +
-        "Run the suite through `npm run test:e2e` (or `node scripts/e2e-env.mjs playwright test`), " +
-        "which loads .env.test.local."
+      "E2E_SUPABASE_URL is not set. It declares which project the suite may seed and delete in; " +
+        "add it to .env.local pointing at the throwaway project. It is deliberately absent from " +
+        "production env, so this is what stops a run against real data."
     );
   }
 
   if (url !== allowed) {
     throw new Error(
-      `Refusing to run: the app is pointed at ${url}, but the designated e2e project is ${allowed}. ` +
-        "This suite seeds and deletes rows — it only ever runs against the test project."
+      `Refusing to run: the app is pointed at ${url}, but the project declared disposable is ` +
+        `${allowed}. This suite seeds and deletes rows.`
     );
   }
 }
