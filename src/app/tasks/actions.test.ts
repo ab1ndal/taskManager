@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { createFakeSupabase, type FailureHook, type Row, type Tables } from "@/test/supabase-fake";
-import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
+import { completeTask, deleteTask, createTaskWithSubtasks, updateTask, reorderTask, getTaskUpdates, addTaskUpdate, addSubtask, reopenTask } from "./actions";
 import { GENERIC_ERROR } from "./action-result";
 
 beforeEach(() => jest.clearAllMocks());
@@ -737,5 +737,94 @@ describe("completeTask — parent and subtasks complete together", () => {
     await completeTask(P1);
 
     expect(tasksIn(tables).find((t) => t.id === T_OTHER)?.completed_at).toBeNull();
+  });
+});
+
+// ─── reopening ───────────────────────────────────────────────────────────────
+
+describe("reopenTask", () => {
+  const DONE = "2026-01-01T00:00:00Z";
+
+  function seedCompletedFamily() {
+    const tables = seed();
+    tables.tasks.push(
+      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: DONE, title: "Parent" },
+      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: DONE, title: "Sub 1" }
+    );
+    tables.task_assignments.push(
+      { task_id: P1, member_id: M1, member_sort_key: 2000 },
+      { task_id: S1, member_id: M1, member_sort_key: 3000 }
+    );
+    return tables;
+  }
+
+  it("clears the completion timestamp", async () => {
+    const tables = seedCompletedFamily();
+    setup({ tables });
+
+    const result = await reopenTask(P1);
+
+    expect(result.ok).toBe(true);
+    expect(tasksIn(tables).find((t) => t.id === P1)?.completed_at).toBeNull();
+  });
+
+  it("leaves the subtasks of a reopened parent completed", async () => {
+    const tables = seedCompletedFamily();
+    setup({ tables });
+
+    await reopenTask(P1);
+
+    expect(tasksIn(tables).find((t) => t.id === S1)?.completed_at).toBe(DONE);
+  });
+
+  it("reopening a subtask reopens its parent", async () => {
+    // The reverse of completeTask's cascade: a parent cannot stay complete while a subtask is open.
+    const tables = seedCompletedFamily();
+    setup({ tables });
+
+    await reopenTask(S1);
+
+    expect(tasksIn(tables).find((t) => t.id === S1)?.completed_at).toBeNull();
+    expect(tasksIn(tables).find((t) => t.id === P1)?.completed_at).toBeNull();
+  });
+
+  it("rejects a user who is not assigned to the task", async () => {
+    const tables = seedCompletedFamily();
+    setup({ tables, user: { id: "auth-user-3" } });
+
+    const result = await reopenTask(P1);
+
+    expect(result.ok).toBe(false);
+    expect(tasksIn(tables).find((t) => t.id === P1)?.completed_at).toBe(DONE);
+  });
+
+  it("rejects a malformed id before touching the database", async () => {
+    const { tables } = setup();
+
+    await expectFailure(reopenTask("not-a-uuid"), "Expected a UUID");
+
+    expect(tasksIn(tables)[0].completed_at).toBeNull();
+  });
+});
+
+describe("addSubtask — new work reopens a finished task", () => {
+  it("clears the parent's completion when a subtask is added to it", async () => {
+    const tables = seed();
+    tasksIn(tables).find((t) => t.id === T1)!.completed_at = "2026-01-01T00:00:00Z";
+    setup({ tables });
+
+    const result = await addSubtask({ parentTaskId: T1, title: "One more thing" });
+
+    expect(result.ok).toBe(true);
+    expect(tasksIn(tables).find((t) => t.id === T1)?.completed_at).toBeNull();
+  });
+
+  it("leaves an open parent alone", async () => {
+    const tables = seed();
+    setup({ tables });
+
+    await addSubtask({ parentTaskId: T1, title: "One more thing" });
+
+    expect(tasksIn(tables).find((t) => t.id === T1)?.completed_at).toBeNull();
   });
 });

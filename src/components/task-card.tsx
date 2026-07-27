@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Circle, CircleCheck, GripVertical, Pencil, Trash2 } from "lucide-react";
-import { completeTask, deleteTask } from "@/app/tasks/actions";
+import { Circle, CircleCheck, GripVertical, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { completeTask, deleteTask, reopenTask } from "@/app/tasks/actions";
 import { ICON_PRIMARY, ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { toast } from "@/components/toaster";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
+import { RowMenu } from "@/components/row-menu";
 
 export type DeadlineVariant = "red" | "yellow" | "green";
 
@@ -93,15 +94,18 @@ export function TaskCard({
           </button>
         )}
 
-        {/* Complete button */}
+        {/*
+          Completed rows keep this control live rather than disabling it: a task marked done by
+          mistake, or one whose work came back, had no way out of the completed section at all.
+        */}
         <button
           onClick={() => {
             // Completing a parent completes its open subtasks server-side, so an open subtask is no
             // longer a reason to block the button.
-            if (!completed) runAction(() => completeTask(taskId), "Failed to complete task");
+            if (completed) runAction(() => reopenTask(taskId), "Failed to reopen task");
+            else runAction(() => completeTask(taskId), "Failed to complete task");
           }}
-          aria-label={completed ? "Completed" : `Mark "${title}" complete`}
-          disabled={completed}
+          aria-label={completed ? `Reopen "${title}"` : `Mark "${title}" complete`}
           className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
           {completed ? (
@@ -123,7 +127,13 @@ export function TaskCard({
             rendered "Renew t…". Two lines then ellipsis keeps the row compact while making most
             titles fully readable.
           */}
-          <p className={`text-sm font-medium line-clamp-2 ${completed ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
+          {/*
+            No clamp on a phone. With edit and delete behind the overflow menu the title column is
+            wide enough that most titles fit, and for the ones that do not, four wrapped lines beat
+            an ellipsis — there is no hover on touch to reveal the rest. The clamp stays above `sm`,
+            where the row competes with two more controls.
+          */}
+          <p className={`text-sm font-medium line-clamp-none sm:line-clamp-2 ${completed ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
             {title}
           </p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -144,21 +154,56 @@ export function TaskCard({
           <button
             onClick={onEdit}
             aria-label={`Edit "${title}"`}
-            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-accent)] transition-[opacity,color]"
+            className="hidden sm:flex flex-shrink-0 w-11 h-11 items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-accent)] transition-[opacity,color]"
           >
             <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>
         )}
 
-        {!completed && (
-          <button
-            onClick={() => setDeleteConfirmOpen(true)}
-            aria-label={`Delete "${title}"`}
-            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-danger-text)] transition-[opacity,color]"
-          >
-            <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
-          </button>
-        )}
+        <button
+          onClick={() => setDeleteConfirmOpen(true)}
+          aria-label={`Delete "${title}"`}
+          className="hidden sm:flex flex-shrink-0 w-11 h-11 items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-danger-text)] transition-[opacity,color]"
+        >
+          <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </button>
+
+        {/*
+          Below `sm` the same two actions live in a menu. Four 44px controls plus padding and gaps
+          consumed 244px of a 393px row and left the title around 90px — this is the overflow menu
+          the 6.5 audit named as the real fix and deferred.
+        */}
+        <div className="sm:hidden">
+          <RowMenu
+            label={`More actions for "${title}"`}
+            items={[
+              ...(!completed && onEdit
+                ? [
+                    {
+                      label: "Edit",
+                      onSelect: onEdit,
+                      icon: <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />,
+                    },
+                  ]
+                : []),
+              ...(completed
+                ? [
+                    {
+                      label: "Reopen",
+                      onSelect: () => runAction(() => reopenTask(taskId), "Failed to reopen task"),
+                      icon: <RotateCcw size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />,
+                    },
+                  ]
+                : []),
+              {
+                label: "Delete",
+                onSelect: () => setDeleteConfirmOpen(true),
+                icon: <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />,
+                danger: true,
+              },
+            ]}
+          />
+        </div>
       </div>
 
       <DeleteConfirmDialog

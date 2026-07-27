@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { Mic, Square } from "lucide-react";
+import { Circle, CircleCheck, Mic, Square, Trash2 } from "lucide-react";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
-import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
+import {
+  updateTask,
+  getTaskUpdates,
+  addTaskUpdate,
+  addSubtask,
+  completeTask,
+  reopenTask,
+  deleteTask,
+} from "./actions";
 import { updateTaskSchema, createTaskUpdateSchema, addSubtaskSchema } from "./schemas";
 import { toast } from "@/components/toaster";
 import { Dialog } from "@/components/dialog";
@@ -138,6 +146,51 @@ export function EditTaskModal({
         return;
       }
       setUpdates((prev) => prev.map((u) => (u.id === tempId ? result.update : u)));
+    });
+  }
+
+  type Subtask = { id: string; title: string; completed_at: string | null };
+
+  /**
+   * Optimistic, then reconciled: the row flips immediately and rolls back to its previous state if
+   * the server refuses. Same shape as the update list above.
+   */
+  function toggleSubtask(subtask: Subtask) {
+    const nextCompletedAt = subtask.completed_at ? null : new Date().toISOString();
+    setSubtaskError("");
+    setSubtasks((prev) =>
+      prev.map((s) => (s.id === subtask.id ? { ...s, completed_at: nextCompletedAt } : s))
+    );
+
+    startSubtaskTransition(async () => {
+      const result = subtask.completed_at
+        ? await reopenTask(subtask.id)
+        : await completeTask(subtask.id);
+      if (!result.ok) {
+        setSubtasks((prev) =>
+          prev.map((s) => (s.id === subtask.id ? { ...s, completed_at: subtask.completed_at } : s))
+        );
+        setSubtaskError(result.error ?? "Failed to update subtask");
+      }
+    });
+  }
+
+  function removeSubtask(subtask: Subtask) {
+    setSubtaskError("");
+    setSubtasks((prev) => prev.filter((s) => s.id !== subtask.id));
+
+    startSubtaskTransition(async () => {
+      const result = await deleteTask(subtask.id);
+      if (!result.ok) {
+        // Put it back where it was rather than at the end — the list is ordered by creation.
+        setSubtasks((prev) => {
+          const index = task.subtasks.findIndex((s) => s.id === subtask.id);
+          const next = [...prev];
+          next.splice(index < 0 ? next.length : index, 0, subtask);
+          return next;
+        });
+        setSubtaskError(result.error ?? "Failed to delete subtask");
+      }
     });
   }
 
@@ -384,15 +437,53 @@ export function EditTaskModal({
           <h4 className="text-sm font-semibold">Subtasks</h4>
           <p className="text-2xs text-[var(--color-text-muted)]">Saves immediately</p>
         </div>
+        {/*
+          Subtasks used to render as bare text: no way to tick one off, no way to remove one added
+          by mistake, and the only signal that a subtask was done was a strikethrough you could not
+          undo. Each row now carries the same two controls the task list has.
+        */}
         {subtasks.length === 0 ? (
           <p className="mb-3 text-sm text-[var(--color-text-muted)]">No subtasks yet.</p>
         ) : (
-          <ul className="flex flex-col gap-1 mb-3">
+          <ul className="flex flex-col mb-2">
             {subtasks.map((s) => (
-              <li key={s.id} className="text-sm flex items-center gap-2">
-                <span className={s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""}>
+              <li key={s.id} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleSubtask(s)}
+                  disabled={subtaskPending}
+                  aria-label={
+                    s.completed_at ? `Reopen "${s.title}"` : `Mark "${s.title}" complete`
+                  }
+                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:opacity-50 transition-colors"
+                >
+                  {s.completed_at ? (
+                    <CircleCheck
+                      size={ICON_SECONDARY}
+                      strokeWidth={ICON_STROKE}
+                      className="text-[var(--color-accent)]"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Circle size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                  )}
+                </button>
+                <span
+                  className={`flex-1 min-w-0 text-sm ${
+                    s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""
+                  }`}
+                >
                   {s.title}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => removeSubtask(s)}
+                  disabled={subtaskPending}
+                  aria-label={`Delete "${s.title}"`}
+                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger-text)] disabled:opacity-50 transition-colors"
+                >
+                  <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                </button>
               </li>
             ))}
           </ul>

@@ -194,6 +194,50 @@ export async function completeTask(rawTaskId: string): Promise<ActionResult> {
   });
 }
 
+/**
+ * Reopens a completed task. `completeTask` cascades in both directions — completing a parent closes
+ * its subtasks, and closing the last open subtask closes the parent — so reopening has to undo the
+ * second half: a parent cannot stay complete while one of its subtasks is open again.
+ *
+ * Reopening a parent deliberately leaves its subtasks completed. They were genuinely done; the work
+ * that reopened the parent is new work, and the user adds it as a new subtask.
+ */
+export async function reopenTask(rawTaskId: string): Promise<ActionResult> {
+  return run("reopenTask", async () => {
+    const { user } = await requireUser();
+    const taskId = parseInput(taskIdSchema, rawTaskId);
+    await assertTaskAssignee(taskId, user.id);
+
+    const admin = createAdminClient();
+
+    assertNoError(
+      "reopen task",
+      await admin.from("tasks").update({ completed_at: null }).eq("id", taskId)
+    );
+
+    const { data: task, error: taskError } = await admin
+      .from("tasks")
+      .select("parent_task_id")
+      .eq("id", taskId)
+      .single();
+
+    assertNoError("load task", { error: taskError });
+
+    if (task?.parent_task_id) {
+      assertNoError(
+        "reopen parent task",
+        await admin
+          .from("tasks")
+          .update({ completed_at: null })
+          .eq("id", task.parent_task_id)
+      );
+    }
+
+    revalidatePath("/tasks");
+    return {};
+  });
+}
+
 export async function deleteTask(rawTaskId: string): Promise<ActionResult> {
   return run("deleteTask", async () => {
     const { user } = await requireUser();
@@ -487,11 +531,21 @@ export async function addSubtask(
 
     const { data: parent, error: parentError } = await admin
       .from("tasks")
-      .select("workspace_id")
+      .select("workspace_id, completed_at")
       .eq("id", parentTaskId)
       .single();
 
     if (parentError || !parent) throw new Error(parentError?.message ?? "Task not found");
+
+    // Adding work to a finished task un-finishes it. A completed parent holding an open subtask is
+    // a state the completion rules say cannot exist, and it is the ordinary way a done task comes
+    // back: the job turned out not to be over.
+    if (parent.completed_at) {
+      assertNoError(
+        "reopen parent for new subtask",
+        await admin.from("tasks").update({ completed_at: null }).eq("id", parentTaskId)
+      );
+    }
 
     const { data: assignments, error: assignError } = await admin
       .from("task_assignments")
