@@ -268,48 +268,60 @@ export function NewTaskModal({
               Subtasks
             </label>
             <div className="flex flex-col gap-1">
+              {/*
+                One row per subtask on desktop, stacked below `sm`. Title, details, date and remove
+                all shared a single flex row at every width, which inside a max-w-md dialog left
+                each field around 60px on a phone.
+              */}
               {subtaskRows.map((row, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Circle
-                    size={ICON_SECONDARY}
-                    strokeWidth={ICON_STROKE}
-                    className="text-[var(--color-text-muted)] shrink-0"
-                    aria-hidden="true"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Subtask title"
-                    value={row.title}
-                    onChange={(e) => updateSubtask(i, "title", e.target.value)}
-                    onKeyDown={(e) => handleSubtaskKeyDown(e, row.title)}
-                    disabled={disabled}
-                    ref={i === subtaskRows.length - 1 ? lastSubtaskRef : undefined}
-                    className="flex-1 border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
-                  />
-                  <textarea
-                    placeholder="Details…"
-                    value={row.description}
-                    onChange={(e) => updateSubtask(i, "description", e.target.value)}
-                    disabled={disabled}
-                    rows={1}
-                    className="flex-1 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
-                  />
-                  <input
-                    type="date"
-                    value={row.dueAt}
-                    onChange={(e) => updateSubtask(i, "dueAt", e.target.value)}
-                    disabled={disabled}
-                    className="border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSubtask(i)}
-                    disabled={disabled}
-                    aria-label="Remove subtask"
-                    className="shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
-                  >
-                    <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
-                  </button>
+                <div
+                  key={i}
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-sm border border-[var(--color-border)] p-2 sm:border-0 sm:p-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <Circle
+                      size={ICON_SECONDARY}
+                      strokeWidth={ICON_STROKE}
+                      className="text-[var(--color-text-muted)] shrink-0"
+                      aria-hidden="true"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Subtask title"
+                      value={row.title}
+                      onChange={(e) => updateSubtask(i, "title", e.target.value)}
+                      onKeyDown={(e) => handleSubtaskKeyDown(e, row.title)}
+                      disabled={disabled}
+                      ref={i === subtaskRows.length - 1 ? lastSubtaskRef : undefined}
+                      className="flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSubtask(i)}
+                      disabled={disabled}
+                      aria-label="Remove subtask"
+                      className="shrink-0 sm:order-last text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                    >
+                      <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 sm:contents">
+                    <textarea
+                      placeholder="Details…"
+                      value={row.description}
+                      onChange={(e) => updateSubtask(i, "description", e.target.value)}
+                      disabled={disabled}
+                      rows={1}
+                      className="flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+                    />
+                    <input
+                      type="date"
+                      value={row.dueAt}
+                      onChange={(e) => updateSubtask(i, "dueAt", e.target.value)}
+                      disabled={disabled}
+                      className="shrink-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+                    />
+                  </div>
                 </div>
               ))}
             </div>

@@ -9,7 +9,7 @@ jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams
 import React from "react";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EditTaskModal } from "./edit-task-modal";
+import { EditTaskModal, formatUpdateTime } from "./edit-task-modal";
 import { updateTask, getTaskUpdates, addTaskUpdate, addSubtask } from "./actions";
 import type { RawTask } from "./bucket-tasks";
 
@@ -381,5 +381,30 @@ describe("EditTaskModal — Subtasks", () => {
 
     await screen.findByText("Something went wrong");
     expect(screen.queryByText("Will fail")).not.toBeInTheDocument();
+  });
+});
+
+describe("formatUpdateTime", () => {
+  const now = new Date("2026-07-26T12:00:00.000Z");
+  const ago = (seconds: number) => new Date(now.getTime() - seconds * 1000).toISOString();
+
+  it("reads as relative time inside the first day", () => {
+    expect(formatUpdateTime(ago(5), now)).toBe("just now");
+    expect(formatUpdateTime(ago(44), now)).toBe("just now");
+    expect(formatUpdateTime(ago(60), now)).toBe("1m ago");
+    expect(formatUpdateTime(ago(45 * 60), now)).toBe("45m ago");
+    expect(formatUpdateTime(ago(2 * 3600), now)).toBe("2h ago");
+  });
+
+  it("never rounds a sub-minute-but-not-just-now gap down to '0m ago'", () => {
+    expect(formatUpdateTime(ago(50), now)).toBe("1m ago");
+  });
+
+  it("falls back to an absolute date once relative stops being useful", () => {
+    expect(formatUpdateTime(ago(3 * 86400), now)).toMatch(/Jul/);
+  });
+
+  it("returns an empty string rather than 'NaN' for an unparseable timestamp", () => {
+    expect(formatUpdateTime("not a date", now)).toBe("");
   });
 });

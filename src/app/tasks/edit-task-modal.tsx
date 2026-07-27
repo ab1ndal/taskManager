@@ -14,6 +14,23 @@ import type { TaskUpdate } from "./actions";
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
 
+/**
+ * Update timestamps are read at a glance to answer "is this recent?", which a full
+ * `toLocaleString()` ("7/26/2026, 11:04:33 PM") answers slowly. Recent entries get a relative
+ * label; anything past a day falls back to an absolute date, where relative stops being useful.
+ * The exact value stays available to assistive tech through the `<time dateTime>` attribute.
+ */
+export function formatUpdateTime(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso);
+  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+
+  if (Number.isNaN(seconds)) return "";
+  if (seconds < 45) return "just now";
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))}m ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
+  return then.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export function EditTaskModal({
   open,
   task,
@@ -43,6 +60,7 @@ export function EditTaskModal({
   // interim/final event carries the FULL transcript for the utterance so far, not a delta, so the
   // draft is rendered as `base + live utterance text` rather than accumulated across events.
   const dictationBaseRef = useRef("");
+  const updatesListRef = useRef<HTMLUListElement>(null);
 
   const [subtasks, setSubtasks] = useState(task.subtasks);
   const [subtaskTitle, setSubtaskTitle] = useState("");
@@ -70,6 +88,13 @@ export function EditTaskModal({
       cancelled = true;
     };
   }, [open, task.id]);
+
+  // Newest update is appended at the bottom of a max-h-40 scroller, so without this the one the
+  // user just posted lands out of view.
+  useEffect(() => {
+    const list = updatesListRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [updates.length]);
 
   const speech = useSpeechRecognition((transcript, isFinal) => {
     // `transcript` is the FULL text of the current utterance so far, not a delta — so it replaces
@@ -265,24 +290,38 @@ export function EditTaskModal({
           </div>
         </form>
 
-      <div className="mt-6 border-t border-[var(--color-border)] pt-4">
-        <h4 className="text-sm font-semibold mb-2">Updates</h4>
+      {/*
+        Updates and Subtasks write the moment their button is pressed, while everything above is
+        staged behind Save. Nothing used to mark that difference, so Cancel looked like it would
+        undo a posted update. They now sit on the sunken surface with an explicit note.
+      */}
+      <section className="mt-6 rounded-md bg-[var(--color-surface-sunken)] p-3">
+        <div className="flex items-baseline justify-between gap-2 mb-2">
+          <h4 className="text-sm font-semibold">Updates</h4>
+          <p className="text-2xs text-[var(--color-text-muted)]">Posts immediately</p>
+        </div>
         {updatesLoadError && (
           <p role="alert" className="mb-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
             {updatesLoadError}
           </p>
         )}
-        <ul className="flex flex-col gap-2 mb-3 max-h-40 overflow-y-auto">
-          {updates.map((u) => (
-            <li key={u.id} className="text-sm">
-              <span className="font-medium">{u.authorName}</span>{" "}
-              <span className="text-[var(--color-text-muted)]">
-                {new Date(u.createdAt).toLocaleString()}
-              </span>
-              <p>{u.updateText}</p>
-            </li>
-          ))}
-        </ul>
+        {updates.length === 0 && !updatesLoadError ? (
+          <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+            No updates yet. Add the first one below.
+          </p>
+        ) : (
+          <ul ref={updatesListRef} className="flex flex-col gap-2 mb-3 max-h-40 overflow-y-auto">
+            {updates.map((u) => (
+              <li key={u.id} className="text-sm">
+                <span className="font-medium">{u.authorName}</span>{" "}
+                <time dateTime={u.createdAt} className="text-2xs text-[var(--color-text-muted)]">
+                  {formatUpdateTime(u.createdAt)}
+                </time>
+                <p>{u.updateText}</p>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="flex gap-2">
           <textarea
             placeholder="Add an update…"
@@ -338,19 +377,26 @@ export function EditTaskModal({
             {speech.error}
           </p>
         )}
-      </div>
+      </section>
 
-      <div className="mt-6 border-t border-[var(--color-border)] pt-4">
-        <h4 className="text-sm font-semibold mb-2">Subtasks</h4>
-        <ul className="flex flex-col gap-1 mb-3">
-          {subtasks.map((s) => (
-            <li key={s.id} className="text-sm flex items-center gap-2">
-              <span className={s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""}>
-                {s.title}
-              </span>
-            </li>
-          ))}
-        </ul>
+      <section className="mt-4 rounded-md bg-[var(--color-surface-sunken)] p-3">
+        <div className="flex items-baseline justify-between gap-2 mb-2">
+          <h4 className="text-sm font-semibold">Subtasks</h4>
+          <p className="text-2xs text-[var(--color-text-muted)]">Saves immediately</p>
+        </div>
+        {subtasks.length === 0 ? (
+          <p className="mb-3 text-sm text-[var(--color-text-muted)]">No subtasks yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-1 mb-3">
+            {subtasks.map((s) => (
+              <li key={s.id} className="text-sm flex items-center gap-2">
+                <span className={s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""}>
+                  {s.title}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
@@ -374,7 +420,7 @@ export function EditTaskModal({
             {subtaskError}
           </p>
         )}
-      </div>
+      </section>
     </Dialog>
   );
 }
