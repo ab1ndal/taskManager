@@ -55,20 +55,27 @@ export function DictationTextarea({
           dictation.noteChange(field, e.target.value);
           onChange(e.target.value);
         }}
-        // The mic overlays the field's bottom-right corner, so text needs a gutter to stop under it.
-        className={`${className} ${dictation.isSupported ? "pr-11" : ""}`}
+        // `block` matters: a textarea is inline by default, which leaves a few pixels of descender
+        // space under it inside the wrapper — enough that a mic positioned from the wrapper's
+        // bottom edge sits below the field's own border instead of inside it. `pr-10` keeps the
+        // text from running under the mic.
+        className={`${className} block ${dictation.isSupported ? "pr-10" : ""}`}
         {...textareaProps}
       />
       {dictation.isSupported && (
+        // Borderless and transparent, inset clear of the field's own border: a bordered box in the
+        // corner reads as a second control bolted onto the field rather than part of it. Idle it is
+        // a muted glyph; dictating, it is a filled stop in the danger tokens, which is the only
+        // state that needs to be unmissable.
         <button
           type="button"
           aria-label={isDictating ? "Stop dictating" : dictateLabel}
           onClick={() => dictation.toggle(field, value, onChange)}
           disabled={textareaProps.disabled}
-          className={`absolute right-1 bottom-1 w-9 h-9 flex items-center justify-center rounded-sm border text-sm disabled:opacity-50 transition-colors ${
+          className={`absolute right-1.5 bottom-1.5 w-8 h-8 flex items-center justify-center rounded-full text-sm disabled:opacity-50 transition-colors ${
             isDictating
-              ? "border-[var(--color-danger-border)] bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]"
-              : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)]"
+              ? "bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]"
+              : "text-[var(--color-text-muted)] hover:bg-[var(--color-accent-subtle)] hover:text-[var(--color-accent-text)]"
           }`}
         >
           {isDictating ? (

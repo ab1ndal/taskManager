@@ -71,9 +71,27 @@ export function TaskCard({
     });
   }
 
+  /**
+   * The row is the task, so pressing it opens the task — a two-step menu-first gesture to read
+   * something is unusual for a list. One guard rather than a `stopPropagation` on every control:
+   * anything that already has a job keeps it, including the delete confirmation, which renders
+   * inside this subtree and would otherwise reopen the modal on its way out.
+   *
+   * There is deliberately no `role`/`tabIndex` here. A keyboard user reaches the same modal through
+   * the pencil above `sm` and the row menu below it, and making a container that holds four buttons
+   * into a button itself would nest interactive elements rather than fix anything.
+   */
+  function handleCardClick(event: React.MouseEvent) {
+    if (!onEdit) return;
+    if (event.defaultPrevented) return;
+    if ((event.target as HTMLElement).closest("button, a, input, label, dialog")) return;
+    onEdit();
+  }
+
   return (
     <div
-      className={`group bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-2 py-3 sm:px-4 transition-opacity ${pending ? "opacity-40" : ""}`}
+      onClick={handleCardClick}
+      className={`group bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-2 py-3 sm:px-4 transition-opacity ${pending ? "opacity-40" : ""} ${onEdit ? "cursor-pointer" : ""}`}
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       {/*

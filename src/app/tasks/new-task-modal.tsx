@@ -323,7 +323,9 @@ export function NewTaskModal({
                     <DictationTextarea
                       field={`subtask-${i}`}
                       dictation={dictation}
-                      dictateLabel={`Dictate subtask ${i + 1} details`}
+                      // Not "Dictate subtask N details": that string contains the field's own
+                      // label, so any substring-matching label query resolves to both controls.
+                      dictateLabel={`Dictate details for subtask ${i + 1}`}
                       placeholder="Details…"
                       aria-label={`Subtask ${i + 1} details`}
                       value={row.description}
