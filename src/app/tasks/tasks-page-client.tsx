@@ -231,7 +231,6 @@ export function TasksPageClient({
           open={!!editingTask}
           task={editingTask}
           workspaces={workspaces}
-          currentMemberIds={currentMemberIds}
           onClose={() => setEditingTask(null)}
         />
       )}
