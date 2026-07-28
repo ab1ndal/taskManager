@@ -509,10 +509,10 @@ describe("NewTaskModal — field labelling", () => {
   // Placeholders vanish the moment typing starts and are not a label to a screen reader. Each of
   // these resolves only if the visible text is tied to the control by id.
   it.each([
-    ["Title", "textbox"],
-    ["Details (optional)", "textbox"],
-    ["Due date (optional)", null],
-    ["Workspace", "combobox"],
+    "Title",
+    "Details (optional)",
+    "Due date (optional)",
+    "Workspace",
   ])("associates the %s label with its control", (labelText) => {
     render(
       <NewTaskModal
