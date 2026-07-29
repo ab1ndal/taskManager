@@ -19,7 +19,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Task Prioritization** - Drag-to-reorder personal task priority (completed 2026-07-26)
 - [ ] **Phase 6: Task Updates & Speech-to-Text** - Text updates on a task; speech only at the input layer
 - [ ] **Phase 6.5: App-Wide UI/UX Polish** (INSERTED) - Task panel polish plus the whole-app design system: dark mode, semantic tokens, icon consolidation, reduced motion (absorbs the former Phase 8)
-- [ ] **Phase 7: Recurring Tasks** - Rule-driven task generation
+- [x] **Phase 7: Recurring Tasks** - Rule-driven task generation (code-complete, verified on DEV
+  2026-07-29; production deploy PENDING)
 
 **Task Detail & Editing** was the original Phase 3. It was largely built outside the planning loop
 (`edit-task-modal.tsx`, `updateTask`, assignee management), so it is not carried as a separate phase.
@@ -142,7 +143,23 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. A rule produces the next instance on schedule
   2. The generator is idempotent for a repeated `next_run_at` — a retry cannot double-create
-**Plans**: TBD
+**Status**: code-complete and verified on DEV (`task-manager-dev`, `mcdpiuiayfljzvnhtqto`)
+2026-07-29 — see `07-VERIFICATION.md`. Production deploy is a separate, PENDING decision; nothing
+in this phase has been merged to `main` or applied to production.
+**Plans**: 10 tasks (see `.superpowers/sdd/2026-07-28-recurring-tasks/progress.md`)
+
+Plans:
+- [x] Task 1: pg_cron availability probe (gate passed)
+- [x] Task 2: migration 012 — reshape `task_rules`, enable RLS, drop `tasks.rule_id`
+- [x] Task 3: migration 013 — recurrence generator, `upsert_task_recurrence`, cron job
+- [x] Task 4: recurrence zod contract
+- [x] Task 5: `setTaskRecurrence`, wired into `createTaskWithSubtasks`
+- [x] Task 6: task-fields extraction (pure refactor)
+- [x] Task 7: Repeats UI in both modals
+- [x] Task 8: repeat badge + Query 3c (recurrence read path)
+- [x] Task 9: e2e coverage, migrations applied to dev for real, screenshot baselines fixed
+- [x] Task 10: dev re-verification, `07-VERIFICATION.md`, `07-FOLLOWUPS.md`, roadmap/state close-out
+  (this task — production deploy explicitly deferred)
 
 ### Phase 8: Design Polish — FOLDED INTO PHASE 6.5 (2026-07-26)
 Its goal (one coherent visual system across light and dark) and audit items U6, U8-U12 are now
@@ -162,7 +179,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7
 | 5. Task Prioritization | 1/1 | Complete | 2026-07-26 |
 | 6. Task Updates & Speech-to-Text | 8/8 | Code landed; manual verification checklist still open | - |
 | 6.5. App-Wide UI/UX Polish | 6/6 | Complete — visual pass done in both colour schemes | 2026-07-26 |
-| 7. Recurring Tasks | 0/? | Not started | - |
+| 7. Recurring Tasks | 10/10 | Code-complete, verified on DEV — production deploy PENDING | 2026-07-29 (dev) |
 | ~~8. Design Polish~~ | - | Folded into 6.5 (2026-07-26) | - |
 
 **Superseded:** the old "Phase 5: Task and workspace lifecycle" entry. Task deletion, editing, and

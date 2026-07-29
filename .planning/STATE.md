@@ -3,12 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Phase 6.5 followups F1-F10, F13-F18 closed; F11, F12, F19 open; F20 (production signup email) and F21 (Google sign-in) newly raised
-last_updated: "2026-07-27T00:00:00.000Z"
+stopped_at: Phase 7 (recurring tasks) code-complete and verified on DEV 2026-07-29; production deploy PENDING, a separate human decision
+last_updated: "2026-07-29T00:00:00.000Z"
 progress:
   # Counted from ROADMAP.md's progress table: phases 1, 2, 3, 5 and 6.5 complete; 4 in progress
   # (one plan and the deferred manual checks open); 6 code-landed with dictation still manual;
-  # 7 not started.
+  # 7 code-complete and dev-verified, production deploy pending (not counted as complete here
+  # since it has not shipped).
   total_phases: 7
   completed_phases: 5
   total_plans: 27
@@ -23,7 +24,8 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users can create, manage, and complete tasks across household and work workspaces — with frictionless workspace onboarding and full task lifecycle control.
-**Current focus:** Phase 06.5 — app-wide UI/UX polish (followups)
+**Current focus:** Phase 07 — recurring tasks: code-complete and verified on dev; production deploy
+is a pending human decision
 
 ## Current Position
 
@@ -34,9 +36,16 @@ Phase: 06 (task-updates-speech-to-text) — COMPLETE. The last two manual checks
 permission denial) were run by hand 2026-07-27 in Chrome, Safari and Firefox and passed; see F10.
 Phase: 06.5 (app-wide-ui-polish) — COMPLETE. Followups F1-F10 and F13-F18 closed 2026-07-27.
 Still open: F11 (offline/service worker), F12 (real icons), F19 (perceived latency, unmeasured),
-plus F20 (production signup email never arrives) and F21 (Google sign-in), both raised outside the
-6.5 pass — all in `06.5-FOLLOWUPS.md`.
-Next: Phase 07 (recurring tasks) — not started, depends on 6.5.
+plus F22 (production email delivery limited to team addresses) — all in `06.5-FOLLOWUPS.md`. F20 and
+F21 closed 2026-07-27.
+Phase: 07 (recurring-tasks) — CODE-COMPLETE, verified on dev (`task-manager-dev`,
+`mcdpiuiayfljzvnhtqto`) 2026-07-29; see `07-VERIFICATION.md`. Production deploy (merge to `main`,
+which auto-applies migrations 012/013 via `deploy-migrations.yml`) is explicitly PENDING — a
+separate human decision, not blocked on anything left to build. Open followups in
+`07-FOLLOWUPS.md`, most notably F4 (production `task_rules` row count unverified — check before
+merging) and F1 (a pre-existing, unrelated optimistic-row race that surfaces a raw error string).
+Next: the production deploy decision (Phase 7 Step 4, deliberately not taken in Task 10), then
+whatever the roadmap picks up after Phase 7.
 
 All work has been landing directly on `main` (not a feature branch) since phase 03, and `main` is
 now pushed to `origin`.
@@ -69,6 +78,24 @@ now pushed to `origin`.
   dialog, not through the global toaster — a `<dialog>.showModal()` makes all other content inert,
   including other top-layer elements like popovers, so there is no way to keep a separate toast
   interactive over an open modal (`tasks/lessons.md` L11)
+- [Phase 07-recurring-tasks]: A recurring task is ONE task row that reactivates, not a stream of
+  generated instances — so idempotency is structural (nothing is inserted) rather than a constraint
+  to maintain
+- [Phase 07-recurring-tasks]: task_rules.task_id -> tasks on delete cascade, reversing the original
+  FK, because "recurs until deleted" is a database rule and an orphan rule is unrepresentable
+- [Phase 07-recurring-tasks]: `biweekly` dropped from the frequency enum — it is `weekly` with
+  interval 2, and two encodings of one schedule means nothing decides which the form emits
+- [Phase 07-recurring-tasks]: datetime-local strings are resolved to instants by
+  public.upsert_task_recurrence, not in TypeScript — the session timezone for app connections is
+  UTC, so the cast has to happen where Pacific is known
+- [Phase 07-recurring-tasks]: HUMAN DECISION 2026-07-28, mid-phase — `due_at` on reactivation is
+  anchored to the MOST RECENT missed occurrence, not the oldest. A 9-day outage on a 3-day rule
+  returns the task due today, not 9 days overdue; the original plan anchored to the stale original
+  occurrence and was corrected during Task 3's review.
+- [Phase 07-recurring-tasks]: the recurrence model is three states, not two — no rule, paused
+  (`is_active = false`, schedule retained), and active — replacing an original two-state
+  (on/off) assumption that lost the schedule on pause. The badge is driven by `is_active`; the
+  modal's prefill is driven by the stored row regardless of its active state.
 
 ### Decisions reversed
 
@@ -103,6 +130,15 @@ now pushed to `origin`.
   WebKit, Firefox and an iPhone profile; dictation and microphone-permission denial stay manual
   (Chromium's fake-device flags do not drive the Web Speech API, a cloud service in Chrome and
   absent in Firefox) and were run by hand in Chrome, Safari and Firefox. All passed — F10.
+- Monthly recurrence drifts on month-end anchors: `interval '1 month'` moves Jan 31 to Feb 28 and it
+  stays on the 28th. Needs a day-of-month anchor column to fix. Accepted in Phase 07.
+- Recurrence has no per-occurrence history. The one-row model means nothing records that a given
+  occurrence was completed; task_updates cannot fill it because member_id is not null and the
+  generator does not know who completed the task. Accepted in Phase 07.
+- Phase 07 production deploy is PENDING — a human decision, not a blocked task. Before merging to
+  `main`, `07-FOLLOWUPS.md` F4 needs a check of production's `task_rules` row count: migration 012
+  adds a `not null` column plus two validating `check` constraints that abort the migration if any
+  existing row fails them. Dev had zero rows, so this path was never exercised there.
 
 ### Resolved concerns
 
@@ -140,6 +176,9 @@ now pushed to `origin`.
 
 ## Session Continuity
 
-Last session: 2026-07-27
-Stopped at: Phase 6.5 followups — seven closed, six open
-Resume file: .planning/phases/06.5-app-wide-ui-polish/06.5-FOLLOWUPS.md
+Last session: 2026-07-29
+Stopped at: Phase 07 (recurring tasks) closed out on the dev side — 10/10 tasks code-complete,
+verified against `task-manager-dev`, `07-VERIFICATION.md` and `07-FOLLOWUPS.md` written. Production
+deploy (Phase 7 Step 4: merge to `main`) was deliberately NOT taken — awaiting a human decision.
+Resume file: .planning/phases/07-recurring-tasks/07-VERIFICATION.md (and 07-FOLLOWUPS.md F4 before
+any merge to main)

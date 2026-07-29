@@ -307,3 +307,24 @@ leaves the user signed out.
 
 **Rule:** for any Supabase auth call, ask what the deliberately-ambiguous response looks like before
 treating a null error as success.
+
+## L17 — A plan's verbatim code is not verified code
+
+**Learned:** 2026-07-28/29, phase 07 (recurring tasks).
+
+Tasks 2-9 copied migration SQL and TypeScript straight from the plan, as instructed, into files
+that a green test suite then passed. The review loop still caught, in code transcribed exactly as
+written: an infinite loop (a `case` with no `else` returning `NULL`, so `exit when v_next > now()`
+never fired and nothing was ever raised for the exception handler to catch), `due_at` anchored to
+the wrong occurrence, a zod datetime validator that silently accepted the one input shape it was
+supposed to reject, a `"use server"` export that would have become an unauthenticated endpoint the
+moment something imported it, a ghost-row failure mode with no atomicity, an inert error toast
+behind an open dialog, and a feature (pause) that quietly destroyed the data it claimed to preserve.
+None of these were caught by the suite being green — each needed a reviewer reading the code for
+what it does, not what it was supposed to do.
+
+**Rule:** "the plan says to write this exactly" is not a reason to skip review. A detailed plan
+raises confidence in the design, not in the transcription — every plan-to-code step still needs the
+same review a from-scratch implementation would get, and "tests pass" is a different claim from
+"the code is correct," especially for logic a jsdom/jest suite cannot exercise (timing, loop
+termination, transaction boundaries, module export surface).
