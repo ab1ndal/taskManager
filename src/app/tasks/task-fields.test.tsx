@@ -15,6 +15,7 @@ const workspaces = [
 
 function setup(overrides: Partial<React.ComponentProps<typeof TaskFields>> = {}) {
   const onRecurrenceChange = jest.fn();
+  const onRecurrenceEnabledChange = jest.fn();
   const { recurrence: initialRecurrence = null, ...restOverrides } = overrides;
   const props = {
     idPrefix: "new-task" as const,
@@ -32,30 +33,41 @@ function setup(overrides: Partial<React.ComponentProps<typeof TaskFields>> = {})
     disabled: false,
     dictation: { stop: jest.fn(), field: null, claim: jest.fn(), supported: false },
     ...restOverrides,
-  } as Omit<React.ComponentProps<typeof TaskFields>, "recurrence" | "onRecurrenceChange">;
+  } as Omit<
+    React.ComponentProps<typeof TaskFields>,
+    "recurrence" | "recurrenceEnabled" | "onRecurrenceChange" | "onRecurrenceEnabledChange"
+  >;
 
   // TaskFields is fully controlled and holds no state of its own, so a spy that never feeds a
   // value back in leaves every keystroke fighting React's own controlled-input restoration (it
   // resets the DOM to the last-committed prop the instant an event's value doesn't match it) —
   // real usage never hits this because the parent modal's setState always closes the loop. This
   // wrapper is that parent: it applies each change to state, in addition to recording it on the
-  // spy the assertions read.
+  // spy the assertions read. Every existing caller here passes a schedule only when it wants the
+  // section already open, so deriving the initial enabled flag from "is there a recurrence" keeps
+  // every prior test's setup call unchanged.
   function Harness() {
     const [recurrence, setRecurrence] = useState<RecurrenceValue | null>(initialRecurrence);
+    const [recurrenceEnabled, setRecurrenceEnabled] = useState<boolean>(initialRecurrence !== null);
     return (
       <TaskFields
         {...props}
         recurrence={recurrence}
+        recurrenceEnabled={recurrenceEnabled}
         onRecurrenceChange={(next) => {
           onRecurrenceChange(next);
           setRecurrence(next);
+        }}
+        onRecurrenceEnabledChange={(enabled) => {
+          onRecurrenceEnabledChange(enabled);
+          setRecurrenceEnabled(enabled);
         }}
       />
     );
   }
 
   render(<Harness />);
-  return { onRecurrenceChange };
+  return { onRecurrenceChange, onRecurrenceEnabledChange };
 }
 
 describe("Repeats", () => {
@@ -78,12 +90,17 @@ describe("Repeats", () => {
     );
   });
 
-  it("switching it off clears the recurrence", async () => {
-    const { onRecurrenceChange } = setup({
+  it("switching it off disables the schedule without clearing its stored values", async () => {
+    const { onRecurrenceChange, onRecurrenceEnabledChange } = setup({
       recurrence: { frequency: "daily", intervalCount: 3, firstRunAt: "2026-07-30T09:00", dueOffsetHours: null },
     });
     await userEvent.click(screen.getByLabelText("Repeats"));
-    expect(onRecurrenceChange).toHaveBeenCalledWith(null);
+
+    expect(onRecurrenceEnabledChange).toHaveBeenCalledWith(false);
+    // Unlike the old contract, turning Repeats off never nulls the value — that is what lets a
+    // paused rule's cadence come back unchanged when it is switched back on (see edit-task-modal).
+    expect(onRecurrenceChange).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("Repeat every")).not.toBeInTheDocument();
   });
 
   it("shows the schedule when it is on", () => {

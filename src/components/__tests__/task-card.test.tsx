@@ -65,6 +65,23 @@ describe("TaskCard", () => {
     expect(screen.queryByText("Shared")).not.toBeInTheDocument();
   });
 
+  it("renders a repeat badge when recurring=true", () => {
+    render(<TaskCard {...baseProps} recurring />);
+    const badge = screen.getByLabelText("Repeats");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveAttribute("role", "img");
+  });
+
+  it("does not render a repeat badge for a one-off task", () => {
+    render(<TaskCard {...baseProps} />);
+    expect(screen.queryByLabelText("Repeats")).not.toBeInTheDocument();
+  });
+
+  it("does not render a repeat badge for a paused rule (recurring=false)", () => {
+    render(<TaskCard {...baseProps} recurring={false} />);
+    expect(screen.queryByLabelText("Repeats")).not.toBeInTheDocument();
+  });
+
   describe("opening the task from the card", () => {
     const subtasks = [{ id: "s-1", title: "Milk", completed_at: null }];
 

@@ -228,7 +228,15 @@ export function NewTaskModal({
             disabled={disabled}
             dictation={dictation}
             recurrence={recurrence}
+            // A new task has no prior rule to remember, so unlike the edit modal there is nothing
+            // gained by keeping `recurrence` around once the toggle turns off — clearing it here
+            // is what makes `recurrenceEnabled` collapse back to the simple `recurrence !== null`
+            // this modal used before Repeats existed.
+            recurrenceEnabled={recurrence !== null}
             onRecurrenceChange={setRecurrence}
+            onRecurrenceEnabledChange={(enabled) => {
+              if (!enabled) setRecurrence(null);
+            }}
           />
 
           {/*

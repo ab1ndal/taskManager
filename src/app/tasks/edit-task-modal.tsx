@@ -86,7 +86,11 @@ export function EditTaskModal({
   const [dueAt, setDueAt] = useState(task.due_at ? task.due_at.slice(0, 10) : "");
   const [workspaceId, setWorkspaceId] = useState(task.workspace.id);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(task.member_ids);
+  // `recurrence` is the stored/draft schedule and `recurrenceEnabled` the on/off state, kept apart
+  // so pausing a rule (Repeats off) never loses the cadence the user set — re-enabling it restores
+  // these values instead of TaskFields seeding fresh defaults over them.
   const [recurrence, setRecurrence] = useState<RecurrenceValue | null>(task.recurrence ?? null);
+  const [recurrenceEnabled, setRecurrenceEnabled] = useState<boolean>(Boolean(task.recurring));
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
 
@@ -118,6 +122,7 @@ export function EditTaskModal({
     setUpdates([]);
     setUpdatesLoadError("");
     setRecurrence(task.recurrence ?? null);
+    setRecurrenceEnabled(Boolean(task.recurring));
   }
 
   // One controller for the whole modal: the update composer, the task description and both subtask
@@ -361,8 +366,9 @@ export function EditTaskModal({
     // Same schema `setTaskRecurrence` parses, checked here for the same reason as `updateTaskSchema`
     // above: catching e.g. an emptied "Repeat every" client-side, instead of paying a round trip to
     // learn what the input already told us. `updateTaskSchema` has no recurrence field of its own,
-    // so this runs separately.
-    if (recurrence) {
+    // so this runs separately. Only validated while enabled: a paused rule's fields are hidden and
+    // unedited, so whatever is already stored in `recurrence` is already known-valid.
+    if (recurrenceEnabled && recurrence) {
       // RecurrenceValue uses null for "no offset set"; the schema (shared with the new-task modal,
       // where the field is genuinely absent rather than null) only accepts undefined for that.
       const recurrenceParsed = recurrenceSchema.safeParse({
@@ -376,11 +382,12 @@ export function EditTaskModal({
     }
     setFormError("");
 
-    // A schedule write only happens when there is a schedule to write — a task with none, which
-    // stays off, never calls `setTaskRecurrence` and so has nothing that can fail inline. Closing
-    // it right away (as every non-recurring edit already did) keeps that common case unchanged;
-    // only the recurring path holds the modal open until the write actually succeeds or fails.
-    const hasSchedule = recurrence || task.recurrence;
+    // A schedule write only happens when there is a schedule to write — a task that has never had
+    // one stays off, never calls `setTaskRecurrence`, and so has nothing that can fail inline.
+    // Closing it right away (as every non-recurring edit already did) keeps that common case
+    // unchanged; only the recurring path — including a paused rule being left paused, which still
+    // needs its is_active write — holds the modal open until the write actually succeeds or fails.
+    const hasSchedule = recurrenceEnabled || recurrence !== null;
     if (!hasSchedule) onClose();
 
     startTransition(async () => {
@@ -398,16 +405,14 @@ export function EditTaskModal({
       // Turning Repeats off pauses rather than deletes, so the schedule the user already set is
       // still there if they turn it back on. Deleting the task is what ends a recurrence, and the
       // FK cascade in migration 012 does that.
-      if (hasSchedule) {
+      if (hasSchedule && recurrence) {
         const recurrenceResult = await setTaskRecurrence({
           taskId: task.id,
-          frequency: recurrence?.frequency ?? task.recurrence!.frequency,
-          intervalCount: recurrence?.intervalCount ?? task.recurrence!.intervalCount,
-          firstRunAt: recurrence?.firstRunAt ?? task.recurrence!.firstRunAt,
-          dueOffsetHours: recurrence
-            ? (recurrence.dueOffsetHours ?? undefined)
-            : (task.recurrence?.dueOffsetHours ?? undefined),
-          isActive: recurrence !== null,
+          frequency: recurrence.frequency,
+          intervalCount: recurrence.intervalCount,
+          firstRunAt: recurrence.firstRunAt,
+          dueOffsetHours: recurrence.dueOffsetHours ?? undefined,
+          isActive: recurrenceEnabled,
         });
 
         if (!recurrenceResult.ok) {
@@ -468,7 +473,9 @@ export function EditTaskModal({
             disabled={pending}
             dictation={dictation}
             recurrence={recurrence}
+            recurrenceEnabled={recurrenceEnabled}
             onRecurrenceChange={setRecurrence}
+            onRecurrenceEnabledChange={setRecurrenceEnabled}
           />
 
           {formError && (

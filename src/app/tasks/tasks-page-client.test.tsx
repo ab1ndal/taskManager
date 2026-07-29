@@ -25,9 +25,16 @@ jest.mock("./new-task-modal", () => ({
   ),
 }));
 
-// Mock TaskCard — not under test here
+// Mock TaskCard — not under test here. `recurring` is echoed as an aria-labelled span rather than
+// dropped, so the tests below can assert TasksPageClient actually threads `task.recurring` through
+// to the prop; the badge's real rendering (icon, role="img") is covered in TaskCard's own test.
 jest.mock("@/components/task-card", () => ({
-  TaskCard: ({ title }: { title: string }) => <div data-testid="task-card">{title}</div>,
+  TaskCard: ({ title, recurring }: { title: string; recurring?: boolean }) => (
+    <div data-testid="task-card">
+      {title}
+      {recurring && <span aria-label="Repeats" />}
+    </div>
+  ),
   EmptyState: () => <div data-testid="empty-state" />,
 }));
 

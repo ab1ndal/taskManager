@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Circle, CircleCheck, GripVertical, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { Circle, CircleCheck, GripVertical, Pencil, Repeat, RotateCcw, Trash2 } from "lucide-react";
 import { completeTask, deleteTask, reopenTask } from "@/app/tasks/actions";
 import { ICON_PRIMARY, ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { toast } from "@/components/toaster";
@@ -44,6 +44,7 @@ export function TaskCard({
   deadlineVariant,
   workspace,
   shared,
+  recurring,
   completed,
   subtasks,
   onEdit,
@@ -55,6 +56,8 @@ export function TaskCard({
   deadlineVariant?: DeadlineVariant | null;
   workspace: string;
   shared?: boolean;
+  /** Drives the repeat badge beside the title. Absent/false for a one-off task or a paused rule. */
+  recurring?: boolean;
   completed?: boolean;
   subtasks?: { id: string; title: string; completed_at: string | null }[];
   onEdit?: () => void;
@@ -157,6 +160,21 @@ export function TaskCard({
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {deadline && deadlineVariant && <DeadlineBadge variant={deadlineVariant} label={deadline} />}
             {shared && <SharedBadge />}
+            {/*
+              aria-label rather than aria-hidden: this is the only place on the card stating the
+              task repeats, so it has to be announced. role="img" backs that up for assistive tech
+              that only reads aria-label off elements it already treats as meaningful, which a bare
+              <svg> is not guaranteed to be.
+            */}
+            {recurring && (
+              <Repeat
+                size={ICON_SECONDARY}
+                strokeWidth={ICON_STROKE}
+                role="img"
+                aria-label="Repeats"
+                className="shrink-0 text-[var(--color-text-muted)]"
+              />
+            )}
             <span className="text-xs text-[var(--color-text-muted)]">{workspace}</span>
           </div>
         </div>
