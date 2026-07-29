@@ -936,6 +936,43 @@ describe("EditTaskModal — recurrence", () => {
     );
   });
 
+  // The other direction of the same round trip, and the one that actually produced the original
+  // bug: pausing an ACTIVE rule must write is_active=false while sending its existing values
+  // untouched, not nulling them and not silently resetting them to TaskFields' daily/1/tomorrow
+  // defaults. Deliberately non-default values (weekly/3/a specific start/an offset) so a reset to
+  // defaults would be visible here instead of coincidentally matching.
+  it("preserves an active schedule's own values when Repeats is turned off", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: true });
+    const activeTask: RawTask = {
+      ...mockTask,
+      recurring: true,
+      recurrence: { frequency: "weekly", intervalCount: 3, firstRunAt: "2026-09-01T09:00", dueOffsetHours: 6 },
+    };
+
+    render(
+      <EditTaskModal open task={activeTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    expect(screen.getByLabelText("Repeats")).toBeChecked();
+    await userEvent.click(screen.getByLabelText("Repeats"));
+    expect(screen.getByLabelText("Repeats")).not.toBeChecked();
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(setTaskRecurrence).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: activeTask.id,
+          frequency: "weekly",
+          intervalCount: 3,
+          firstRunAt: "2026-09-01T09:00",
+          dueOffsetHours: 6,
+          isActive: false,
+        })
+      )
+    );
+  });
+
   // updateTask's error path used to toast unconditionally, which is fine when there is no schedule
   // (the modal already closed above by then) but was inert when there is one: the modal is still
   // open at this point, and an open <dialog>.showModal() makes the toaster unfocusable and
