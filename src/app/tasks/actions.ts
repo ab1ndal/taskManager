@@ -326,23 +326,31 @@ export async function createTaskWithSubtasks(
 export async function updateTask(input: UpdateTaskInput): Promise<ActionResult> {
   return run("updateTask", async () => {
     const { user } = await requireUser();
-    const { taskId, title, description, dueAt, memberIds } = parseInput(updateTaskSchema, input);
+    const { taskId, title, description, dueAt, memberIds, workspaceId } = parseInput(
+      updateTaskSchema,
+      input
+    );
     await assertTaskAssignee(taskId, user.id);
 
     const admin = createAdminClient();
     const uniqueNewIds = [...new Set(memberIds)];
 
     // Reassignment is scoped to the task's own workspace — otherwise a caller could hand the task
-    // to a member row belonging to a workspace they have nothing to do with.
+    // to a member row belonging to a workspace they have nothing to do with. A move widens that
+    // scope to the destination workspace, which the caller must belong to.
     const { data: task, error: taskError } = await admin
       .from("tasks")
-      .select("workspace_id")
+      .select("workspace_id, parent_task_id")
       .eq("id", taskId)
       .single();
 
     if (taskError || !task) throw new Error(taskError?.message ?? "Task not found");
 
-    await assertMembersInWorkspace(uniqueNewIds, task.workspace_id as string);
+    const isMove = workspaceId !== undefined && workspaceId !== task.workspace_id;
+    const targetWorkspaceId = isMove ? workspaceId! : (task.workspace_id as string);
+
+    if (isMove) await assertWorkspaceMember(targetWorkspaceId, user.id);
+    await assertMembersInWorkspace(uniqueNewIds, targetWorkspaceId);
 
     assertNoError(
       "update task",
@@ -355,6 +363,28 @@ export async function updateTask(input: UpdateTaskInput): Promise<ActionResult> 
         })
         .eq("id", taskId)
     );
+
+    // A move rewrites the workspace of the task and every subtask, and rewrites all of their
+    // assignments — member ids belong to one workspace, so the old rows cannot survive. Both halves
+    // run inside one Postgres function (migration 010): a task sitting in its new workspace while
+    // still assigned to the old one's members is visible to the wrong people, and separate
+    // PostgREST calls have no way to roll that back.
+    if (isMove) {
+      if (task.parent_task_id) {
+        const message = "A subtask moves with its parent, so it cannot change workspace on its own";
+        throw new ValidationError({ workspaceId: [message] }, message);
+      }
+
+      const { error: moveError } = await admin.rpc("move_task_workspace", {
+        p_task_id: taskId,
+        p_workspace_id: targetWorkspaceId,
+        p_member_ids: uniqueNewIds,
+      });
+      if (moveError) throw new Error(`move task workspace: ${moveError.message}`);
+
+      revalidatePath("/tasks");
+      return {};
+    }
 
     const { data: currentAssignments, error: assignmentsError } = await admin
       .from("task_assignments")

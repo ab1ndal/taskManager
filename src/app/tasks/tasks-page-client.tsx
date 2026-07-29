@@ -136,7 +136,7 @@ export function TasksPageClient({
 }: {
   workspaces: Workspace[];
   currentMemberIds: string[];
-  memberIdByWorkspaceId: Record<string, string>; // used by drag-to-reorder (Task 15)
+  memberIdByWorkspaceId: Record<string, string>; // drag-to-reorder, and the edit modal's workspace move
   workspaceFilter?: string;
   viewFilter?: string;
   initialTasks: RawTask[];
@@ -231,6 +231,7 @@ export function TasksPageClient({
           open={!!editingTask}
           task={editingTask}
           workspaces={workspaces}
+          memberIdByWorkspaceId={memberIdByWorkspaceId}
           onClose={() => setEditingTask(null)}
         />
       )}

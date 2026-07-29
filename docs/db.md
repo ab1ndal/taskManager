@@ -79,6 +79,9 @@ created_at timestamptz not null
 
 Notes
 Subtasks are rows with parent_task_id set.
+A task may be moved to another workspace only through move_task_workspace (migration 010): member ids
+are workspace-scoped, so the parent, its subtasks and all of their task_assignments rows must change
+together, in one transaction.
 
 ### task_assignments
 

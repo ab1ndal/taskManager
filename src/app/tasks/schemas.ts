@@ -52,6 +52,12 @@ export const updateTaskSchema = z.object({
   description,
   dueAt,
   memberIds,
+  /**
+   * Absent means "leave the workspace alone". Present and different from the task's current
+   * workspace is a move: the task and its subtasks change workspace and are reassigned to
+   * `memberIds`, which must be members of this workspace.
+   */
+  workspaceId: uuid.optional(),
 });
 
 const updateText = z

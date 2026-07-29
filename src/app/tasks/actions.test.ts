@@ -17,6 +17,7 @@ const WS2 = "a0000000-0000-4000-8000-000000000002";
 const M1 = "b0000000-0000-4000-8000-000000000001";
 const M2 = "b0000000-0000-4000-8000-000000000002";
 const M_OUTSIDER = "b0000000-0000-4000-8000-000000000003";
+const M1_WS2 = "b0000000-0000-4000-8000-000000000004";
 const T1 = "c0000000-0000-4000-8000-000000000001";
 const T_OTHER = "c0000000-0000-4000-8000-000000000002";
 const P1 = "d0000000-0000-4000-8000-000000000001";
@@ -414,6 +415,104 @@ describe("updateTask", () => {
 
     expect(assignmentsIn(tables)).toHaveLength(1);
     expect(assignmentsIn(tables)[0].member_id).toBe(M1);
+  });
+
+  // ─── moving to another workspace ───────────────────────────────────────────
+
+  /** M1_WS2 is the signed-in user's own member row in WS2, which is where a move can go. */
+  function seedForMove(): Tables {
+    const tables = seed();
+    tables.workspace_members.push({
+      id: M1_WS2,
+      workspace_id: WS2,
+      auth_user_id: "auth-user-1",
+      display_name: "Alice at work",
+    });
+    tables.tasks.push({ id: S1, workspace_id: WS1, parent_task_id: T1, completed_at: null, title: "Sub" });
+    tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
+    return tables;
+  }
+
+  it("moves the task and its subtasks, replacing every assignment", async () => {
+    const tables = seedForMove();
+    setup({ tables });
+
+    const result = await updateTask({
+      taskId: T1,
+      title: "Moved",
+      memberIds: [M1_WS2],
+      workspaceId: WS2,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(tasksIn(tables).find((t) => t.id === T1)).toMatchObject({ workspace_id: WS2, title: "Moved" });
+    expect(tasksIn(tables).find((t) => t.id === S1)?.workspace_id).toBe(WS2);
+    // Old WS1 assignments are gone; parent and subtask are both assigned to the WS2 member.
+    expect(assignmentsIn(tables).filter((a) => a.member_id === M1)).toHaveLength(0);
+    expect(assignmentsIn(tables).filter((a) => a.member_id === M1_WS2).map((a) => a.task_id).sort()).toEqual(
+      [T1, S1].sort()
+    );
+    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+  });
+
+  it("rejects moving a subtask on its own", async () => {
+    const tables = seedForMove();
+    setup({ tables });
+
+    await expectFailure(
+      updateTask({ taskId: S1, title: "Sub", memberIds: [M1_WS2], workspaceId: WS2 }),
+      "subtask moves with its parent"
+    );
+
+    expect(tasksIn(tables).find((t) => t.id === S1)?.workspace_id).toBe(WS1);
+  });
+
+  it("rejects a move into a workspace the caller does not belong to", async () => {
+    const tables = seedForMove();
+    // The caller's own WS2 row is what authorizes the move; without it WS2 is someone else's.
+    tables.workspace_members = tables.workspace_members.filter((m) => (m as Row).id !== M1_WS2);
+    tables.workspace_members.push({
+      id: M1_WS2,
+      workspace_id: WS2,
+      auth_user_id: "auth-user-9",
+      display_name: "Not you",
+    });
+    setup({ tables });
+
+    await expectFailure(
+      updateTask({ taskId: T1, title: "T", memberIds: [M1_WS2], workspaceId: WS2 }),
+      `Forbidden`
+    );
+
+    expect(tasksIn(tables).find((t) => t.id === T1)?.workspace_id).toBe(WS1);
+  });
+
+  it("rejects a move that assigns members outside the destination workspace", async () => {
+    const tables = seedForMove();
+    setup({ tables });
+
+    await expectFailure(
+      updateTask({ taskId: T1, title: "T", memberIds: [M1], workspaceId: WS2 }),
+      `members not in workspace ${WS2}: ${M1}`
+    );
+
+    expect(tasksIn(tables).find((t) => t.id === T1)?.workspace_id).toBe(WS1);
+    expect(assignmentsIn(tables).filter((a) => a.task_id === T1)).toHaveLength(1);
+  });
+
+  // The modal sends the task's workspace on every save, so the no-move case must stay on the
+  // diff-based assignment path rather than tearing every assignment down and rebuilding it.
+  it("treats the task's own workspace id as a plain edit", async () => {
+    const tables = seedForMove();
+    setup({ tables });
+
+    await updateTask({ taskId: T1, title: "Edited", memberIds: [M1, M2], workspaceId: WS1 });
+
+    expect(tasksIn(tables).find((t) => t.id === T1)).toMatchObject({ workspace_id: WS1, title: "Edited" });
+    // M1's existing row kept its sort key — a rebuild would have reassigned it.
+    const m1Row = assignmentsIn(tables).find((a) => a.task_id === T1 && a.member_id === M1);
+    expect(m1Row?.member_sort_key).toBe(1000);
+    expect(assignmentsIn(tables).filter((a) => a.task_id === T1)).toHaveLength(2);
   });
 });
 

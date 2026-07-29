@@ -70,15 +70,19 @@ export function EditTaskModal({
   task,
   onClose,
   workspaces,
+  memberIdByWorkspaceId,
 }: {
   open: boolean;
   task: RawTask;
   onClose: () => void;
   workspaces: Workspace[];
+  /** The signed-in user's own member row per workspace, used to preselect them after a move. */
+  memberIdByWorkspaceId: Record<string, string>;
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");
   const [dueAt, setDueAt] = useState(task.due_at ? task.due_at.slice(0, 10) : "");
+  const [workspaceId, setWorkspaceId] = useState(task.workspace.id);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(task.member_ids);
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
@@ -297,7 +301,29 @@ export function EditTaskModal({
     });
   }
 
-  const currentWorkspace = workspaces.find((w) => w.id === task.workspace.id);
+  // The selected workspace, not the task's stored one: it owns the member rows the Assign-to list is
+  // built from, and while a move is staged those must be the destination's members.
+  const selectedWorkspace = workspaces.find((w) => w.id === workspaceId);
+  const isMove = workspaceId !== task.workspace.id;
+
+  /**
+   * A member id belongs to exactly one workspace, so the current assignees cannot carry across a
+   * move. The destination starts with the one assignee that is always correct — the person doing the
+   * move — and they adjust from there. Returning to the original workspace restores what the task
+   * actually has, so an accidental change costs nothing.
+   */
+  function handleWorkspaceChange(nextWorkspaceId: string) {
+    setWorkspaceId(nextWorkspaceId);
+    setFormError("");
+
+    if (nextWorkspaceId === task.workspace.id) {
+      setSelectedMemberIds(task.member_ids);
+      return;
+    }
+
+    const ownMemberId = memberIdByWorkspaceId[nextWorkspaceId];
+    setSelectedMemberIds(ownMemberId ? [ownMemberId] : []);
+  }
 
   function toggleMember(id: string) {
     setSelectedMemberIds((prev) =>
@@ -316,6 +342,7 @@ export function EditTaskModal({
       description: description.trim() || undefined,
       dueAt: dueAt || undefined,
       memberIds: selectedMemberIds,
+      workspaceId,
     });
 
     if (!parsed.success) {
@@ -397,10 +424,45 @@ export function EditTaskModal({
             />
           </div>
 
+          {/*
+            Sits directly above Assign to because it governs that list: member rows belong to one
+            workspace, so changing this changes who the task can be assigned to. Only shown when
+            there is somewhere to move to.
+          */}
+          {workspaces.length > 1 && (
+            <div>
+              <label htmlFor="edit-task-workspace" className="block text-xs text-[var(--color-text-muted)] mb-1">
+                Workspace
+              </label>
+              <select
+                id="edit-task-workspace"
+                value={workspaceId}
+                onChange={(e) => handleWorkspaceChange(e.target.value)}
+                disabled={pending}
+                className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+              >
+                {workspaces.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              {isMove && (
+                <p className="mt-1 text-2xs text-[var(--color-text-muted)]">
+                  Saving moves this task
+                  {subtasks.length > 0 &&
+                    ` and its ${subtasks.length === 1 ? "subtask" : `${subtasks.length} subtasks`}`}{" "}
+                  to {selectedWorkspace?.name} and replaces who it is assigned to. Priority order in{" "}
+                  {task.workspace.name} is not kept.
+                </p>
+              )}
+            </div>
+          )}
+
           <fieldset>
             <legend className="block text-xs text-[var(--color-text-muted)] mb-1">Assign to</legend>
             <div className="flex flex-col gap-1.5">
-              {currentWorkspace?.members.map((m) => (
+              {selectedWorkspace?.members.map((m) => (
                 <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"

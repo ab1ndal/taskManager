@@ -50,6 +50,22 @@ const mockTask: RawTask = {
 
 const mockWs = { id: "a0000000-0000-4000-8000-000000000001", name: "Home", kind: "household", members: [{ id: "b0000000-0000-4000-8000-000000000001", display_name: "Alice" }] };
 
+// A second workspace the signed-in user also belongs to, so the task has somewhere to move to.
+const otherWs = {
+  id: "a0000000-0000-4000-8000-000000000002",
+  name: "Work",
+  kind: "work",
+  members: [
+    { id: "b0000000-0000-4000-8000-000000000002", display_name: "Alice at work" },
+    { id: "b0000000-0000-4000-8000-000000000003", display_name: "Bob" },
+  ],
+};
+
+const memberIdByWorkspaceId = {
+  [mockWs.id]: "b0000000-0000-4000-8000-000000000001",
+  [otherWs.id]: "b0000000-0000-4000-8000-000000000002",
+};
+
 beforeEach(() => {
   // Every render of the modal fires the Updates-loading effect; default it to an empty list so
   // tests unrelated to Updates don't have to stub it themselves.
@@ -61,7 +77,7 @@ describe("EditTaskModal", () => {
 
   it("renders with task values pre-filled", () => {
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
     expect(screen.getByDisplayValue("Buy groceries")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Milk and eggs")).toBeInTheDocument();
@@ -73,7 +89,7 @@ describe("EditTaskModal", () => {
     mock.mockResolvedValue({ ok: true });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     const titleInput = screen.getByDisplayValue("Buy groceries");
@@ -94,7 +110,7 @@ describe("EditTaskModal", () => {
     const onClose = jest.fn();
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={onClose} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={onClose} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
@@ -110,7 +126,7 @@ describe("EditTaskModal", () => {
     const onClose = jest.fn();
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={onClose} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={onClose} />
     );
 
     const titleInput = screen.getByDisplayValue("Buy groceries");
@@ -125,7 +141,7 @@ describe("EditTaskModal", () => {
 
   it("does not render when open is false", () => {
     render(
-      <EditTaskModal open={false} task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open={false} task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
     expect(screen.queryByDisplayValue("Buy groceries")).not.toBeInTheDocument();
   });
@@ -138,7 +154,7 @@ describe("EditTaskModal — Dialog primitive", () => {
 
   it("focuses the title input when the modal opens, without user interaction", () => {
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
     expect(screen.getByDisplayValue("Buy groceries")).toHaveFocus();
   });
@@ -146,7 +162,7 @@ describe("EditTaskModal — Dialog primitive", () => {
   it("pressing Escape calls the same onClose Cancel calls", () => {
     const onClose = jest.fn();
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={onClose} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={onClose} />
     );
     const dialogEl = screen.getByRole("dialog", { hidden: true });
     fireEvent(dialogEl, new Event("close"));
@@ -168,7 +184,7 @@ describe("EditTaskModal — Updates", () => {
     });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     const updateItem = (await screen.findByText("First update")).closest("li")!;
@@ -183,7 +199,7 @@ describe("EditTaskModal — Updates", () => {
     });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await screen.findByPlaceholderText(/add an update/i);
@@ -199,7 +215,7 @@ describe("EditTaskModal — Updates", () => {
     jest.mocked(addTaskUpdate).mockResolvedValue({ ok: false, error: "Something went wrong" });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await screen.findByPlaceholderText(/add an update/i);
@@ -214,7 +230,7 @@ describe("EditTaskModal — Updates", () => {
     jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await screen.findByPlaceholderText(/add an update/i);
@@ -225,7 +241,7 @@ describe("EditTaskModal — Updates", () => {
     jest.mocked(getTaskUpdates).mockResolvedValue({ ok: false, error: "Could not load updates" });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     expect(await screen.findByText("Could not load updates")).toBeInTheDocument();
@@ -235,7 +251,7 @@ describe("EditTaskModal — Updates", () => {
     jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     const headings = (await screen.findAllByRole("heading", { level: 4 })).map((h) => h.textContent);
@@ -251,7 +267,7 @@ describe("EditTaskModal — Updates", () => {
     });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await screen.findByText("Ordered it");
@@ -269,7 +285,7 @@ describe("EditTaskModal — Updates", () => {
     });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     const list = (await screen.findByText("Ordered it")).closest("ul");
@@ -313,7 +329,7 @@ describe("EditTaskModal — Updates", () => {
       jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
 
       render(
-        <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+        <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
       );
 
       await screen.findByPlaceholderText(/add an update/i);
@@ -334,7 +350,7 @@ describe("EditTaskModal — Updates", () => {
       });
 
       render(
-        <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+        <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
       );
 
       await screen.findByPlaceholderText(/add an update/i);
@@ -359,7 +375,7 @@ describe("EditTaskModal — Updates", () => {
     });
 
     const { rerender } = render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
     await screen.findByText("First task update");
 
@@ -368,7 +384,7 @@ describe("EditTaskModal — Updates", () => {
     jest.mocked(getTaskUpdates).mockReturnValue(new Promise(() => {}));
     const otherTask = { ...mockTask, id: "c0000000-0000-4000-8000-000000000002", title: "Other task" };
     rerender(
-      <EditTaskModal open task={otherTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={otherTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     expect(screen.queryByText("First task update")).not.toBeInTheDocument();
@@ -378,14 +394,14 @@ describe("EditTaskModal — Updates", () => {
     jest.mocked(getTaskUpdates).mockResolvedValue({ ok: false, error: "Could not load updates" });
 
     const { rerender } = render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
     await screen.findByText("Could not load updates");
 
     jest.mocked(getTaskUpdates).mockReturnValue(new Promise(() => {}));
     const otherTask = { ...mockTask, id: "c0000000-0000-4000-8000-000000000002", title: "Other task" };
     rerender(
-      <EditTaskModal open task={otherTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={otherTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     expect(screen.queryByText("Could not load updates")).not.toBeInTheDocument();
@@ -402,7 +418,7 @@ describe("EditTaskModal — Subtasks", () => {
     jest.mocked(getTaskUpdates).mockResolvedValue({ ok: true, updates: [] });
 
     render(
-      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     expect(screen.getByText("Existing subtask")).toBeInTheDocument();
@@ -413,7 +429,7 @@ describe("EditTaskModal — Subtasks", () => {
     jest.mocked(addSubtask).mockResolvedValue({ ok: true, subtask: { id: "s2", title: "New subtask", completed_at: null, description: null, due_at: null } });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await userEvent.type(screen.getByPlaceholderText(/new subtask title/i), "New subtask");
@@ -430,7 +446,7 @@ describe("EditTaskModal — Subtasks", () => {
     jest.mocked(addSubtask).mockResolvedValue({ ok: false, error: "Something went wrong" });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await userEvent.type(screen.getByPlaceholderText(/new subtask title/i), "Will fail");
@@ -447,7 +463,7 @@ describe("EditTaskModal — Subtasks", () => {
     });
 
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await userEvent.type(screen.getByPlaceholderText(/new subtask title/i), "New subtask");
@@ -477,7 +493,7 @@ describe("EditTaskModal — Subtasks", () => {
     };
 
     render(
-      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     // The values a subtask already holds have to be visible before they can be edited — they were
@@ -515,7 +531,7 @@ describe("EditTaskModal — Subtasks", () => {
     };
 
     render(
-      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /edit "existing subtask"/i }));
@@ -536,7 +552,7 @@ describe("EditTaskModal — Subtasks", () => {
     };
 
     render(
-      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /delete "existing subtask"/i }));
@@ -554,7 +570,7 @@ describe("EditTaskModal — Subtasks", () => {
     };
 
     render(
-      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /delete "existing subtask"/i }));
@@ -571,7 +587,7 @@ describe("EditTaskModal — Subtasks", () => {
     };
 
     render(
-      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={taskWithSubtasks} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
     await userEvent.click(screen.getByRole("button", { name: /delete "existing subtask"/i }));
@@ -626,7 +642,7 @@ describe("EditTaskModal — field labelling", () => {
     "associates the %s label with its control",
     (labelText) => {
       render(
-        <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+        <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
       );
       expect(screen.getByLabelText(labelText)).toBeInTheDocument();
     }
@@ -634,8 +650,109 @@ describe("EditTaskModal — field labelling", () => {
 
   it("groups the assignee checkboxes under an Assign to group label", () => {
     render(
-      <EditTaskModal open task={mockTask} workspaces={[mockWs]} onClose={() => {}} />
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
     expect(screen.getByRole("group", { name: "Assign to" })).toBeInTheDocument();
+  });
+});
+
+// ─── Moving a task to another workspace ──────────────────────────────────────
+
+describe("EditTaskModal — workspace move", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const bothWorkspaces = [mockWs, otherWs];
+
+  function renderWithBoth(task: RawTask = mockTask) {
+    return render(
+      <EditTaskModal
+        open
+        task={task}
+        workspaces={bothWorkspaces}
+        memberIdByWorkspaceId={memberIdByWorkspaceId}
+        onClose={() => {}}
+      />
+    );
+  }
+
+  // Nothing to move to means the control is noise, and it would read as an editable field that
+  // cannot change.
+  it("hides the workspace select when the user belongs to one workspace", () => {
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+    expect(screen.queryByLabelText("Workspace")).not.toBeInTheDocument();
+  });
+
+  it("shows the task's workspace as the current selection", () => {
+    renderWithBoth();
+    expect(screen.getByLabelText("Workspace")).toHaveValue(mockWs.id);
+  });
+
+  it("swaps the assignee list to the destination's members and preselects the user's own row", async () => {
+    renderWithBoth();
+
+    await userEvent.selectOptions(screen.getByLabelText("Workspace"), otherWs.id);
+
+    expect(screen.queryByLabelText("Alice")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Alice at work")).toBeChecked();
+    expect(screen.getByLabelText("Bob")).not.toBeChecked();
+  });
+
+  it("restores the task's own assignees when the original workspace is reselected", async () => {
+    renderWithBoth();
+    const select = screen.getByLabelText("Workspace");
+
+    await userEvent.selectOptions(select, otherWs.id);
+    await userEvent.selectOptions(select, mockWs.id);
+
+    expect(screen.getByLabelText("Alice")).toBeChecked();
+  });
+
+  it("warns that subtasks move too and assignments are replaced", async () => {
+    renderWithBoth({
+      ...mockTask,
+      subtasks: [
+        { id: "d0000000-0000-4000-8000-000000000001", title: "Sub", completed_at: null, description: null, due_at: null },
+      ],
+    });
+
+    await userEvent.selectOptions(screen.getByLabelText("Workspace"), otherWs.id);
+
+    expect(screen.getByText(/its subtask .*to Work/i)).toBeInTheDocument();
+  });
+
+  it("sends the destination workspace and its members on save", async () => {
+    const mock = jest.mocked(updateTask);
+    mock.mockResolvedValue({ ok: true });
+
+    renderWithBoth();
+    await userEvent.selectOptions(screen.getByLabelText("Workspace"), otherWs.id);
+    await userEvent.click(screen.getByLabelText("Bob"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: mockTask.id,
+          workspaceId: otherWs.id,
+          memberIds: [memberIdByWorkspaceId[otherWs.id], "b0000000-0000-4000-8000-000000000003"],
+        })
+      )
+    );
+  });
+
+  // The task's own workspace still travels with every save, so the action can tell "no move
+  // requested" from "moved back", without the modal having to special-case it.
+  it("sends the current workspace when nothing was moved", async () => {
+    const mock = jest.mocked(updateTask);
+    mock.mockResolvedValue({ ok: true });
+
+    renderWithBoth();
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: mockWs.id }))
+    );
   });
 });
