@@ -819,4 +819,90 @@ describe("EditTaskModal — recurrence", () => {
     await waitFor(() => expect(updateTask).toHaveBeenCalled());
     expect(setTaskRecurrence).not.toHaveBeenCalled();
   });
+
+  // Nothing previously pinned the actual value sent on the wire — recurrence-time.ts is explicit
+  // that a `datetime-local` value must reach the server byte-for-byte, never converted or offset.
+  it("sends the Starting value exactly as the field holds it, never converted", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-07-30T16:00:00Z")); // 2026-07-30 09:00 PDT
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: true });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    fireEvent.click(screen.getByLabelText("Repeats"));
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(setTaskRecurrence).toHaveBeenCalledWith(
+        expect.objectContaining({ firstRunAt: "2026-07-31T09:00" })
+      )
+    );
+    jest.useRealTimers();
+  });
+
+  // RecurrenceValue.dueOffsetHours uses null for "not set" (task-fields.tsx), so `??` alone can't
+  // tell "cleared" from "never had one" — falling through to the stored value would make the field
+  // uneditable back to empty.
+  it("sends undefined, not the old value, when the due-offset field is cleared", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: true });
+    const taskWithRecurrence: RawTask = {
+      ...mockTask,
+      recurrence: { frequency: "daily", intervalCount: 1, firstRunAt: "2026-07-30T09:00", dueOffsetHours: 4 },
+    };
+
+    render(
+      <EditTaskModal open task={taskWithRecurrence} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    const offsetInput = screen.getByLabelText("Due hours after it appears (optional)");
+    expect(offsetInput).toHaveValue(4);
+    await userEvent.clear(offsetInput);
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(setTaskRecurrence).toHaveBeenCalledWith(
+        expect.objectContaining({ dueOffsetHours: undefined })
+      )
+    );
+  });
+
+  // updateTask's error path used to toast unconditionally, which is fine when there is no schedule
+  // (the modal already closed above by then) but was inert when there is one: the modal is still
+  // open at this point, and an open <dialog>.showModal() makes the toaster unfocusable and
+  // unclickable (tasks/lessons.md L11).
+  it("shows a task-save failure inline, not as a toast, when a schedule write is pending", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: false, error: "Could not save the task" });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByLabelText("Repeats"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save the task");
+    expect(setTaskRecurrence).not.toHaveBeenCalled();
+  });
+
+  // The new-task modal already catches an emptied recurrence field client-side via
+  // createTaskWithSubtasksSchema; this modal's updateTaskSchema has no recurrence field of its own,
+  // so without a separate check the same mistake here only surfaces after a round trip. Clearing
+  // "Starting" rather than "Repeat every": that field has no HTML min/max, so it reaches our schema
+  // check instead of being stopped by the browser's own number-input constraint validation first.
+  it("validates the recurrence client-side, matching the new-task modal", async () => {
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByLabelText("Repeats"));
+    fireEvent.change(screen.getByLabelText("Starting"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/date and a time/i);
+    expect(updateTask).not.toHaveBeenCalled();
+    expect(setTaskRecurrence).not.toHaveBeenCalled();
+  });
 });
