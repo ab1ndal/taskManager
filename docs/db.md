@@ -43,13 +43,10 @@ Unique display_name within a workspace
 ### task_rules
 
 id uuid primary key
-workspace_id uuid not null
+task_id uuid not null unique, references tasks(id) on delete cascade
 
-title text not null
-description text nullable
-
-frequency text not null
-interval_count int not null
+frequency text not null          daily | weekly | monthly
+interval_count int not null      > 0
 next_run_at timestamptz not null
 is_active boolean not null
 
@@ -57,8 +54,12 @@ default_due_offset_hours int nullable
 created_at timestamptz not null
 
 Notes
-Scheduled function generates new tasks when next_run_at is reached.
-Generated tasks set rule_id to this rule id.
+One rule per task, one task per rule. A recurring task is a single permanent tasks row.
+A scheduled function clears completed_at and re-dates the task when next_run_at is reached,
+then rolls next_run_at forward by whole intervals. Nothing is inserted, so a repeated run
+cannot double-create.
+Deleting the task deletes the rule. That is how a recurrence is stopped for good.
+All schedule arithmetic runs in America/Los_Angeles.
 
 ### tasks
 
@@ -66,7 +67,6 @@ id uuid primary key
 workspace_id uuid nullable, set on root tasks only
 
 parent_task_id uuid nullable
-rule_id uuid nullable
 
 title text not null
 description text nullable
@@ -128,6 +128,6 @@ Indexes should exist on:
 
 tasks.workspace_id, tasks.parent_task_id
 task_assignments.member_id, task_assignments.member_sort_key
-task_rules.workspace_id, task_rules.next_run_at
+task_rules.next_run_at (partial, where is_active)
 task_updates.task_id, task_updates.created_at
 workspace_members.workspace_id, workspace_members.auth_user_id

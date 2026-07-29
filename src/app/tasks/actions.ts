@@ -159,7 +159,7 @@ export async function completeTask(rawTaskId: string): Promise<ActionResult> {
 
     const { data: task, error: taskError } = await admin
       .from("tasks")
-      .select("parent_task_id, rule_id")
+      .select("parent_task_id")
       .eq("id", taskId)
       .single();
 

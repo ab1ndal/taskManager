@@ -15,7 +15,6 @@ export type RawTask = {
     description: string | null;
     due_at: string | null;
   }[];
-  rule_id?: string | null;
 };
 
 export type BucketedTask = RawTask & {
