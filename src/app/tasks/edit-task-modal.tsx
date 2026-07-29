@@ -26,6 +26,7 @@ import { useDictation } from "@/lib/use-dictation";
 import { DictationTextarea } from "@/components/dictation-textarea";
 import type { RawTask } from "./bucket-tasks";
 import type { TaskUpdate } from "./actions";
+import { TaskFields } from "./task-fields";
 
 type WorkspaceMember = { id: string; display_name: string };
 type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
@@ -378,76 +379,20 @@ export function EditTaskModal({
       <h3 id="edit-task-modal-title" className="text-base font-semibold mb-4">Edit task</h3>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {/* Same labelling as the new-task modal: visible text, tied to its control by id. */}
-          <div>
-            <label htmlFor="edit-task-title" className="block text-xs text-[var(--color-text-muted)] mb-1">
-              Title
-            </label>
-            <input
-              id="edit-task-title"
-              type="text"
-              placeholder="Task title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={pending}
-              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="edit-task-description" className="block text-xs text-[var(--color-text-muted)] mb-1">
-              Details (optional)
-            </label>
-            <DictationTextarea
-              id="edit-task-description"
-              field="description"
-              dictation={dictation}
-              dictateLabel="Dictate task details"
-              placeholder="Add details…"
-              value={description}
-              onChange={setDescription}
-              disabled={pending}
-              rows={3}
-              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="edit-task-due" className="block text-xs text-[var(--color-text-muted)] mb-1">Due date (optional)</label>
-            <input
-              id="edit-task-due"
-              type="date"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
-              disabled={pending}
-              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
-            />
-          </div>
-
-          {/*
-            Sits directly above Assign to because it governs that list: member rows belong to one
-            workspace, so changing this changes who the task can be assigned to. Only shown when
-            there is somewhere to move to.
-          */}
-          {workspaces.length > 1 && (
-            <div>
-              <label htmlFor="edit-task-workspace" className="block text-xs text-[var(--color-text-muted)] mb-1">
-                Workspace
-              </label>
-              <select
-                id="edit-task-workspace"
-                value={workspaceId}
-                onChange={(e) => handleWorkspaceChange(e.target.value)}
-                disabled={pending}
-                className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
-              >
-                {workspaces.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-              {isMove && (
+          <TaskFields
+            idPrefix="edit-task"
+            title={title}
+            onTitleChange={setTitle}
+            description={description}
+            onDescriptionChange={setDescription}
+            dueAt={dueAt}
+            onDueAtChange={setDueAt}
+            workspaces={workspaces}
+            workspaceId={workspaceId}
+            onWorkspaceChange={handleWorkspaceChange}
+            hideWorkspaceWhenOnlyOne
+            workspaceNote={
+              isMove && (
                 <p className="mt-1 text-2xs text-[var(--color-text-muted)]">
                   Saving moves this task
                   {subtasks.length > 0 &&
@@ -455,27 +400,13 @@ export function EditTaskModal({
                   to {selectedWorkspace?.name} and replaces who it is assigned to. Priority order in{" "}
                   {task.workspace.name} is not kept.
                 </p>
-              )}
-            </div>
-          )}
-
-          <fieldset>
-            <legend className="block text-xs text-[var(--color-text-muted)] mb-1">Assign to</legend>
-            <div className="flex flex-col gap-1.5">
-              {selectedWorkspace?.members.map((m) => (
-                <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedMemberIds.includes(m.id)}
-                    onChange={() => toggleMember(m.id)}
-                    disabled={pending}
-                    className="rounded accent-[var(--color-accent)]"
-                  />
-                  {m.display_name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+              )
+            }
+            selectedMemberIds={selectedMemberIds}
+            onToggleMember={toggleMember}
+            disabled={pending}
+            dictation={dictation}
+          />
 
           {formError && (
             <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
