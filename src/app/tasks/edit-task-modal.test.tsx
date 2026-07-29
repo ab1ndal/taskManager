@@ -15,6 +15,9 @@ jest.mock("./recurring-actions", () => ({
   setTaskRecurrence: jest.fn().mockResolvedValue({ ok: true }),
 }));
 jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
+// Same pattern as new-task-modal.test.tsx: a bare jest.fn() spy, so a toast call can be asserted
+// without the real toaster's DOM/timer side effects.
+jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 import React from "react";
 import { render, screen, waitFor, fireEvent, within, act } from "@testing-library/react";
@@ -29,6 +32,7 @@ import {
   deleteTask,
 } from "./actions";
 import { setTaskRecurrence } from "./recurring-actions";
+import { toast } from "@/components/toaster";
 import type { RawTask } from "./bucket-tasks";
 
 beforeAll(() => {
@@ -884,6 +888,25 @@ describe("EditTaskModal — recurrence", () => {
     await userEvent.click(screen.getByRole("button", { name: /save/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not save the task");
+    expect(setTaskRecurrence).not.toHaveBeenCalled();
+  });
+
+  // The toast path is only safe because the modal already closed synchronously before the write —
+  // that ordering, not just "an error surfaces somehow", is what the branch in handleSubmit exists
+  // to preserve. Assert both: onClose fired, and toast (not an inline alert) carries the error.
+  it("shows a task-save failure as a toast, after already closing, when there is no schedule", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: false, error: "Could not save the task" });
+    const onClose = jest.fn();
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={onClose} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(onClose).toHaveBeenCalled();
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Could not save the task", "error"));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(setTaskRecurrence).not.toHaveBeenCalled();
   });
 
