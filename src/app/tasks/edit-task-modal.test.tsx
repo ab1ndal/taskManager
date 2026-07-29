@@ -1028,4 +1028,55 @@ describe("EditTaskModal — recurrence", () => {
     expect(updateTask).not.toHaveBeenCalled();
     expect(setTaskRecurrence).not.toHaveBeenCalled();
   });
+
+  // The bug: `next_run_at` is prefilled from the task as it stood at page render, which a cron
+  // tick can make stale before the modal is even opened. Writing it back on every save — even one
+  // that never touches the schedule — rewinds `next_run_at` to that stale value and can undo a
+  // completion the user made in between. A save must only write the schedule when the user
+  // actually changed something about it.
+  it("does not call setTaskRecurrence on a pure title edit of a recurring task", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    const recurringTask: RawTask = {
+      ...mockTask,
+      recurring: true,
+      recurrence: { frequency: "daily", intervalCount: 1, firstRunAt: "2026-07-30T09:00", dueOffsetHours: null },
+    };
+
+    render(
+      <EditTaskModal open task={recurringTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    const titleInput = screen.getByDisplayValue("Buy groceries");
+    await userEvent.clear(titleInput);
+    await userEvent.type(titleInput, "Buy more groceries");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(updateTask).toHaveBeenCalled());
+    expect(setTaskRecurrence).not.toHaveBeenCalled();
+  });
+
+  it("still calls setTaskRecurrence when the schedule itself changes", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: true });
+    const recurringTask: RawTask = {
+      ...mockTask,
+      recurring: true,
+      recurrence: { frequency: "daily", intervalCount: 1, firstRunAt: "2026-07-30T09:00", dueOffsetHours: null },
+    };
+
+    render(
+      <EditTaskModal open task={recurringTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    const intervalInput = screen.getByLabelText("Repeat every");
+    await userEvent.clear(intervalInput);
+    await userEvent.type(intervalInput, "2");
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(setTaskRecurrence).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: recurringTask.id, intervalCount: 2, isActive: true })
+      )
+    );
+  });
 });

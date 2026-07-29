@@ -91,6 +91,16 @@ export function EditTaskModal({
   // these values instead of TaskFields seeding fresh defaults over them.
   const [recurrence, setRecurrence] = useState<RecurrenceValue | null>(task.recurrence ?? null);
   const [recurrenceEnabled, setRecurrenceEnabled] = useState<boolean>(Boolean(task.recurring));
+  // Snapshot of what the modal loaded, held apart from `recurrence`/`recurrenceEnabled` above so a
+  // save can tell "the user changed the schedule" from "the schedule fields simply exist" — see
+  // handleSubmit's `recurrenceChanged`. Never written to after load except when the modal is
+  // repointed at a different task.
+  const [initialRecurrence, setInitialRecurrence] = useState<RecurrenceValue | null>(
+    task.recurrence ?? null
+  );
+  const [initialRecurrenceEnabled, setInitialRecurrenceEnabled] = useState<boolean>(
+    Boolean(task.recurring)
+  );
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
 
@@ -123,6 +133,8 @@ export function EditTaskModal({
     setUpdatesLoadError("");
     setRecurrence(task.recurrence ?? null);
     setRecurrenceEnabled(Boolean(task.recurring));
+    setInitialRecurrence(task.recurrence ?? null);
+    setInitialRecurrenceEnabled(Boolean(task.recurring));
   }
 
   // One controller for the whole modal: the update composer, the task description and both subtask
@@ -382,13 +394,31 @@ export function EditTaskModal({
     }
     setFormError("");
 
-    // A schedule write only happens when there is a schedule to write — a task that has never had
-    // one stays off, never calls `setTaskRecurrence`, and so has nothing that can fail inline.
-    // Closing it right away (as every non-recurring edit already did) keeps that common case
-    // unchanged; only the recurring path — including a paused rule being left paused, which still
-    // needs its is_active write — holds the modal open until the write actually succeeds or fails.
-    const hasSchedule = recurrenceEnabled || recurrence !== null;
-    if (!hasSchedule) onClose();
+    // A task that never had a rule and is off again at save time (Repeats toggled on then off
+    // before saving) must write nothing: `recurrence` is deliberately never cleared when the
+    // toggle goes off (task-fields.tsx), so a stray seeded value must not read as "has a schedule".
+    const hadRule = task.recurrence !== null;
+    const willHaveSchedule = hadRule || recurrenceEnabled;
+
+    // `next_run_at` is prefilled from the task as it was when the page rendered, which can already
+    // be stale by the time this save happens (a cron tick landed in between). Writing it back on
+    // every save — even a pure title edit — rewinds the schedule to that stale value. Only write
+    // when the user actually touched the schedule: the enabled state flipped, or a schedule field
+    // differs from what the modal loaded.
+    const recurrenceChanged =
+      recurrenceEnabled !== initialRecurrenceEnabled ||
+      recurrence?.frequency !== initialRecurrence?.frequency ||
+      recurrence?.intervalCount !== initialRecurrence?.intervalCount ||
+      recurrence?.firstRunAt !== initialRecurrence?.firstRunAt ||
+      (recurrence?.dueOffsetHours ?? null) !== (initialRecurrence?.dueOffsetHours ?? null);
+
+    const shouldWriteRecurrence = willHaveSchedule && recurrenceChanged && recurrence !== null;
+
+    // A schedule write only happens when one is actually due — a task with nothing to write stays
+    // off, never calls `setTaskRecurrence`, and so has nothing that can fail inline. Closing it
+    // right away (as every non-recurring edit already did) keeps that common case unchanged; only a
+    // real schedule change holds the modal open until the write actually succeeds or fails.
+    if (!shouldWriteRecurrence) onClose();
 
     startTransition(async () => {
       const result = await updateTask(parsed.data);
@@ -397,7 +427,7 @@ export function EditTaskModal({
         // schedule to write it did, so the toaster is reachable exactly as it always was; with one
         // pending, the modal is still open, and an open `<dialog>.showModal()` makes the toaster
         // inert — unfocusable and unclickable (`tasks/lessons.md` L11) — so that case goes inline.
-        if (hasSchedule) setFormError(result.error);
+        if (shouldWriteRecurrence) setFormError(result.error);
         else toast(result.error, "error");
         return;
       }
@@ -405,7 +435,7 @@ export function EditTaskModal({
       // Turning Repeats off pauses rather than deletes, so the schedule the user already set is
       // still there if they turn it back on. Deleting the task is what ends a recurrence, and the
       // FK cascade in migration 012 does that.
-      if (hasSchedule && recurrence) {
+      if (shouldWriteRecurrence && recurrence) {
         const recurrenceResult = await setTaskRecurrence({
           taskId: task.id,
           frequency: recurrence.frequency,
@@ -429,7 +459,7 @@ export function EditTaskModal({
       toast("Task updated");
       // Already closed above when there was no schedule to write; deferred until here otherwise,
       // since closing earlier would have hidden the inline error above had the write failed.
-      if (hasSchedule) onClose();
+      if (shouldWriteRecurrence) onClose();
     });
   }
 

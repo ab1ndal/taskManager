@@ -64,9 +64,10 @@ all closed 2026-07-27. Full write-ups in `06.5-FOLLOWUPS.md`.
 - Phase 04 — the real-device address-bar-collapse check (U7) needs an actual phone; leaked-password
   protection is a Supabase dashboard toggle and is still off.
 - Phase 06 — closed 2026-07-27 with F10. Nothing manual left.
-- Phase 07 (recurring tasks) is next and has not started. `task_rules` and `tasks.rule_id` exist
-  with no generator; `task_rules` has RLS enabled and no policies, which is deny-all — the safe
-  direction. The generator must be idempotent for a repeated `next_run_at`.
+- Phase 07 (recurring tasks) is code-complete and verified on dev (`mcdpiuiayfljzvnhtqto`);
+  production deploy is pending. `task_rules` holds the schedule as a 1:1 row keyed by `task_id` —
+  there is no `tasks.rule_id` column. `public.run_due_recurrences()` (013, followed up by 014) is
+  the idempotent generator, run every 15 minutes by pg_cron.
 
 ## Resume commands
 

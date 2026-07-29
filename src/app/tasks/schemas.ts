@@ -161,7 +161,6 @@ export type ReorderTaskInput = z.input<typeof reorderTaskSchema>;
 export type CreateTaskUpdateInput = z.input<typeof createTaskUpdateSchema>;
 export type AddSubtaskInput = z.input<typeof addSubtaskSchema>;
 export type UpdateSubtaskInput = z.input<typeof updateSubtaskSchema>;
-export type RecurrenceInput = z.input<typeof recurrenceSchema>;
 export type Recurrence = z.output<typeof recurrenceSchema>;
 export type SetTaskRecurrenceInput = z.input<typeof setTaskRecurrenceSchema>;
 

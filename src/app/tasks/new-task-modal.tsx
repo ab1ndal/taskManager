@@ -148,6 +148,7 @@ export function NewTaskModal({
       member_ids: input.memberIds,
       subtasks: [],
       recurring: recurrence !== null,
+      recurrence,
     };
 
     // Optimistic actions: fire callback, close modal, reset form, toast

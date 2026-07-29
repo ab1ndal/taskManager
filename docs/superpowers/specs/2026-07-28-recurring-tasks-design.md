@@ -190,8 +190,11 @@ the DB values, `intervalCount` a positive integer with a sane upper bound, `firs
 `dueOffsetHours` optional and non-negative. The same schema backs the form, so client and server
 cannot disagree.
 
-**Reads**: no new path. The tasks page query gains a left join to `task_rules` so a task carries its
-recurrence, if any.
+**Reads**: not a left join — a separate query. The tasks page issues its own `select ... from
+task_rules where task_id in (...)` (page.tsx, Query 3c) keyed off the task ids the first query
+already returned, and the results are merged into each task by `task_id` in application code. A
+task carries its recurrence, if any, either way; the mechanism is two queries plus a merge, not a
+join in the SQL itself.
 
 ## UI
 
@@ -253,7 +256,29 @@ First run is `datetime-local`, not `date` — the existing due-date fields are d
 versus midnight is the whole point of a chore schedule.
 
 **Repeat badge** on recurring task cards: lucide `Repeat` at `ICON_SECONDARY` / `ICON_STROKE`,
-matching the Phase 6.5 icon convention. Driven by the left join above.
+matching the Phase 6.5 icon convention. Driven by the `task_rules` query above.
+
+### Retrofit: three states on one checkbox
+
+A rule is one of three states — no rule, paused (`is_active = false`), active — but the UI has one
+toggle. That toggle cannot be driven by `recurrence`'s nullness alone: the read is deliberately
+unfiltered on `is_active` (a paused rule still has to reach the edit modal with its stored cadence,
+or re-enabling it would overwrite that cadence with fresh defaults), so `recurrence` is non-null in
+both the paused and active cases and null only when no rule exists at all. That collapses two of the
+three states onto the same value.
+
+The fix actually shipped splits the checkbox's own state from the schedule's stored values:
+`recurrenceEnabled` (on/off, i.e. what the checkbox shows and what becomes `is_active` on write) is
+held apart from `recurrence` (the draft/stored schedule fields). Turning the checkbox off never
+clears `recurrence` — that is what lets re-enabling it restore the same cadence instead of
+`TaskFields` seeding new defaults over a value that was wiped. `task-fields.tsx`'s
+`handleToggleRecurrence` only seeds defaults the first time the checkbox goes on and `recurrence` is
+still null (a task that never had a rule); every other transition leaves `recurrence` as the user or
+the loaded task left it.
+
+This was not anticipated at plan time — the plan above still describes `recurrence` as the only
+prop. It is the most consequential UI decision of the phase and previously lived only in code
+comments (`edit-task-modal.tsx`, `task-fields.tsx`), not here.
 
 The Repeats section and the badge are built through the **ui-ux-pro-max** skill against the Phase
 6.5 token system rather than styled ad hoc.

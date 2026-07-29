@@ -579,4 +579,36 @@ describe("NewTaskModal — recurrence payload", () => {
       )
     );
   });
+
+  // The optimistic row set `recurring: recurrence !== null` but never carried `recurrence` itself,
+  // so opening the edit modal on that row (before the server round trip lands) read as
+  // `recurrenceEnabled=true, recurrence=null` — a checked Repeats box with no fields, and
+  // unchecking it would silently write nothing.
+  it("carries the recurrence value onto the optimistic task, not just the recurring flag", async () => {
+    let resolveServer!: (val: { ok: true; subtaskErrors: number; recurrenceFailed: boolean }) => void;
+    (createTaskWithSubtasks as jest.Mock).mockReturnValue(
+      new Promise((res) => { resolveServer = res; })
+    );
+    const onTaskCreated = jest.fn();
+
+    render(
+      <NewTaskModal
+        open={true}
+        onClose={jest.fn()}
+        workspaces={workspaces}
+        currentMemberIds={["b0000000-0000-4000-8000-000000000001"]}
+        onTaskCreated={onTaskCreated}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Water plants" } });
+    fireEvent.click(screen.getByLabelText("Repeats"));
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+
+    expect(onTaskCreated).toHaveBeenCalledTimes(1);
+    expect(onTaskCreated.mock.calls[0][0]).toMatchObject({
+      recurring: true,
+      recurrence: expect.objectContaining({ frequency: "daily", intervalCount: 1 }),
+    });
+    resolveServer({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
+  });
 });

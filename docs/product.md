@@ -110,6 +110,10 @@ Any interval of these is allowed, so "every 3 days" and "every 2 weeks" are both
 
 A recurring task is a single permanent task that automatically reactivates at each occurrence.
 
+Switching Repeats off pauses the schedule rather than deleting it: the task stops reactivating, but
+its cadence is kept and switching Repeats back on resumes it unchanged. Deleting the task is what
+ends a recurrence for good.
+
 ## Subtasks
 
 Tasks may contain subtasks.
