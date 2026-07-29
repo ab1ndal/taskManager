@@ -50,18 +50,21 @@ const intervalCount = z
   .number()
   .int("Repeat interval must be a whole number")
   .min(1, "Repeat interval must be at least 1")
-  .max(365, "Repeat interval must be 365 or fewer");
+  .max(365, "Repeat interval must be 365 or fewer"); // UI guardrail; database has no upper bound
 
 /**
  * A wall-clock time with no offset, exactly as `<input type="datetime-local">` produces it. It is
  * resolved to an instant by `public.upsert_task_recurrence`, which is the only place in the stack
  * that knows the app is Pacific. Date-only is rejected: 9am versus midnight is the point of a
  * chore schedule.
+ *
+ * Use regex instead of `z.iso.datetime({ local: true })` because the latter permits an optional
+ * offset (e.g., "2026-07-30T09:00Z"), and this field must reject any offset. Server actions are
+ * public endpoints; a caller sending UTC would silently become Pacific time with no error.
  */
-const firstRunAt = z.iso.datetime({
-  local: true,
-  message: "Start must include a date and a time",
-});
+const firstRunAt = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, "Start must include a date and a time");
 
 const dueOffsetHours = z
   .number()
