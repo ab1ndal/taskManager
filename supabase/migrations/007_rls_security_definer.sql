@@ -84,6 +84,11 @@ $$;
 -- Which workspace does this task belong to? Needed by task_assignments policies: reading
 -- public.tasks directly from a policy would trigger tasks_select, which requires an assignment
 -- row that does not exist yet at assignment-insert time.
+--
+-- Body kept identical to 011's. This migration was written before workspace_id became root-only, and
+-- read the row's own column — NULL for every subtask under 011. Since both use `create or replace`,
+-- applying them in either order has to leave the same resolver behind; the original body would have
+-- silently regressed subtask resolution if 007 landed second. See 011 for why the walk is bounded.
 create or replace function private.task_workspace(t uuid)
 returns uuid
 language sql
@@ -91,7 +96,17 @@ security definer
 stable
 set search_path = ''
 as $$
-  select workspace_id from public.tasks where id = t;
+  with recursive chain as (
+    select id, parent_task_id, workspace_id, 1 as depth
+    from public.tasks
+    where id = t
+    union all
+    select parent.id, parent.parent_task_id, parent.workspace_id, child.depth + 1
+    from public.tasks parent
+    join chain child on child.parent_task_id = parent.id
+    where child.depth < 10
+  )
+  select workspace_id from chain where workspace_id is not null limit 1;
 $$;
 
 -- Which workspace does this member row belong to? Used to reject cross-workspace assignment.
