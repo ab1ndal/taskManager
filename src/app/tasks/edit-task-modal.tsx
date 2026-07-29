@@ -70,13 +70,11 @@ export function EditTaskModal({
   task,
   onClose,
   workspaces,
-  currentMemberIds,
 }: {
   open: boolean;
   task: RawTask;
   onClose: () => void;
   workspaces: Workspace[];
-  currentMemberIds: string[];
 }) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? "");

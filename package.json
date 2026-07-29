@@ -4,19 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run typecheck && next build",
     "start": "next start",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:e2e": "next build && playwright test"
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.98.0",
     "lucide-react": "^1.27.0",
-    "next": "16.1.6",
+    "next": "16.2.12",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
@@ -32,14 +33,15 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.12",
     "jest": "^30.3.0",
     "jest-axe": "^10.0.0",
     "jest-environment-jsdom": "^30.3.0",
     "tailwindcss": "^4",
-    "ts-jest": "^29.4.6",
+    "ts-jest": "^29.4.12",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "npm:@typescript/typescript6@6.0.2"
   }
 }
