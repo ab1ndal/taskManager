@@ -14,25 +14,49 @@
 -- ---------------------------------------------------------------------------
 
 -- A pure helper, so it lives in `private` and is never reachable as an RPC endpoint.
--- An unknown frequency returns NULL, which fails the not-null column loudly rather than silently
--- skipping a rule. The check constraint on task_rules.frequency makes that unreachable.
+-- An unknown frequency raises rather than returning NULL: the caller's roll-forward loop does
+-- `exit when v_next > now()`, and NULL compares to neither true nor false, so a NULL result would
+-- spin the loop forever instead of failing. Raising here turns that into a normal exception the
+-- per-rule handler in run_due_recurrences can catch. The check constraint on
+-- task_rules.frequency makes this unreachable in practice; the raise is a backstop for future
+-- callers, not the primary defense.
+--
+-- `stable`, not `immutable`: timestamptz + interval is timezone-dependent (that's the entire point
+-- of the `set timezone` clause below) and its result for future dates can shift with tzdata
+-- updates, which is exactly what core marks `stable` for. The only call site is a plpgsql loop, so
+-- there is no cost to being precise about volatility here.
+-- plpgsql, not sql: raising on an invalid frequency needs a statement, and CASE in a `select` has
+-- no way to do that.
 create or replace function private.advance_next_run(
   p_from timestamptz,
   p_frequency text,
   p_interval_count int
 )
 returns timestamptz
-language sql
-immutable
+language plpgsql
+stable
 set search_path = ''
 set timezone = 'America/Los_Angeles'
 as $$
-  select p_from + case p_frequency
+begin
+  if p_frequency not in ('daily', 'weekly', 'monthly') then
+    raise exception using
+      errcode = 'invalid_parameter_value',
+      message = format('advance_next_run: unrecognized frequency %L', p_frequency);
+  end if;
+
+  return p_from + case p_frequency
     when 'daily'   then make_interval(days   => p_interval_count)
     when 'weekly'  then make_interval(weeks  => p_interval_count)
     when 'monthly' then make_interval(months => p_interval_count)
   end;
+end;
 $$;
+
+-- One-shot statements from 007/011 cannot cover a function created later. Same posture: pure
+-- arithmetic, no security exposure, but the convention is explicit in this repo.
+revoke execute on all functions in schema private from public, anon;
+grant execute on all functions in schema private to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- The generator
@@ -50,8 +74,10 @@ set timezone = 'America/Los_Angeles'
 as $$
 declare
   r record;
+  v_fired timestamptz;
   v_next timestamptz;
   v_processed int := 0;
+  v_failed int := 0;
 begin
   for r in
     select tr.id, tr.task_id, tr.next_run_at, tr.frequency, tr.interval_count,
@@ -66,17 +92,27 @@ begin
       -- Roll forward by whole intervals from the original anchor rather than from now(), so a rule
       -- that was missed for a week comes back on its own weekday instead of drifting to whenever
       -- the catch-up happened to run. One reactivation, never a backlog.
-      v_next := r.next_run_at;
+      --
+      -- v_fired tracks the most recent occurrence that has actually come due — the one being
+      -- fired now — as opposed to v_next, which is the schedule's next future slot. On time
+      -- (the common case), the loop body runs once and exits immediately, so v_fired never moves
+      -- off r.next_run_at: current behaviour for an on-schedule rule is unchanged. After an
+      -- outage, v_fired advances one interval behind v_next each pass, so it lands on the last
+      -- occurrence that was due rather than the stale original anchor — a task that missed nine
+      -- days of a three-day rule comes back dated today, not nine days overdue.
+      v_fired := r.next_run_at;
+      v_next  := r.next_run_at;
       loop
         v_next := private.advance_next_run(v_next, r.frequency, r.interval_count);
         exit when v_next > now();
+        v_fired := v_next;
       end loop;
 
       -- If the task was never completed this cycle, completed_at is already null and this is a
       -- no-op. That is the whole handling the "still open on day 3" case needs.
       update public.tasks
          set completed_at = null,
-             due_at = r.next_run_at
+             due_at = v_fired
                       + coalesce(make_interval(hours => r.default_due_offset_hours), interval '0')
        where id = r.task_id;
 
@@ -87,10 +123,19 @@ begin
       v_processed := v_processed + 1;
     exception when others then
       -- Batch-item isolation, not a swallowed error: one malformed rule must not stop every other
-      -- household's chores, and the failure is logged with the rule id that caused it.
+      -- household's chores, and the failure is logged with the rule id that caused it. The
+      -- subtransaction rollback here also undoes the next_run_at advance, so a failing rule stays
+      -- due and is retried every cron tick — by design, not a bug, but silent otherwise: v_failed
+      -- surfaces it to both the cron log and the e2e caller without building a counter or
+      -- dead-letter table.
+      v_failed := v_failed + 1;
       raise warning 'run_due_recurrences: rule % failed: %', r.id, sqlerrm;
     end;
   end loop;
+
+  if v_failed > 0 then
+    raise warning 'run_due_recurrences: % processed, % failed', v_processed, v_failed;
+  end if;
 
   return v_processed;
 end;
