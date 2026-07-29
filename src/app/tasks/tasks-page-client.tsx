@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
-import { Briefcase, House, LayoutGrid, ListTodo, Plus, Users } from "lucide-react";
+import { Briefcase, House, LayoutGrid, ListTodo, Plus, Repeat, Users } from "lucide-react";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { NewTaskModal } from "./new-task-modal";
 import { TabPill } from "./tab-pill";
@@ -371,7 +371,7 @@ export function TasksPageClient({
                                   <div
                                     ref={dragProvided.innerRef}
                                     {...dragProvided.draggableProps}
-                                    className={optimisticTaskIds.has(task.id) ? "opacity-40" : undefined}
+                                    className={`relative ${optimisticTaskIds.has(task.id) ? "opacity-40" : ""}`}
                                   >
                                     <TaskCard
                                       taskId={task.id}
@@ -384,6 +384,17 @@ export function TasksPageClient({
                                       onEdit={() => setEditingTask(task)}
                                       dragHandleProps={dragProvided.dragHandleProps ?? undefined}
                                     />
+                                    {/* aria-label rather than aria-hidden: recurring is stated nowhere
+                                        else on the card. pointer-events-none so the corner marker never
+                                        steals a click from the buttons underneath it. */}
+                                    {task.recurring && (
+                                      <Repeat
+                                        size={ICON_SECONDARY}
+                                        strokeWidth={ICON_STROKE}
+                                        aria-label="Repeats"
+                                        className="absolute top-1 right-1 shrink-0 text-[var(--color-text-muted)] pointer-events-none"
+                                      />
+                                    )}
                                   </div>
                                 )}
                               </Draggable>

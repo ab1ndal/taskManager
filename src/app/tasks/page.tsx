@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { RawTask } from "./bucket-tasks";
 import { TasksPageClient } from "./tasks-page-client";
+import { toLocalInputValue } from "./recurrence-time";
 
 type SearchParams = Promise<{ workspace?: string; view?: string }>;
 
@@ -115,6 +116,26 @@ export default async function TasksPage({
     memberIdsByTaskId[a.task_id].push(a.member_id as string);
   });
 
+  // Query 3c: recurrence for these tasks. RLS scopes task_rules to tasks the user is assigned to,
+  // so this needs no membership filter of its own.
+  const { data: rulesData } = myTaskIds.length
+    ? await supabase
+        .from("task_rules")
+        .select("task_id, frequency, interval_count, next_run_at, default_due_offset_hours, is_active")
+        .in("task_id", myTaskIds)
+        .eq("is_active", true)
+    : { data: [] };
+
+  const recurrenceByTaskId: Record<string, NonNullable<RawTask["recurrence"]>> = {};
+  (rulesData ?? []).forEach((r) => {
+    recurrenceByTaskId[r.task_id as string] = {
+      frequency: r.frequency as "daily" | "weekly" | "monthly",
+      intervalCount: r.interval_count as number,
+      firstRunAt: toLocalInputValue(r.next_run_at as string),
+      dueOffsetHours: (r.default_due_offset_hours as number | null) ?? null,
+    };
+  });
+
   // Query 4: subtasks for all parent tasks
   const parentTaskIds = (tasksData ?? []).map((t) => t.id);
   const { data: subtasksData } = parentTaskIds.length
@@ -155,6 +176,8 @@ export default async function TasksPage({
       assignee_count: assigneeCounts[t.id] ?? 1,
       member_ids: memberIdsByTaskId[t.id] ?? [],
       subtasks: subtasksByParentId[t.id] ?? [],
+      recurrence: recurrenceByTaskId[t.id] ?? null,
+      recurring: Boolean(recurrenceByTaskId[t.id]),
     };
   });
 
