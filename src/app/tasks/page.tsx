@@ -94,7 +94,7 @@ export default async function TasksPage({
   const { data: tasksData } = myTaskIds.length
     ? await supabase
         .from("tasks")
-        .select("id, title, description, due_at, completed_at, parent_task_id, workspace_id, rule_id")
+        .select("id, title, description, due_at, completed_at, parent_task_id, workspace_id")
         .in("id", myTaskIds)
         .is("parent_task_id", null)
     : { data: [] };
@@ -155,7 +155,6 @@ export default async function TasksPage({
       assignee_count: assigneeCounts[t.id] ?? 1,
       member_ids: memberIdsByTaskId[t.id] ?? [],
       subtasks: subtasksByParentId[t.id] ?? [],
-      rule_id: (t.rule_id as string | null) ?? null,
     };
   });
 

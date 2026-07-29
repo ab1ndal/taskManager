@@ -104,10 +104,11 @@ Supported frequencies:
 
 daily
 weekly
-biweekly
 monthly
 
-Recurring rules automatically generate task instances.
+Any interval of these is allowed, so "every 3 days" and "every 2 weeks" are both expressible.
+
+A recurring task is a single permanent task that automatically reactivates at each occurrence.
 
 ## Subtasks
 
