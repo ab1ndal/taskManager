@@ -60,7 +60,8 @@ from task_rules where id = '55555555-5555-5555-5555-555555555555';
 
 -- Check 3b: the fired occurrence is the most recent one that came due, not the stale original
 -- anchor — a task that missed 9 days of a 3-day rule reads as due today, not 9 days overdue.
-select due_at > now() - interval '3 days' as due_at_is_recent_not_backlogged
+select
+  due_at > now() - interval '3 days' and due_at <= now() as due_at_is_recent_not_backlogged
 from tasks where id = '44444444-4444-4444-4444-444444444444';
 
 -- Check 5: an inactive rule is skipped.
@@ -100,7 +101,11 @@ values ('66666666-6666-6666-6666-666666666666',
         'Water plants');
 
 -- Check 11: the riskiest claim in the migration — a datetime-local string with no offset resolves
--- as Pacific, not the session's UTC.
+-- as Pacific, not the session's UTC. The session is deliberately UTC here (the opposite of the
+-- file-wide `set local timezone` above) so the assertion can only pass because of
+-- upsert_task_recurrence's own `set timezone` clause — with the session already Pacific, this
+-- would have passed even with that clause deleted. Do not "tidy" this back to Pacific.
+set local timezone = 'UTC';
 select public.upsert_task_recurrence(
   '66666666-6666-6666-6666-666666666666', 'daily', 1, '2026-07-30T09:00', 0, true
 );
@@ -108,6 +113,7 @@ select public.upsert_task_recurrence(
 select extract(hour from next_run_at at time zone 'America/Los_Angeles') = 9
        as local_time_resolved_pacific
 from public.task_rules where task_id = '66666666-6666-6666-6666-666666666666';
+set local timezone = 'America/Los_Angeles';
 
 -- Check 12: on conflict, a second call updates the existing rule rather than inserting a second
 -- one for the same task.
