@@ -9,7 +9,6 @@ import {
   assertMembersInWorkspace,
   memberIdsForUser,
   ForbiddenError,
-  UnauthorizedError,
 } from "@/lib/auth";
 import {
   parseInput,
@@ -30,9 +29,10 @@ import type {
   AddSubtaskInput,
   UpdateSubtaskInput,
 } from "./schemas";
-import { GENERIC_ERROR } from "./action-result";
 import type { ActionResult } from "./action-result";
 import type { RawTask } from "./bucket-tasks";
+import { run, assertNoError } from "./action-run";
+import { writeRecurrence } from "./recurring-actions";
 
 // Every exported function in this file is a public endpoint. Each one authenticates the caller and
 // then authorizes them for the specific row named in its arguments — a disabled button or a
@@ -44,48 +44,6 @@ import type { RawTask } from "./bucket-tasks";
 // friends exist; the ledger lists 007). The comment here previously claimed otherwise. RLS therefore
 // already agrees with these checks, and moving these calls to the user-scoped client so it enforces
 // too is a live option rather than a blocked one (Task 3).
-
-/**
- * Runs an action body and converts a thrown failure into `{ ok: false, error }`.
- *
- * Validation and authorization messages are meant for the person who triggered the action, so they
- * are passed through. Anything else — a database error, a bug — is logged with the action name and
- * replaced with a generic message, because those carry schema detail the client has no business
- * seeing.
- */
-async function run<T extends object>(
-  action: string,
-  body: () => Promise<T>
-): Promise<ActionResult<T>> {
-  try {
-    return { ok: true, ...(await body()) };
-  } catch (error) {
-    if (
-      error instanceof ValidationError ||
-      error instanceof ForbiddenError ||
-      error instanceof UnauthorizedError
-    ) {
-      return { ok: false, error: error.message };
-    }
-
-    console.error(
-      JSON.stringify({
-        level: "error",
-        action,
-        message: error instanceof Error ? error.message : String(error),
-      })
-    );
-    return { ok: false, error: GENERIC_ERROR };
-  }
-}
-
-/** Throws on a Supabase error so `run` can turn it into a failed result instead of losing it. */
-function assertNoError(
-  step: string,
-  { error }: { error: { message: string } | null }
-): void {
-  if (error) throw new Error(`${step}: ${error.message}`);
-}
 
 /**
  * Assign a member to a task with the next sort key, computed and inserted atomically in Postgres.
@@ -265,7 +223,7 @@ export async function createTaskWithSubtasks(
 ): Promise<ActionResult<{ subtaskErrors: number }>> {
   return run("createTaskWithSubtasks", async () => {
     const { user } = await requireUser();
-    const { title, description, dueAt, workspaceId, memberIds, subtasks } = parseInput(
+    const { title, description, dueAt, workspaceId, memberIds, subtasks, recurrence } = parseInput(
       createTaskWithSubtasksSchema,
       input
     );
@@ -294,6 +252,13 @@ export async function createTaskWithSubtasks(
 
     for (const memberId of uniqueMemberIds) {
       await assignTaskMember(admin, parentId, memberId);
+    }
+
+    // Inside the same action as the task insert, deliberately: a recurring task whose rule failed
+    // to write is a task the user believes repeats and which never will. A thrown error here is
+    // turned into { ok: false } by `run`, and the modal's optimistic row is rolled back with it.
+    if (recurrence) {
+      await writeRecurrence(admin, parentId, recurrence);
     }
 
     // A failed subtask is reported rather than thrown: the parent task exists at this point, and

@@ -363,6 +363,29 @@ describe("createTaskWithSubtasks", () => {
     );
     expect(newAssignment).toBeDefined();
   });
+
+  it("writes the rule when a task is created with a recurrence", async () => {
+    const fake = setup();
+    const rpcSpy = jest.spyOn(fake, "rpc");
+
+    await createTaskWithSubtasks({
+      title: "Take trash",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+      recurrence: {
+        frequency: "daily",
+        intervalCount: 3,
+        firstRunAt: "2026-07-30T09:00",
+        isActive: true,
+      },
+    });
+
+    expect(rpcSpy).toHaveBeenCalledWith(
+      "upsert_task_recurrence",
+      expect.objectContaining({ p_frequency: "daily", p_interval_count: 3 })
+    );
+  });
 });
 
 // ─── updateTask ──────────────────────────────────────────────────────────────

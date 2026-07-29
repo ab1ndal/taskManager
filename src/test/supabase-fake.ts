@@ -262,6 +262,26 @@ export function createFakeSupabase(options: FakeOptions = {}) {
         return { data: null, error: null };
       }
 
+      // Mirrors migration 013's upsert: one rule row per task, keyed by task_id, replaced wholesale
+      // on conflict rather than merged field-by-field.
+      if (fnName === "upsert_task_recurrence") {
+        const taskId = params.p_task_id as string;
+        const rows = (tables.task_rules ?? []) as Row[];
+        const row: Row = {
+          task_id: taskId,
+          frequency: params.p_frequency,
+          interval_count: params.p_interval_count,
+          next_run_at: params.p_first_run_local,
+          default_due_offset_hours: params.p_due_offset_hours,
+          is_active: params.p_is_active,
+        };
+        const existing = rows.find((r) => r.task_id === taskId);
+        if (existing) Object.assign(existing, row);
+        else rows.push(row);
+        tables.task_rules = rows;
+        return { data: null, error: null };
+      }
+
       return { data: null, error: { message: `unknown rpc: ${fnName}` } };
     },
     auth: {
