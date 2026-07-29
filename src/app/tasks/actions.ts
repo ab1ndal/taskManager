@@ -38,9 +38,12 @@ import type { RawTask } from "./bucket-tasks";
 // then authorizes them for the specific row named in its arguments — a disabled button or a
 // filtered list is not access control. See tasks/lessons.md L4.
 //
-// Mutations still run on the admin client because migration 007 is not yet applied; the assertions
-// above them are what enforces access. Once 007 is live these can move to the user-scoped client
-// and let RLS enforce as well (Task 3).
+// Mutations run on the admin client, so the assertions above them are what enforces access.
+//
+// 007 IS applied — verified against both projects on 2026-07-28 (private.is_workspace_member and
+// friends exist; the ledger lists 007). The comment here previously claimed otherwise. RLS therefore
+// already agrees with these checks, and moving these calls to the user-scoped client so it enforces
+// too is a live option rather than a blocked one (Task 3).
 
 /**
  * Runs an action body and converts a thrown failure into `{ ok: false, error }`.
