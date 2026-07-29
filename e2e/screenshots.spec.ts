@@ -25,9 +25,16 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-/** Relative update times ("just now", "3m ago") change between runs. */
+/**
+ * Relative update times ("just now", "3m ago") change between runs. So does the "Today: take the
+ * bins out" fixture's due date: it is seeded as `new Date()` at seed time (see fixtures.ts), an
+ * absolute calendar date rather than a relative one, so its <input type="date"> renders whatever day
+ * the suite happens to run on — masked here rather than given a mask-free absolute date because it
+ * is the one fixture task standing in for "due today" everywhere else that reads it (deadline
+ * buckets, badges), and changing what it seeds would be a wider, non-obvious edit.
+ */
 function volatile(page: Page): Locator[] {
-  return [page.locator("time")];
+  return [page.locator("time"), page.locator('input[type="date"]')];
 }
 
 async function openTasks(page: Page) {
