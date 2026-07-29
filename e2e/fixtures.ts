@@ -189,12 +189,14 @@ export async function seed(): Promise<SeedResult> {
   if (assignErr) throw assignErr;
 
   const parentId = byTitle("Today");
+  // Migration 011 normalized workspace_id to the root task only: a subtask now carries
+  // parent_task_id and no workspace_id of its own (`tasks_workspace_only_on_root` rejects a row
+  // that has both), so this stopped setting it once 011 was actually applied to dev.
   const { data: subtasks, error: subErr } = await admin
     .from("tasks")
     .insert([
-      { workspace_id: ws.id, parent_task_id: parentId, title: "Rinse the recycling" },
+      { parent_task_id: parentId, title: "Rinse the recycling" },
       {
-        workspace_id: ws.id,
         parent_task_id: parentId,
         title: "Put the bin back",
         completed_at: new Date().toISOString(),
@@ -256,12 +258,28 @@ export async function cleanupUiWrites(): Promise<void> {
     }
   }
 
-  const { error: taskErr } = await admin
+  // Migration 011 normalized workspace_id to the root task only, so a subtask row now has
+  // workspace_id = null (see the seed() note above) — it has to be found through its parent's id
+  // instead of the workspace filter this used before 011 was actually applied to dev.
+  if (taskIds.length) {
+    const { error: taskErr } = await admin
+      .from("tasks")
+      .delete()
+      .in("parent_task_id", taskIds)
+      .like("title", "E2E subtask%");
+    if (taskErr) throw taskErr;
+  }
+
+  // Recurring specs create real tasks titled `${E2E_TAG} …` through the UI. `task_rules` has
+  // `task_id references tasks(id) on delete cascade` (migration 012), so deleting the task takes
+  // its rule with it — a rule left behind is invisible to the spec that wrote it but still due,
+  // and the live cron job (run-due-recurrences, every 15 minutes) would reactivate it later.
+  const { error: recurringTaskErr } = await admin
     .from("tasks")
     .delete()
     .in("workspace_id", workspaceIds)
-    .like("title", "E2E subtask%");
-  if (taskErr) throw taskErr;
+    .like("title", `${E2E_TAG}%`);
+  if (recurringTaskErr) throw recurringTaskErr;
 }
 
 /**
