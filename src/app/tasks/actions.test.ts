@@ -182,7 +182,7 @@ describe("createTaskWithSubtasks", () => {
     expect(assignmentsIn(tables)).toContainEqual(
       expect.objectContaining({ task_id: parent!.id, member_id: M1 })
     );
-    expect(result).toEqual({ ok: true, subtaskErrors: 0 });
+    expect(result).toEqual({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
     expect(revalidatePath).toHaveBeenCalledTimes(1);
   });
 
@@ -210,7 +210,7 @@ describe("createTaskWithSubtasks", () => {
     expect(assignmentsIn(tables)).toContainEqual(
       expect.objectContaining({ task_id: subtask!.id, member_id: M1 })
     );
-    expect(result).toEqual({ ok: true, subtaskErrors: 0 });
+    expect(result).toEqual({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
   });
 
   it("stores the parent due date as UTC midnight and null when omitted", async () => {
@@ -286,7 +286,7 @@ describe("createTaskWithSubtasks", () => {
       subtasks: [{ title: "Bad subtask" }],
     });
 
-    expect(result).toEqual({ ok: true, subtaskErrors: 1 });
+    expect(result).toEqual({ ok: true, subtaskErrors: 1, recurrenceFailed: false });
     expect(tasksIn(tables).find((t) => t.title === "Bad subtask")).toBeUndefined();
     expect(revalidatePath).toHaveBeenCalledTimes(1);
   });
@@ -364,11 +364,10 @@ describe("createTaskWithSubtasks", () => {
     expect(newAssignment).toBeDefined();
   });
 
-  it("writes the rule when a task is created with a recurrence", async () => {
+  it("writes the rule when a task is created with a recurrence, attached to the new task", async () => {
     const fake = setup();
-    const rpcSpy = jest.spyOn(fake, "rpc");
 
-    await createTaskWithSubtasks({
+    const result = await createTaskWithSubtasks({
       title: "Take trash",
       workspaceId: WS1,
       memberIds: [M1],
@@ -381,10 +380,48 @@ describe("createTaskWithSubtasks", () => {
       },
     });
 
-    expect(rpcSpy).toHaveBeenCalledWith(
-      "upsert_task_recurrence",
-      expect.objectContaining({ p_frequency: "daily", p_interval_count: 3 })
+    const parent = tasksIn(fake.tables).find((t) => t.title === "Take trash");
+    // Asserting on the materialized row, not just the RPC call, rules out the rule landing on the
+    // wrong id — a workspace id, a subtask id, or a stale id would still satisfy a call-args check.
+    const rules = (fake.tables.task_rules as Row[]) ?? [];
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatchObject({
+      task_id: parent!.id,
+      frequency: "daily",
+      interval_count: 3,
+    });
+    expect(result).toEqual({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
+  });
+
+  it("keeps the task and reports recurrenceFailed when the rule write fails", async () => {
+    const fake = setup();
+    // assign_task_member fires before the rule write, so the stub has to target the RPC by name
+    // rather than by call order.
+    const originalRpc = fake.rpc.bind(fake);
+    jest.spyOn(fake, "rpc").mockImplementation(async (fnName, params) =>
+      fnName === "upsert_task_recurrence"
+        ? { data: null, error: { message: "DB error" } }
+        : originalRpc(fnName, params)
     );
+    const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await createTaskWithSubtasks({
+      title: "Take trash",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+      recurrence: {
+        frequency: "daily",
+        intervalCount: 3,
+        firstRunAt: "2026-07-30T09:00",
+        isActive: true,
+      },
+    });
+
+    expect(result).toEqual({ ok: true, subtaskErrors: 0, recurrenceFailed: true });
+    expect(tasksIn(fake.tables).find((t) => t.title === "Take trash")).toBeDefined();
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("DB error"));
+    logged.mockRestore();
   });
 });
 

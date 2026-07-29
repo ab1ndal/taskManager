@@ -7,7 +7,7 @@ import { toast } from "@/components/toaster";
 
 jest.mock("./actions", () => ({
   createTask: jest.fn().mockResolvedValue({ ok: true }),
-  createTaskWithSubtasks: jest.fn().mockResolvedValue({ ok: true, subtaskErrors: 0 }),
+  createTaskWithSubtasks: jest.fn().mockResolvedValue({ ok: true, subtaskErrors: 0, recurrenceFailed: false }),
 }));
 
 jest.mock("next/navigation", () => ({ useSearchParams: jest.fn(() => new URLSearchParams()) }));
@@ -322,7 +322,7 @@ describe("NewTaskModal — error handling", () => {
   });
 
   it("closes modal immediately on submit (optimistic close)", async () => {
-    let resolveServer!: (val: { ok: true; subtaskErrors: number }) => void;
+    let resolveServer!: (val: { ok: true; subtaskErrors: number; recurrenceFailed: boolean }) => void;
     (createTaskWithSubtasks as jest.Mock).mockReturnValue(
       new Promise((res) => { resolveServer = res; })
     );
@@ -331,7 +331,7 @@ describe("NewTaskModal — error handling", () => {
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
 
     expect(onClose).toHaveBeenCalled();
-    resolveServer({ ok: true, subtaskErrors: 0 });
+    resolveServer({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
   });
 });
 
@@ -341,7 +341,7 @@ describe("NewTaskModal — toast feedback", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("fires 'Task created' toast on successful submit", async () => {
-    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: true, subtaskErrors: 0 });
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
     renderModal();
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
@@ -349,7 +349,7 @@ describe("NewTaskModal — toast feedback", () => {
   });
 
   it("fires warning toast when subtaskErrors > 0", async () => {
-    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: true, subtaskErrors: 2 });
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: true, subtaskErrors: 2, recurrenceFailed: false });
     renderModal();
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
@@ -391,7 +391,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
   beforeEach(() => jest.clearAllMocks());
 
   it("calls onTaskCreated immediately on submit before server resolves", async () => {
-    let resolveServer!: (val: { ok: true; subtaskErrors: number }) => void;
+    let resolveServer!: (val: { ok: true; subtaskErrors: number; recurrenceFailed: boolean }) => void;
     (createTaskWithSubtasks as jest.Mock).mockReturnValue(
       new Promise((res) => { resolveServer = res; })
     );
@@ -411,11 +411,11 @@ describe("NewTaskModal — onTaskCreated callback", () => {
     // onTaskCreated must fire immediately, not after resolveServer()
     expect(onTaskCreated).toHaveBeenCalledTimes(1);
     expect(onTaskCreated.mock.calls[0][0]).toMatchObject({ title: "Buy milk", completed_at: null });
-    resolveServer({ ok: true, subtaskErrors: 0 });
+    resolveServer({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
   });
 
   it("calls onClose immediately on submit before server resolves", async () => {
-    let resolveServer!: (val: { ok: true; subtaskErrors: number }) => void;
+    let resolveServer!: (val: { ok: true; subtaskErrors: number; recurrenceFailed: boolean }) => void;
     (createTaskWithSubtasks as jest.Mock).mockReturnValue(
       new Promise((res) => { resolveServer = res; })
     );
@@ -431,7 +431,7 @@ describe("NewTaskModal — onTaskCreated callback", () => {
     fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
     fireEvent.click(screen.getByRole("button", { name: /add task/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
-    resolveServer({ ok: true, subtaskErrors: 0 });
+    resolveServer({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
   });
 
   it("calls onTaskError with tempId when server throws", async () => {
@@ -469,7 +469,7 @@ describe("NewTaskModal — subtask description", () => {
 
   it("passes subtask description to createTaskWithSubtasks", async () => {
     const mock = jest.mocked(createTaskWithSubtasks);
-    mock.mockResolvedValue({ ok: true, subtaskErrors: 0 });
+    mock.mockResolvedValue({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
 
     render(<NewTaskModal open workspaces={[mockWs]} currentMemberIds={["b0000000-0000-4000-8000-000000000001"]} onClose={() => {}} />);
 

@@ -86,6 +86,9 @@ describe("setTaskRecurrence", () => {
 
     expect(result.ok).toBe(false);
     expect(rpcSpy).not.toHaveBeenCalled();
+    // Proves the property (nothing was written), not just the mechanism (the RPC wasn't invoked) —
+    // this would still catch a refactor to a direct insert that bypassed the RPC entirely.
+    expect(fake.tables.task_rules ?? []).toHaveLength(0);
   });
 
   it("passes a paused rule through as is_active false", async () => {
