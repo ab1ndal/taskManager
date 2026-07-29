@@ -118,15 +118,20 @@ export default async function TasksPage({
 
   // Query 3c: recurrence for these tasks. RLS scopes task_rules to tasks the user is assigned to,
   // so this needs no membership filter of its own.
+  //
+  // Deliberately unfiltered on `is_active`: a paused rule still has to reach the edit modal so
+  // re-enabling it restores the schedule the user set rather than overwriting it with fresh
+  // defaults. `is_active` alone decides the badge (below); `recurrence` carries the stored values
+  // regardless of whether the rule is currently active.
   const { data: rulesData } = myTaskIds.length
     ? await supabase
         .from("task_rules")
         .select("task_id, frequency, interval_count, next_run_at, default_due_offset_hours, is_active")
         .in("task_id", myTaskIds)
-        .eq("is_active", true)
     : { data: [] };
 
   const recurrenceByTaskId: Record<string, NonNullable<RawTask["recurrence"]>> = {};
+  const activeByTaskId: Record<string, boolean> = {};
   (rulesData ?? []).forEach((r) => {
     recurrenceByTaskId[r.task_id as string] = {
       frequency: r.frequency as "daily" | "weekly" | "monthly",
@@ -134,6 +139,7 @@ export default async function TasksPage({
       firstRunAt: toLocalInputValue(r.next_run_at as string),
       dueOffsetHours: (r.default_due_offset_hours as number | null) ?? null,
     };
+    activeByTaskId[r.task_id as string] = Boolean(r.is_active);
   });
 
   // Query 4: subtasks for all parent tasks
@@ -177,7 +183,10 @@ export default async function TasksPage({
       member_ids: memberIdsByTaskId[t.id] ?? [],
       subtasks: subtasksByParentId[t.id] ?? [],
       recurrence: recurrenceByTaskId[t.id] ?? null,
-      recurring: Boolean(recurrenceByTaskId[t.id]),
+      // The badge and the toggle's default state track `is_active`, not merely whether a rule
+      // row exists — a paused rule has a row (so `recurrence` is non-null) but must not look
+      // recurring on the card or show Repeats ON until the user re-enables it.
+      recurring: activeByTaskId[t.id] ?? false,
     };
   });
 

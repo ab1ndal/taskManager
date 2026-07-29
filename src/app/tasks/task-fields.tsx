@@ -29,8 +29,16 @@ export type TaskFieldsProps = {
   onToggleMember: (id: string) => void;
   disabled: boolean;
   dictation: ReturnType<typeof useDictation>;
+  /**
+   * The stored/draft schedule values. Kept populated even while `recurrenceEnabled` is false so a
+   * paused rule's cadence survives being switched back on — see the note above the checkbox below.
+   */
   recurrence: RecurrenceValue | null;
-  onRecurrenceChange: (next: RecurrenceValue | null) => void;
+  /** Whether Repeats is switched on. Independent of `recurrence` so "off" can still remember a value. */
+  recurrenceEnabled: boolean;
+  /** Edits to the schedule fields while `recurrenceEnabled` is true. Never called with null. */
+  onRecurrenceChange: (next: RecurrenceValue) => void;
+  onRecurrenceEnabledChange: (enabled: boolean) => void;
 };
 
 /**
@@ -60,10 +68,31 @@ export function TaskFields({
   disabled,
   dictation,
   recurrence,
+  recurrenceEnabled,
   onRecurrenceChange,
+  onRecurrenceEnabledChange,
 }: TaskFieldsProps) {
   const currentWorkspace = workspaces.find((w) => w.id === workspaceId);
   const showWorkspace = !hideWorkspaceWhenOnlyOne || workspaces.length > 1;
+
+  /**
+   * Flipping the toggle only ever changes `recurrenceEnabled`. It seeds `recurrence` with defaults
+   * the first time it is switched on and there is nothing stored yet, but turning it off never
+   * touches `recurrence` — that is what lets a paused rule's cadence come back unchanged when the
+   * user re-enables it, instead of the checkbox itself overloading "off" as "forgotten".
+   */
+  function handleToggleRecurrence() {
+    const next = !recurrenceEnabled;
+    onRecurrenceEnabledChange(next);
+    if (next && recurrence === null) {
+      onRecurrenceChange({
+        frequency: "daily",
+        intervalCount: 1,
+        firstRunAt: defaultFirstRun(),
+        dueOffsetHours: null,
+      });
+    }
+  }
 
   return (
     <>
@@ -167,27 +196,17 @@ export function TaskFields({
 
       {/*
         Recurrence is a property of the task, not a separate entity — one permanent task row that
-        reactivates at each occurrence. Switching Repeats off in the modal clears the draft; the
-        edit modal turns that into is_active = false so the schedule survives being switched back
-        on, and deleting the task is what removes a recurrence for good.
+        reactivates at each occurrence. Switching Repeats off in the modal turns into is_active =
+        false so the schedule survives being switched back on, and deleting the task is what
+        removes a recurrence for good. The checkbox reflects `recurrenceEnabled`, not merely
+        whether `recurrence` is non-null — a paused rule has stored values but must render OFF.
       */}
       <div>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"
-            checked={recurrence !== null}
-            onChange={() =>
-              onRecurrenceChange(
-                recurrence
-                  ? null
-                  : {
-                      frequency: "daily",
-                      intervalCount: 1,
-                      firstRunAt: defaultFirstRun(),
-                      dueOffsetHours: null,
-                    }
-              )
-            }
+            checked={recurrenceEnabled}
+            onChange={handleToggleRecurrence}
             disabled={disabled}
             className="rounded accent-[var(--color-accent)]"
           />
@@ -195,7 +214,7 @@ export function TaskFields({
           Repeats
         </label>
 
-        {recurrence && (
+        {recurrenceEnabled && recurrence && (
           <div className="mt-2 flex flex-col gap-2 rounded-sm border border-[var(--color-border)] p-2">
             <div className="flex items-end gap-2">
               <div className="w-20">

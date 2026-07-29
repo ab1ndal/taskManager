@@ -852,8 +852,11 @@ describe("EditTaskModal — recurrence", () => {
   it("sends undefined, not the old value, when the due-offset field is cleared", async () => {
     jest.mocked(updateTask).mockResolvedValue({ ok: true });
     jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: true });
+    // `recurring: true` matters here: it is what page.tsx's Query 3c would set for an active rule,
+    // and it is what makes the checkbox render checked and the fields render open without a click.
     const taskWithRecurrence: RawTask = {
       ...mockTask,
+      recurring: true,
       recurrence: { frequency: "daily", intervalCount: 1, firstRunAt: "2026-07-30T09:00", dueOffsetHours: 4 },
     };
 
@@ -861,6 +864,7 @@ describe("EditTaskModal — recurrence", () => {
       <EditTaskModal open task={taskWithRecurrence} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
     );
 
+    expect(screen.getByLabelText("Repeats")).toBeChecked();
     const offsetInput = screen.getByLabelText("Due hours after it appears (optional)");
     expect(offsetInput).toHaveValue(4);
     await userEvent.clear(offsetInput);
@@ -869,6 +873,65 @@ describe("EditTaskModal — recurrence", () => {
     await waitFor(() =>
       expect(setTaskRecurrence).toHaveBeenCalledWith(
         expect.objectContaining({ dueOffsetHours: undefined })
+      )
+    );
+  });
+
+  // The bug this covers: Query 3c used to filter `is_active = true`, so a paused rule reached this
+  // modal as `recurrence: null` — Repeats showed OFF with no stored values, and re-enabling wrote
+  // fresh defaults (daily, interval 1, tomorrow 09:00) straight over whatever cadence the user had
+  // actually set. Fixed by keeping `recurrence` populated from the stored row regardless of
+  // `is_active`, and driving the checkbox off `recurring` (== is_active) instead of `recurrence`'s
+  // nullness.
+  it("shows Repeats off but prefills the old schedule once a paused rule is re-enabled", async () => {
+    const pausedTask: RawTask = {
+      ...mockTask,
+      recurring: false,
+      recurrence: { frequency: "weekly", intervalCount: 2, firstRunAt: "2026-08-01T09:00", dueOffsetHours: 5 },
+    };
+
+    render(
+      <EditTaskModal open task={pausedTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    expect(screen.getByLabelText("Repeats")).not.toBeChecked();
+    expect(screen.queryByLabelText("Repeat unit")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Repeats"));
+
+    expect(screen.getByLabelText("Repeats")).toBeChecked();
+    expect(screen.getByLabelText("Repeat every")).toHaveValue(2);
+    expect(screen.getByLabelText("Repeat unit")).toHaveValue("weekly");
+    expect(screen.getByLabelText("Starting")).toHaveValue("2026-08-01T09:00");
+    expect(screen.getByLabelText("Due hours after it appears (optional)")).toHaveValue(5);
+  });
+
+  it("writes the paused schedule's own values when re-enabled, not fresh defaults", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: true });
+    const pausedTask: RawTask = {
+      ...mockTask,
+      recurring: false,
+      recurrence: { frequency: "weekly", intervalCount: 2, firstRunAt: "2026-08-01T09:00", dueOffsetHours: 5 },
+    };
+
+    render(
+      <EditTaskModal open task={pausedTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByLabelText("Repeats"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(setTaskRecurrence).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: pausedTask.id,
+          frequency: "weekly",
+          intervalCount: 2,
+          firstRunAt: "2026-08-01T09:00",
+          dueOffsetHours: 5,
+          isActive: true,
+        })
       )
     );
   });
