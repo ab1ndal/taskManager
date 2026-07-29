@@ -40,6 +40,21 @@ describe("recurrenceSchema", () => {
     expect(recurrenceSchema.safeParse({ ...validRecurrence, firstRunAt: "2026-07-30" }).success).toBe(false);
   });
 
+  it("rejects a UTC offset suffix (Z), because resolution must be in Pacific", () => {
+    const result = recurrenceSchema.safeParse({ ...validRecurrence, firstRunAt: "2026-07-30T09:00Z" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a positive offset (e.g., +05:00), because resolution must be in Pacific", () => {
+    const result = recurrenceSchema.safeParse({ ...validRecurrence, firstRunAt: "2026-07-30T09:00+05:00" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects seconds in the timestamp, matching datetime-local input which omits them", () => {
+    const result = recurrenceSchema.safeParse({ ...validRecurrence, firstRunAt: "2026-07-30T09:00:00" });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects a negative due offset", () => {
     expect(recurrenceSchema.safeParse({ ...validRecurrence, dueOffsetHours: -1 }).success).toBe(false);
   });
