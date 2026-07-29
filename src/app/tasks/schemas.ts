@@ -35,6 +35,52 @@ const memberIds = z
   .min(1, "Assign the task to at least one person")
   .max(50, "A task cannot be assigned to more than 50 people");
 
+/**
+ * A recurrence is the schedule half of a recurring task; the task row owns everything else.
+ *
+ * `biweekly` is deliberately absent — with a free interval count it is `weekly` with
+ * `intervalCount: 2`, and two encodings of one schedule means nothing decides which the form emits.
+ * Migration 012 drops it from the database check constraint for the same reason.
+ */
+const frequency = z.enum(["daily", "weekly", "monthly"], {
+  message: "Choose days, weeks or months",
+});
+
+const intervalCount = z
+  .number()
+  .int("Repeat interval must be a whole number")
+  .min(1, "Repeat interval must be at least 1")
+  .max(365, "Repeat interval must be 365 or fewer");
+
+/**
+ * A wall-clock time with no offset, exactly as `<input type="datetime-local">` produces it. It is
+ * resolved to an instant by `public.upsert_task_recurrence`, which is the only place in the stack
+ * that knows the app is Pacific. Date-only is rejected: 9am versus midnight is the point of a
+ * chore schedule.
+ */
+const firstRunAt = z.iso.datetime({
+  local: true,
+  message: "Start must include a date and a time",
+});
+
+const dueOffsetHours = z
+  .number()
+  .int("Due offset must be a whole number of hours")
+  .min(0, "Due offset cannot be negative")
+  .max(8760, "Due offset must be 8760 hours or fewer")
+  .optional();
+
+export const recurrenceSchema = z.object({
+  frequency,
+  intervalCount,
+  firstRunAt,
+  dueOffsetHours,
+  /** Toggling Repeats off pauses rather than deletes, so the schedule survives being turned back on. */
+  isActive: z.boolean().default(true),
+});
+
+export const setTaskRecurrenceSchema = recurrenceSchema.extend({ taskId: uuid });
+
 export const createTaskWithSubtasksSchema = z.object({
   title,
   description,
@@ -44,6 +90,8 @@ export const createTaskWithSubtasksSchema = z.object({
   subtasks: z
     .array(z.object({ title, dueAt, description }))
     .max(50, "A task cannot have more than 50 subtasks"),
+  /** Present when the Repeats section is on. The task and its rule are written by one action. */
+  recurrence: recurrenceSchema.optional(),
 });
 
 export const updateTaskSchema = z.object({
@@ -110,6 +158,9 @@ export type ReorderTaskInput = z.input<typeof reorderTaskSchema>;
 export type CreateTaskUpdateInput = z.input<typeof createTaskUpdateSchema>;
 export type AddSubtaskInput = z.input<typeof addSubtaskSchema>;
 export type UpdateSubtaskInput = z.input<typeof updateSubtaskSchema>;
+export type RecurrenceInput = z.input<typeof recurrenceSchema>;
+export type Recurrence = z.output<typeof recurrenceSchema>;
+export type SetTaskRecurrenceInput = z.input<typeof setTaskRecurrenceSchema>;
 
 /** Thrown when input fails a schema. Carries per-field messages so the UI can point at the field. */
 export class ValidationError extends Error {
