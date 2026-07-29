@@ -1,3 +1,5 @@
+import type { RecurrenceValue } from "./recurrence-time";
+
 export type RawTask = {
   id: string;
   title: string;
@@ -15,6 +17,10 @@ export type RawTask = {
     description: string | null;
     due_at: string | null;
   }[];
+  /** Present when the task has an active schedule. Seeds the Repeats section in the edit modal. */
+  recurrence?: RecurrenceValue | null;
+  /** Whether the card shows the repeat badge. Set optimistically before `recurrence` is read back. */
+  recurring?: boolean;
 };
 
 export type BucketedTask = RawTask & {

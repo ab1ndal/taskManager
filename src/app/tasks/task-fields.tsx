@@ -1,7 +1,10 @@
 "use client";
 
+import { Repeat } from "lucide-react";
+import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { DictationTextarea } from "@/components/dictation-textarea";
 import { useDictation } from "@/lib/use-dictation";
+import { defaultFirstRun, type RecurrenceValue } from "./recurrence-time";
 
 export type WorkspaceMember = { id: string; display_name: string };
 export type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
@@ -26,6 +29,8 @@ export type TaskFieldsProps = {
   onToggleMember: (id: string) => void;
   disabled: boolean;
   dictation: ReturnType<typeof useDictation>;
+  recurrence: RecurrenceValue | null;
+  onRecurrenceChange: (next: RecurrenceValue | null) => void;
 };
 
 /**
@@ -54,6 +59,8 @@ export function TaskFields({
   onToggleMember,
   disabled,
   dictation,
+  recurrence,
+  onRecurrenceChange,
 }: TaskFieldsProps) {
   const currentWorkspace = workspaces.find((w) => w.id === workspaceId);
   const showWorkspace = !hideWorkspaceWhenOnlyOne || workspaces.length > 1;
@@ -157,6 +164,138 @@ export function TaskFields({
           ))}
         </div>
       </fieldset>
+
+      {/*
+        Recurrence is a property of the task, not a separate entity — one permanent task row that
+        reactivates at each occurrence. Switching Repeats off in the modal clears the draft; the
+        edit modal turns that into is_active = false so the schedule survives being switched back
+        on, and deleting the task is what removes a recurrence for good.
+      */}
+      <div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={recurrence !== null}
+            onChange={() =>
+              onRecurrenceChange(
+                recurrence
+                  ? null
+                  : {
+                      frequency: "daily",
+                      intervalCount: 1,
+                      firstRunAt: defaultFirstRun(),
+                      dueOffsetHours: null,
+                    }
+              )
+            }
+            disabled={disabled}
+            className="rounded accent-[var(--color-accent)]"
+          />
+          <Repeat size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+          Repeats
+        </label>
+
+        {recurrence && (
+          <div className="mt-2 flex flex-col gap-2 rounded-sm border border-[var(--color-border)] p-2">
+            <div className="flex items-end gap-2">
+              <div className="w-20">
+                <label
+                  htmlFor={`${idPrefix}-repeat-interval`}
+                  className="block text-xs text-[var(--color-text-muted)] mb-1"
+                >
+                  Repeat every
+                </label>
+                <input
+                  id={`${idPrefix}-repeat-interval`}
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={recurrence.intervalCount}
+                  onChange={(e) =>
+                    onRecurrenceChange({
+                      ...recurrence,
+                      intervalCount: Number(e.target.value),
+                    })
+                  }
+                  disabled={disabled}
+                  className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                />
+              </div>
+              <div className="flex-1">
+                <label
+                  htmlFor={`${idPrefix}-repeat-unit`}
+                  className="block text-xs text-[var(--color-text-muted)] mb-1"
+                >
+                  Repeat unit
+                </label>
+                <select
+                  id={`${idPrefix}-repeat-unit`}
+                  value={recurrence.frequency}
+                  onChange={(e) =>
+                    onRecurrenceChange({
+                      ...recurrence,
+                      frequency: e.target.value as RecurrenceValue["frequency"],
+                    })
+                  }
+                  disabled={disabled}
+                  className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+                >
+                  {/* No biweekly: it is weekly with an interval of 2, and migration 012 drops it. */}
+                  <option value="daily">days</option>
+                  <option value="weekly">weeks</option>
+                  <option value="monthly">months</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor={`${idPrefix}-repeat-start`}
+                className="block text-xs text-[var(--color-text-muted)] mb-1"
+              >
+                Starting
+              </label>
+              {/*
+                datetime-local, not date: the existing due-date fields are date-only, but 9am versus
+                midnight is the point of a chore schedule. The value is Pacific wall-clock and is
+                resolved server-side — see recurrence-time.ts.
+              */}
+              <input
+                id={`${idPrefix}-repeat-start`}
+                type="datetime-local"
+                value={recurrence.firstRunAt}
+                onChange={(e) => onRecurrenceChange({ ...recurrence, firstRunAt: e.target.value })}
+                disabled={disabled}
+                className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor={`${idPrefix}-repeat-offset`}
+                className="block text-xs text-[var(--color-text-muted)] mb-1"
+              >
+                Due hours after it appears (optional)
+              </label>
+              <input
+                id={`${idPrefix}-repeat-offset`}
+                type="number"
+                min={0}
+                max={8760}
+                value={recurrence.dueOffsetHours ?? ""}
+                onChange={(e) =>
+                  onRecurrenceChange({
+                    ...recurrence,
+                    dueOffsetHours: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+                disabled={disabled}
+                className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 }

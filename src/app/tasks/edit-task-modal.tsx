@@ -26,10 +26,10 @@ import { useDictation } from "@/lib/use-dictation";
 import { DictationTextarea } from "@/components/dictation-textarea";
 import type { RawTask } from "./bucket-tasks";
 import type { TaskUpdate } from "./actions";
-import { TaskFields } from "./task-fields";
+import { TaskFields, type Workspace } from "./task-fields";
+import type { RecurrenceValue } from "./recurrence-time";
+import { setTaskRecurrence } from "./recurring-actions";
 
-type WorkspaceMember = { id: string; display_name: string };
-type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
 type Subtask = RawTask["subtasks"][number];
 
 /**
@@ -85,6 +85,7 @@ export function EditTaskModal({
   const [dueAt, setDueAt] = useState(task.due_at ? task.due_at.slice(0, 10) : "");
   const [workspaceId, setWorkspaceId] = useState(task.workspace.id);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(task.member_ids);
+  const [recurrence, setRecurrence] = useState<RecurrenceValue | null>(task.recurrence ?? null);
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
 
@@ -115,6 +116,7 @@ export function EditTaskModal({
     setLoadedTaskId(task.id);
     setUpdates([]);
     setUpdatesLoadError("");
+    setRecurrence(task.recurrence ?? null);
   }
 
   // One controller for the whole modal: the update composer, the task description and both subtask
@@ -356,14 +358,40 @@ export function EditTaskModal({
     }
     setFormError("");
 
-    onClose();
-
     // No optimistic update happens here — the list only changes once the server revalidates — so
     // the success toast waits for the result rather than announcing an edit that may not land.
     startTransition(async () => {
       const result = await updateTask(parsed.data);
-      if (result.ok) toast("Task updated");
-      else toast(result.error, "error");
+      if (!result.ok) {
+        toast(result.error, "error");
+        return;
+      }
+
+      // Turning Repeats off pauses rather than deletes, so the schedule the user already set is
+      // still there if they turn it back on. Deleting the task is what ends a recurrence, and the
+      // FK cascade in migration 012 does that.
+      if (recurrence || task.recurrence) {
+        const recurrenceResult = await setTaskRecurrence({
+          taskId: task.id,
+          frequency: recurrence?.frequency ?? task.recurrence!.frequency,
+          intervalCount: recurrence?.intervalCount ?? task.recurrence!.intervalCount,
+          firstRunAt: recurrence?.firstRunAt ?? task.recurrence!.firstRunAt,
+          dueOffsetHours:
+            (recurrence?.dueOffsetHours ?? task.recurrence?.dueOffsetHours) ?? undefined,
+          isActive: recurrence !== null,
+        });
+
+        if (!recurrenceResult.ok) {
+          // Inline, not a toast. This modal is still open at this point, and an open
+          // `<dialog>.showModal()` makes the rest of the document inert — the toaster included —
+          // so a toast here would be unfocusable and unclickable (`tasks/lessons.md` L11).
+          setFormError(recurrenceResult.error);
+          return;
+        }
+      }
+
+      toast("Task updated");
+      onClose();
     });
   }
 
@@ -406,6 +434,8 @@ export function EditTaskModal({
             onToggleMember={toggleMember}
             disabled={pending}
             dictation={dictation}
+            recurrence={recurrence}
+            onRecurrenceChange={setRecurrence}
           />
 
           {formError && (

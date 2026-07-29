@@ -361,6 +361,22 @@ describe("NewTaskModal — toast feedback", () => {
     );
   });
 
+  // A rule that fails to write no longer aborts the action (createTaskWithSubtasks keeps the task
+  // and reports recurrenceFailed instead) — so this is the only signal a user gets that the
+  // schedule they just set will never actually repeat.
+  it("fires warning toast when recurrenceFailed is true", async () => {
+    (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: true, subtaskErrors: 0, recurrenceFailed: true });
+    renderModal();
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        "Task created, but the repeat schedule could not be saved",
+        "warning"
+      )
+    );
+  });
+
   it("fires error toast when server throws", async () => {
     (createTaskWithSubtasks as jest.Mock).mockResolvedValue({ ok: false, error: "Something went wrong. Please try again." });
     renderModal();
