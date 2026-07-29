@@ -31,8 +31,7 @@ import type {
 } from "./schemas";
 import type { ActionResult } from "./action-result";
 import type { RawTask } from "./bucket-tasks";
-import { run, assertNoError } from "./action-run";
-import { writeRecurrence } from "./recurring-actions";
+import { run, assertNoError, writeRecurrence } from "./action-run";
 
 // Every exported function in this file is a public endpoint. Each one authenticates the caller and
 // then authorizes them for the specific row named in its arguments — a disabled button or a
@@ -220,7 +219,7 @@ export async function deleteTask(rawTaskId: string): Promise<ActionResult> {
 
 export async function createTaskWithSubtasks(
   input: CreateTaskWithSubtasksInput
-): Promise<ActionResult<{ subtaskErrors: number }>> {
+): Promise<ActionResult<{ subtaskErrors: number; recurrenceFailed: boolean }>> {
   return run("createTaskWithSubtasks", async () => {
     const { user } = await requireUser();
     const { title, description, dueAt, workspaceId, memberIds, subtasks, recurrence } = parseInput(
@@ -254,11 +253,28 @@ export async function createTaskWithSubtasks(
       await assignTaskMember(admin, parentId, memberId);
     }
 
-    // Inside the same action as the task insert, deliberately: a recurring task whose rule failed
-    // to write is a task the user believes repeats and which never will. A thrown error here is
-    // turned into { ok: false } by `run`, and the modal's optimistic row is rolled back with it.
+    // A failed rule write is reported rather than thrown, the same as a failed subtask below: there
+    // is no transaction spanning the task insert, the assignment RPCs, and this write, so by the
+    // time it runs the task and its assignments already exist and are visible to the user.
+    // Discarding that work would be worse than the failure it was meant to prevent — the task would
+    // simply reappear, unexplained, on the next load. Instead the task is kept and the caller is
+    // told the schedule did not save, so it can say so.
+    let recurrenceFailed = false;
     if (recurrence) {
-      await writeRecurrence(admin, parentId, recurrence);
+      try {
+        await writeRecurrence(admin, parentId, recurrence);
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            action: "createTaskWithSubtasks",
+            step: "write recurrence",
+            parentId,
+            message: err instanceof Error ? err.message : String(err),
+          })
+        );
+        recurrenceFailed = true;
+      }
     }
 
     // A failed subtask is reported rather than thrown: the parent task exists at this point, and
@@ -288,7 +304,7 @@ export async function createTaskWithSubtasks(
     }
 
     revalidatePath("/tasks");
-    return { subtaskErrors };
+    return { subtaskErrors, recurrenceFailed };
   });
 }
 
