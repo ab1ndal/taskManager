@@ -32,8 +32,17 @@ export function toLocalInputValue(iso: string): string {
   return formatted.slice(0, 16).replace(" ", "T");
 }
 
-/** Tomorrow at 09:00 Pacific — the value Repeats starts on rather than an empty field. */
+/**
+ * Tomorrow at 09:00 Pacific — the value Repeats starts on rather than an empty field.
+ *
+ * Adding a fixed 24h in UTC is wrong here: Pacific's clock does not move by exactly 24h across a
+ * DST transition, so it either skips a calendar day (spring-forward) or repeats one (fall-back).
+ * The fix works on the Pacific calendar date itself — read today's Y/M/D from `toLocalInputValue`,
+ * advance the date component by one, and let `Date.UTC` normalize the month/year rollover — so no
+ * instant arithmetic, and therefore no DST, is involved at all.
+ */
 export function defaultFirstRun(now: Date = new Date()): string {
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  return `${toLocalInputValue(tomorrow.toISOString()).slice(0, 10)}T09:00`;
+  const [year, month, day] = toLocalInputValue(now.toISOString()).slice(0, 10).split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+  return `${tomorrow}T09:00`;
 }

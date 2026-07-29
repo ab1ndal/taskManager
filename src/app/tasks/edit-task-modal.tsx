@@ -18,6 +18,7 @@ import {
   createTaskUpdateSchema,
   addSubtaskSchema,
   updateSubtaskSchema,
+  recurrenceSchema,
 } from "./schemas";
 import { toast } from "@/components/toaster";
 import { Dialog } from "@/components/dialog";
@@ -356,28 +357,56 @@ export function EditTaskModal({
       setFormError(parsed.error.issues[0].message);
       return;
     }
+
+    // Same schema `setTaskRecurrence` parses, checked here for the same reason as `updateTaskSchema`
+    // above: catching e.g. an emptied "Repeat every" client-side, instead of paying a round trip to
+    // learn what the input already told us. `updateTaskSchema` has no recurrence field of its own,
+    // so this runs separately.
+    if (recurrence) {
+      // RecurrenceValue uses null for "no offset set"; the schema (shared with the new-task modal,
+      // where the field is genuinely absent rather than null) only accepts undefined for that.
+      const recurrenceParsed = recurrenceSchema.safeParse({
+        ...recurrence,
+        dueOffsetHours: recurrence.dueOffsetHours ?? undefined,
+      });
+      if (!recurrenceParsed.success) {
+        setFormError(recurrenceParsed.error.issues[0].message);
+        return;
+      }
+    }
     setFormError("");
 
-    // No optimistic update happens here — the list only changes once the server revalidates — so
-    // the success toast waits for the result rather than announcing an edit that may not land.
+    // A schedule write only happens when there is a schedule to write — a task with none, which
+    // stays off, never calls `setTaskRecurrence` and so has nothing that can fail inline. Closing
+    // it right away (as every non-recurring edit already did) keeps that common case unchanged;
+    // only the recurring path holds the modal open until the write actually succeeds or fails.
+    const hasSchedule = recurrence || task.recurrence;
+    if (!hasSchedule) onClose();
+
     startTransition(async () => {
       const result = await updateTask(parsed.data);
       if (!result.ok) {
-        toast(result.error, "error");
+        // Whether this can be a toast tracks whether the modal already closed above: with no
+        // schedule to write it did, so the toaster is reachable exactly as it always was; with one
+        // pending, the modal is still open, and an open `<dialog>.showModal()` makes the toaster
+        // inert — unfocusable and unclickable (`tasks/lessons.md` L11) — so that case goes inline.
+        if (hasSchedule) setFormError(result.error);
+        else toast(result.error, "error");
         return;
       }
 
       // Turning Repeats off pauses rather than deletes, so the schedule the user already set is
       // still there if they turn it back on. Deleting the task is what ends a recurrence, and the
       // FK cascade in migration 012 does that.
-      if (recurrence || task.recurrence) {
+      if (hasSchedule) {
         const recurrenceResult = await setTaskRecurrence({
           taskId: task.id,
           frequency: recurrence?.frequency ?? task.recurrence!.frequency,
           intervalCount: recurrence?.intervalCount ?? task.recurrence!.intervalCount,
           firstRunAt: recurrence?.firstRunAt ?? task.recurrence!.firstRunAt,
-          dueOffsetHours:
-            (recurrence?.dueOffsetHours ?? task.recurrence?.dueOffsetHours) ?? undefined,
+          dueOffsetHours: recurrence
+            ? (recurrence.dueOffsetHours ?? undefined)
+            : (task.recurrence?.dueOffsetHours ?? undefined),
           isActive: recurrence !== null,
         });
 
@@ -390,8 +419,12 @@ export function EditTaskModal({
         }
       }
 
+      // No optimistic update happens here — the list only changes once the server revalidates — so
+      // the toast waits for both writes rather than announcing an edit that may not land.
       toast("Task updated");
-      onClose();
+      // Already closed above when there was no schedule to write; deferred until here otherwise,
+      // since closing earlier would have hidden the inline error above had the write failed.
+      if (hasSchedule) onClose();
     });
   }
 

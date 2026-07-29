@@ -553,3 +553,30 @@ describe("NewTaskModal — field labelling", () => {
     expect(screen.getByRole("group", { name: "Assign to" })).toBeInTheDocument();
   });
 });
+
+// ─── Recurrence payload ───────────────────────────────────────────────────────
+
+describe("NewTaskModal — recurrence payload", () => {
+  afterEach(() => jest.useRealTimers());
+
+  // `objectContaining` elsewhere in this file never pins `firstRunAt`, so nothing enforced that a
+  // `datetime-local` value reaches the server as the exact string the field held — recurrence-time.ts
+  // is explicit that this must never be converted or offset, since only `upsert_task_recurrence`
+  // knows the app's timezone.
+  it("submits the Starting value byte-for-byte, never converted", async () => {
+    jest.useFakeTimers().setSystemTime(new Date("2026-07-30T16:00:00Z")); // 2026-07-30 09:00 PDT
+
+    renderModal();
+    fireEvent.change(screen.getByPlaceholderText(/task title/i), { target: { value: "Water plants" } });
+    fireEvent.click(screen.getByLabelText("Repeats"));
+    fireEvent.click(screen.getByRole("button", { name: /add task/i }));
+
+    await waitFor(() =>
+      expect(createTaskWithSubtasks).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recurrence: expect.objectContaining({ firstRunAt: "2026-07-31T09:00" }),
+        })
+      )
+    );
+  });
+});
