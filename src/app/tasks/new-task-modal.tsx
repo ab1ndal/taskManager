@@ -10,9 +10,8 @@ import { Dialog } from "@/components/dialog";
 import { DictationTextarea } from "@/components/dictation-textarea";
 import { useDictation } from "@/lib/use-dictation";
 import type { RawTask } from "./bucket-tasks";
+import { TaskFields, type Workspace } from "./task-fields";
 
-type WorkspaceMember = { id: string; display_name: string };
-type Workspace = { id: string; name: string; kind: string; members: WorkspaceMember[] };
 type SubtaskRow = { title: string; dueAt: string; description: string };
 
 export function NewTaskModal({
@@ -50,8 +49,6 @@ export function NewTaskModal({
   // One recognizer for the whole form: the task details field and every subtask's details field
   // share it, and claiming it from one field releases whichever held it.
   const dictation = useDictation();
-
-  const currentWorkspace = workspaces.find((w) => w.id === workspaceId);
 
   function handleWorkspaceChange(id: string) {
     setWorkspaceId(id);
@@ -202,98 +199,22 @@ export function NewTaskModal({
       <h3 id="new-task-modal-title" className="text-base font-semibold mb-4">New task</h3>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {/*
-            Every field carries a visible label tied to its control by id. Title and details used to
-            rely on their placeholder alone, which disappears the moment typing starts and is not a
-            label to a screen reader; Due date, Workspace and Assign to had visible text that was
-            never associated with anything.
-          */}
-          <div>
-            <label htmlFor="new-task-title" className="block text-xs text-[var(--color-text-muted)] mb-1">
-              Title
-            </label>
-            <input
-              id="new-task-title"
-              type="text"
-              placeholder="Task title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={disabled}
-              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="new-task-description" className="block text-xs text-[var(--color-text-muted)] mb-1">
-              Details (optional)
-            </label>
-            <DictationTextarea
-              id="new-task-description"
-              field="description"
-              dictation={dictation}
-              dictateLabel="Dictate task details"
-              placeholder="Add details…"
-              value={description}
-              onChange={setDescription}
-              disabled={disabled}
-              rows={3}
-              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="new-task-due" className="block text-xs text-[var(--color-text-muted)] mb-1">
-              Due date (optional)
-            </label>
-            <input
-              id="new-task-due"
-              type="date"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
-              disabled={disabled}
-              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="new-task-workspace" className="block text-xs text-[var(--color-text-muted)] mb-1">
-              Workspace
-            </label>
-            <select
-              id="new-task-workspace"
-              value={workspaceId}
-              onChange={(e) => handleWorkspaceChange(e.target.value)}
-              disabled={disabled}
-              className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
-            >
-              {workspaces.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* A group of checkboxes needs a group label, which is what fieldset/legend is for. */}
-          <fieldset>
-            <legend className="block text-xs text-[var(--color-text-muted)] mb-1">
-              Assign to
-            </legend>
-            <div className="flex flex-col gap-1.5">
-              {currentWorkspace?.members.map((m) => (
-                <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedMemberIds.includes(m.id)}
-                    onChange={() => toggleMember(m.id)}
-                    disabled={disabled}
-                    className="rounded accent-[var(--color-accent)]"
-                  />
-                  {m.display_name}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <TaskFields
+            idPrefix="new-task"
+            title={title}
+            onTitleChange={setTitle}
+            description={description}
+            onDescriptionChange={setDescription}
+            dueAt={dueAt}
+            onDueAtChange={setDueAt}
+            workspaces={workspaces}
+            workspaceId={workspaceId}
+            onWorkspaceChange={handleWorkspaceChange}
+            selectedMemberIds={selectedMemberIds}
+            onToggleMember={toggleMember}
+            disabled={disabled}
+            dictation={dictation}
+          />
 
           {/*
             Not a <label>: this heads a repeating group of rows whose own fields carry aria-labels,
