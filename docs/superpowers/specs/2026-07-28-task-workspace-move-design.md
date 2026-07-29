@@ -96,7 +96,15 @@ already passed to `TasksPageClient`), `workspaceId` state, and the select descri
 - `edit-task-modal.test.tsx`: the select swaps the member list and preselects the user's own member;
   switching back restores the original assignees; submit carries `workspaceId`.
 
-## Known race, narrowed by 011
+## Known race, accepted (2026-07-28)
+
+Decision: not fixed, deliberately. The workspace is two users, and a subtask is not added while a
+move is in flight, so the window described below cannot be hit in practice. Revisit if the workspace
+grows or if subtask creation ever becomes automated (a recurring rule generating subtasks, say),
+because the fix is small — take `for update` on the parent in `addSubtask` so it serializes against
+`move_task_workspace`.
+
+
 
 `move_task_workspace` takes `for update` on the parent row and then snapshots its subtasks. A
 concurrent `addSubtask` does not lock the parent, so a subtask inserted in the same instant can miss
