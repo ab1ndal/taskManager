@@ -89,6 +89,32 @@ describe("TasksPageClient — initial render", () => {
   });
 });
 
+describe("TasksPageClient — repeat badge", () => {
+  it("marks a recurring task with a repeat badge", () => {
+    render(
+      <TasksPageClient
+        workspaces={workspaces}
+        currentMemberIds={["m-1"]}
+        memberIdByWorkspaceId={{}}
+        initialTasks={[makeTask({ id: "t1", title: "Take trash", recurring: true })]}
+      />
+    );
+    expect(screen.getByLabelText("Repeats")).toBeInTheDocument();
+  });
+
+  it("leaves a one-off task unbadged", () => {
+    render(
+      <TasksPageClient
+        workspaces={workspaces}
+        currentMemberIds={["m-1"]}
+        memberIdByWorkspaceId={{}}
+        initialTasks={[makeTask({ id: "t2", title: "Pay rent" })]}
+      />
+    );
+    expect(screen.queryByLabelText("Repeats")).not.toBeInTheDocument();
+  });
+});
+
 describe("TasksPageClient — optimistic insert (handleTaskCreated)", () => {
   it("wires onTaskCreated prop to NewTaskModal", () => {
     render(
