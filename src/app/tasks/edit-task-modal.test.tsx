@@ -8,6 +8,12 @@ jest.mock("./actions", () => ({
   reopenTask: jest.fn(),
   deleteTask: jest.fn(),
 }));
+// The real module is a "use server" file that imports next/cache, which reaches for a
+// TextEncoder the jsdom test environment doesn't provide — the same reason ./actions is mocked
+// above rather than imported for real. Task 7 is the first time the edit modal calls it.
+jest.mock("./recurring-actions", () => ({
+  setTaskRecurrence: jest.fn().mockResolvedValue({ ok: true }),
+}));
 jest.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 
 import React from "react";
@@ -22,6 +28,7 @@ import {
   updateSubtask,
   deleteTask,
 } from "./actions";
+import { setTaskRecurrence } from "./recurring-actions";
 import type { RawTask } from "./bucket-tasks";
 
 beforeAll(() => {
@@ -754,5 +761,62 @@ describe("EditTaskModal — workspace move", () => {
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: mockWs.id }))
     );
+  });
+});
+
+// ─── Recurrence ──────────────────────────────────────────────────────────────
+
+describe("EditTaskModal — recurrence", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("persists a newly-enabled schedule after the task itself saves", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: true });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByLabelText("Repeats"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(setTaskRecurrence).toHaveBeenCalledWith(
+        expect.objectContaining({ taskId: mockTask.id, frequency: "daily", intervalCount: 1, isActive: true })
+      )
+    );
+  });
+
+  // The dialog's own showModal() makes the rest of the document inert while it is open, so a
+  // toast fired here would be unfocusable and unclickable — the error has to render inside the
+  // still-open modal instead. See tasks/lessons.md L11 and the new-task modal's own validation
+  // errors for the same reasoning.
+  it("shows a schedule save failure inline and keeps the modal open, instead of toasting", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+    jest.mocked(setTaskRecurrence).mockResolvedValue({ ok: false, error: "Could not save the schedule" });
+    const onClose = jest.fn();
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={onClose} />
+    );
+
+    await userEvent.click(screen.getByLabelText("Repeats"));
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not save the schedule");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("does not call setTaskRecurrence when the task has no schedule and Repeats stays off", async () => {
+    jest.mocked(updateTask).mockResolvedValue({ ok: true });
+
+    render(
+      <EditTaskModal open task={mockTask} workspaces={[mockWs]} memberIdByWorkspaceId={memberIdByWorkspaceId} onClose={() => {}} />
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(updateTask).toHaveBeenCalled());
+    expect(setTaskRecurrence).not.toHaveBeenCalled();
   });
 });

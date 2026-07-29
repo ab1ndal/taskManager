@@ -11,6 +11,7 @@ import { DictationTextarea } from "@/components/dictation-textarea";
 import { useDictation } from "@/lib/use-dictation";
 import type { RawTask } from "./bucket-tasks";
 import { TaskFields, type Workspace } from "./task-fields";
+import type { RecurrenceValue } from "./recurrence-time";
 
 type SubtaskRow = { title: string; dueAt: string; description: string };
 
@@ -43,6 +44,7 @@ export function NewTaskModal({
     getInitialMembers(firstWorkspace?.id ?? "")
   );
   const [subtaskRows, setSubtaskRows] = useState<SubtaskRow[]>([]);
+  const [recurrence, setRecurrence] = useState<RecurrenceValue | null>(null);
   const [pending, startTransition] = useTransition();
   const [formError, setFormError] = useState("");
   const lastSubtaskRef = useRef<HTMLInputElement>(null);
@@ -93,6 +95,7 @@ export function NewTaskModal({
     setWorkspaceId(firstWorkspace?.id ?? "");
     setSelectedMemberIds(getInitialMembers(firstWorkspace?.id ?? ""));
     setSubtaskRows([]);
+    setRecurrence(null);
     setFormError("");
   }
 
@@ -114,6 +117,9 @@ export function NewTaskModal({
           dueAt: r.dueAt || undefined,
           description: r.description.trim() || undefined,
         })),
+      recurrence: recurrence
+        ? { ...recurrence, dueOffsetHours: recurrence.dueOffsetHours ?? undefined, isActive: true }
+        : undefined,
     });
 
     if (!parsed.success) {
@@ -141,6 +147,7 @@ export function NewTaskModal({
       assignee_count: input.memberIds.length,
       member_ids: input.memberIds,
       subtasks: [],
+      recurring: recurrence !== null,
     };
 
     // Optimistic actions: fire callback, close modal, reset form, toast
@@ -161,6 +168,12 @@ export function NewTaskModal({
 
       if (result.subtaskErrors > 0) {
         toast(`Task created, but ${result.subtaskErrors} subtask(s) could not be saved`, "warning");
+      }
+
+      // The task is kept even when its schedule fails to write (see createTaskWithSubtasks), so
+      // "Task created" alone would leave the user believing a recurrence exists that never will.
+      if (result.recurrenceFailed) {
+        toast("Task created, but the repeat schedule could not be saved", "warning");
       }
     });
   }
@@ -214,6 +227,8 @@ export function NewTaskModal({
             onToggleMember={toggleMember}
             disabled={disabled}
             dictation={dictation}
+            recurrence={recurrence}
+            onRecurrenceChange={setRecurrence}
           />
 
           {/*
