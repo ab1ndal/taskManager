@@ -105,12 +105,15 @@ async function assignTaskMember(
  * Inserts a subtask row and assigns it the given members. Shared by `createTaskWithSubtasks`
  * (batch, at parent-creation time) and `addSubtask` (single, on an already-existing task) — both
  * need the identical insert-then-assign shape, just triggered at different times.
+ *
+ * No `workspace_id`: a subtask's workspace is its root task's, recorded once there. Migration 011
+ * makes the column NULL for exactly the rows that have a parent, so writing one here would violate
+ * `tasks_workspace_only_on_root`.
  */
 async function insertSubtask(
   admin: ReturnType<typeof createAdminClient>,
   args: {
     parentId: string;
-    workspaceId: string;
     memberIds: string[];
     title: string;
     description?: string;
@@ -126,7 +129,6 @@ async function insertSubtask(
       title: args.title,
       description: args.description ?? null,
       due_at: args.dueAt ? `${args.dueAt}T00:00:00Z` : null,
-      workspace_id: args.workspaceId,
       parent_task_id: args.parentId,
     })
   );
@@ -298,7 +300,6 @@ export async function createTaskWithSubtasks(
       try {
         await insertSubtask(admin, {
           parentId,
-          workspaceId,
           memberIds: uniqueMemberIds,
           title: sub.title,
           description: sub.description,
@@ -564,11 +565,19 @@ export async function addSubtask(
 
     const { data: parent, error: parentError } = await admin
       .from("tasks")
-      .select("workspace_id, completed_at")
+      .select("parent_task_id, completed_at")
       .eq("id", parentTaskId)
       .single();
 
     if (parentError || !parent) throw new Error(parentError?.message ?? "Task not found");
+
+    // A subtask is one level deep (docs/product.md: subtasks are tasks with parent_task_id), and
+    // nothing in the schema enforces that — this action is the only way to create one, so it is the
+    // boundary that has to. Nesting would also put a workspace two hops from its root.
+    if (parent.parent_task_id) {
+      const message = "A subtask cannot have subtasks of its own";
+      throw new ValidationError({ parentTaskId: [message] }, message);
+    }
 
     // Adding work to a finished task un-finishes it. A completed parent holding an open subtask is
     // a state the completion rules say cannot exist, and it is the ordinary way a done task comes
@@ -590,7 +599,6 @@ export async function addSubtask(
 
     const subtaskId = await insertSubtask(admin, {
       parentId: parentTaskId,
-      workspaceId: parent.workspace_id as string,
       memberIds,
       title,
       description,

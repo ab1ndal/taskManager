@@ -210,8 +210,9 @@ export function createFakeSupabase(options: FakeOptions = {}) {
         tables.task_assignments = rows;
         return { data: row, error: null };
       }
-      // Mirrors migration 010: parent and subtasks change workspace, all of their assignments are
-      // replaced by the given members, each new key landing at the end of that member's list.
+      // Mirrors migration 011: only the root task carries a workspace, so the workspace write is one
+      // row, while every assignment for the task and its subtasks is replaced by the given members,
+      // each new key landing at the end of that member's list.
       if (fnName === "move_task_workspace") {
         const taskId = params.p_task_id as string;
         const workspaceId = params.p_workspace_id as string;
@@ -238,16 +239,18 @@ export function createFakeSupabase(options: FakeOptions = {}) {
           };
         }
 
-        const movedIds = [taskId, ...taskRows.filter((t) => t.parent_task_id === taskId).map((t) => t.id as string)];
-        taskRows.forEach((t) => {
-          if (movedIds.includes(t.id as string)) t.workspace_id = workspaceId;
-        });
+        target.workspace_id = workspaceId;
+
+        const affectedIds = [
+          taskId,
+          ...taskRows.filter((t) => t.parent_task_id === taskId).map((t) => t.id as string),
+        ];
 
         const assignments = ((tables.task_assignments ?? []) as Row[]).filter(
-          (a) => !movedIds.includes(a.task_id as string)
+          (a) => !affectedIds.includes(a.task_id as string)
         );
         for (const memberId of memberIds) {
-          for (const movedId of movedIds) {
+          for (const movedId of affectedIds) {
             const max = assignments
               .filter((a) => a.member_id === memberId)
               .reduce((acc, a) => Math.max(acc, a.member_sort_key as number), 0);

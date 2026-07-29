@@ -63,7 +63,7 @@ Generated tasks set rule_id to this rule id.
 ### tasks
 
 id uuid primary key
-workspace_id uuid not null
+workspace_id uuid nullable, set on root tasks only
 
 parent_task_id uuid nullable
 rule_id uuid nullable
@@ -79,9 +79,18 @@ created_at timestamptz not null
 
 Notes
 Subtasks are rows with parent_task_id set.
-A task may be moved to another workspace only through move_task_workspace (migration 010): member ids
-are workspace-scoped, so the parent, its subtasks and all of their task_assignments rows must change
-together, in one transaction.
+
+A workspace is recorded once per task tree, on the root task. Migration 011 enforces
+check ((parent_task_id is null) = (workspace_id is not null)), so a subtask cannot carry a workspace
+and therefore cannot disagree with its parent. A subtask's workspace is resolved through
+parent_task_id — private.task_workspace(task_id) does this for the RLS policies.
+
+Subtasks are one level deep. Nothing in the schema enforces the depth; addSubtask rejects a parent
+that is itself a subtask, and private.task_workspace walks up to the root regardless.
+
+A task may be moved to another workspace only through move_task_workspace (migration 011). The
+workspace write is one row, but member ids are workspace-scoped, so the assignments of the root task
+and every subtask are deleted and rebuilt for members of the destination — all in one transaction.
 
 ### task_assignments
 

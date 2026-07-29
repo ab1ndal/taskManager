@@ -8,6 +8,22 @@ A task is created inside one workspace and stays there. A household task typed i
 workspace (or the reverse) can only be fixed by deleting it and retyping it, losing its subtasks and
 its update history.
 
+## Follow-up: normalization (migration 011)
+
+The first cut kept `workspace_id NOT NULL` on subtask rows and copied the parent's value into them.
+That is a denormalization — the value is derivable from `parent_task_id` — and nothing in the schema
+forced the copies to agree, so a manual `UPDATE` or a future code path could split a task across two
+workspaces. Migration 011 removes the duplication: `workspace_id` is nullable and constrained to be
+present exactly when `parent_task_id` is null, `private.task_workspace()` resolves a subtask's
+workspace by walking to the root, and the move updates one row. The assignment rebuild is unchanged —
+`task_assignments.member_id` points at workspace-scoped member rows, so those still all have to be
+replaced.
+
+The alternative considered and rejected was keeping the column and adding a composite deferrable
+foreign key `(parent_task_id, workspace_id) → (id, workspace_id)`, which makes disagreement
+impossible without touching any reader. Cheaper, but it preserves the duplicate value; normalization
+was preferred.
+
 ## Why this is not a one-field edit
 
 `workspace_members.id` is workspace-scoped, and `task_assignments.member_id` points at those rows.
@@ -80,13 +96,14 @@ already passed to `TasksPageClient`), `workspaceId` state, and the select descri
 - `edit-task-modal.test.tsx`: the select swaps the member list and preselects the user's own member;
   switching back restores the original assignees; submit carries `workspaceId`.
 
-## Known race, not addressed
+## Known race, narrowed by 011
 
 `move_task_workspace` takes `for update` on the parent row and then snapshots its subtasks. A
-concurrent `addSubtask` does not lock the parent, so a subtask inserted in the same instant can land
-in the old workspace with old-workspace assignees inherited from the pre-move parent. Closing it
-means locking the parent in `addSubtask` too, which is a change to a path this work does not
-otherwise touch.
+concurrent `addSubtask` does not lock the parent, so a subtask inserted in the same instant can miss
+the snapshot. Under 011 it can no longer end up in the wrong workspace — it has none, and resolves
+through its parent — but it can keep assignments pointing at the old workspace's member rows, which
+makes it invisible to the destination members until reassigned. Closing it means locking the parent
+in `addSubtask` too, which is a change to a path this work does not otherwise touch.
 
 ## Out of scope
 

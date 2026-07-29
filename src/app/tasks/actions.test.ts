@@ -83,8 +83,8 @@ describe("completeTask", () => {
     const tables = seed();
     tables.tasks.push(
       { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null },
-      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null },
-      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: "2026-01-01T00:00:00Z" }
+      { id: S1, workspace_id: null, parent_task_id: P1, completed_at: null },
+      { id: S2, workspace_id: null, parent_task_id: P1, completed_at: "2026-01-01T00:00:00Z" }
     );
     tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
     setup({ tables });
@@ -99,8 +99,8 @@ describe("completeTask", () => {
     const tables = seed();
     tables.tasks.push(
       { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null },
-      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null },
-      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: null }
+      { id: S1, workspace_id: null, parent_task_id: P1, completed_at: null },
+      { id: S2, workspace_id: null, parent_task_id: P1, completed_at: null }
     );
     tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
     setup({ tables });
@@ -200,11 +200,13 @@ describe("createTaskWithSubtasks", () => {
     const parent = tasksIn(tables).find((t) => t.title === "Parent");
     const subtask = tasksIn(tables).find((t) => t.title === "Subtask A");
 
-    expect(parent).toMatchObject({ description: "Arrange catering and venue" });
+    expect(parent).toMatchObject({ description: "Arrange catering and venue", workspace_id: WS1 });
     expect(subtask).toMatchObject({
       parent_task_id: parent!.id,
       due_at: "2026-03-25T00:00:00Z",
     });
+    // The workspace lives on the parent only; the subtask resolves it through parent_task_id.
+    expect(subtask?.workspace_id).toBeUndefined();
     expect(assignmentsIn(tables)).toContainEqual(
       expect.objectContaining({ task_id: subtask!.id, member_id: M1 })
     );
@@ -428,12 +430,12 @@ describe("updateTask", () => {
       auth_user_id: "auth-user-1",
       display_name: "Alice at work",
     });
-    tables.tasks.push({ id: S1, workspace_id: WS1, parent_task_id: T1, completed_at: null, title: "Sub" });
+    tables.tasks.push({ id: S1, workspace_id: null, parent_task_id: T1, completed_at: null, title: "Sub" });
     tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
     return tables;
   }
 
-  it("moves the task and its subtasks, replacing every assignment", async () => {
+  it("moves the root task and rebuilds the assignments of its subtasks", async () => {
     const tables = seedForMove();
     setup({ tables });
 
@@ -446,7 +448,8 @@ describe("updateTask", () => {
 
     expect(result).toEqual({ ok: true });
     expect(tasksIn(tables).find((t) => t.id === T1)).toMatchObject({ workspace_id: WS2, title: "Moved" });
-    expect(tasksIn(tables).find((t) => t.id === S1)?.workspace_id).toBe(WS2);
+    // The subtask has no workspace of its own to move (migration 011) — it follows T1 by parentage.
+    expect(tasksIn(tables).find((t) => t.id === S1)?.workspace_id).toBeNull();
     // Old WS1 assignments are gone; parent and subtask are both assigned to the WS2 member.
     expect(assignmentsIn(tables).filter((a) => a.member_id === M1)).toHaveLength(0);
     expect(assignmentsIn(tables).filter((a) => a.member_id === M1_WS2).map((a) => a.task_id).sort()).toEqual(
@@ -464,7 +467,7 @@ describe("updateTask", () => {
       "subtask moves with its parent"
     );
 
-    expect(tasksIn(tables).find((t) => t.id === S1)?.workspace_id).toBe(WS1);
+    expect(tasksIn(tables).find((t) => t.id === S1)?.workspace_id).toBeNull();
   });
 
   it("rejects a move into a workspace the caller does not belong to", async () => {
@@ -679,6 +682,34 @@ describe("addSubtask", () => {
 
     expect(result.ok).toBe(false);
   });
+
+  // The workspace is recorded on the root task only (migration 011), so a subtask row that carried
+  // one would violate tasks_workspace_only_on_root.
+  it("stores no workspace on the subtask row", async () => {
+    const { tables } = setup();
+
+    await addSubtask({ parentTaskId: T1, title: "New subtask" });
+
+    const subtask = tasksIn(tables).find((t) => t.parent_task_id === T1);
+    expect(subtask).toBeDefined();
+    expect(subtask?.workspace_id).toBeUndefined();
+  });
+
+  // Nesting is not part of the model, and this action is the only way to create a subtask, so it is
+  // where the depth has to be enforced — a grandchild would sit two hops from its workspace.
+  it("rejects a parent that is itself a subtask", async () => {
+    const tables = seed();
+    tables.tasks.push({ id: S1, workspace_id: null, parent_task_id: T1, completed_at: null, title: "Sub" });
+    tables.task_assignments.push({ task_id: S1, member_id: M1, member_sort_key: 2000 });
+    setup({ tables });
+
+    await expectFailure(
+      addSubtask({ parentTaskId: S1, title: "Too deep" }),
+      "A subtask cannot have subtasks of its own"
+    );
+
+    expect(tasksIn(tables).filter((t) => t.parent_task_id === S1)).toHaveLength(0);
+  });
 });
 
 // ─── input validation ────────────────────────────────────────────────────────
@@ -783,8 +814,8 @@ describe("completeTask — parent and subtasks complete together", () => {
     const tables = seed();
     tables.tasks.push(
       { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: null, title: "Parent" },
-      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: null, title: "Sub 1" },
-      { id: S2, workspace_id: WS1, parent_task_id: P1, completed_at: null, title: "Sub 2" }
+      { id: S1, workspace_id: null, parent_task_id: P1, completed_at: null, title: "Sub 1" },
+      { id: S2, workspace_id: null, parent_task_id: P1, completed_at: null, title: "Sub 2" }
     );
     tables.task_assignments.push(
       { task_id: P1, member_id: M1, member_sort_key: 2000 },
@@ -848,7 +879,7 @@ describe("reopenTask", () => {
     const tables = seed();
     tables.tasks.push(
       { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: DONE, title: "Parent" },
-      { id: S1, workspace_id: WS1, parent_task_id: P1, completed_at: DONE, title: "Sub 1" }
+      { id: S1, workspace_id: null, parent_task_id: P1, completed_at: DONE, title: "Sub 1" }
     );
     tables.task_assignments.push(
       { task_id: P1, member_id: M1, member_sort_key: 2000 },
