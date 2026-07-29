@@ -1,6 +1,12 @@
 -- Phase 07 Task 3 — generator behaviour. Run against task-manager-dev; nothing is kept.
 begin;
 
+-- Fixtures below write "local" anchors with plain date_trunc/interval arithmetic, which resolves
+-- in the SESSION timezone. The app's connections (and psql's default) are UTC, so without this the
+-- "9am" fixtures below land at 2am Pacific and every assertion phrased in Pacific hours is wrong
+-- from the moment the fixture is written, not because of a bug in the functions under test.
+set local timezone = 'America/Los_Angeles';
+
 -- Fixtures: a workspace, a member, a task, and a rule that is already due.
 insert into workspaces (id, name, kind)
 values ('11111111-1111-1111-1111-111111111111', 'phase07 test', 'household');
@@ -52,6 +58,11 @@ select
   extract(hour from next_run_at at time zone 'America/Los_Angeles') = 9 as anchor_kept
 from task_rules where id = '55555555-5555-5555-5555-555555555555';
 
+-- Check 3b: the fired occurrence is the most recent one that came due, not the stale original
+-- anchor — a task that missed 9 days of a 3-day rule reads as due today, not 9 days overdue.
+select due_at > now() - interval '3 days' as due_at_is_recent_not_backlogged
+from tasks where id = '44444444-4444-4444-4444-444444444444';
+
 -- Check 5: an inactive rule is skipped.
 update task_rules set is_active = false, next_run_at = now() - interval '1 minute'
  where id = '55555555-5555-5555-5555-555555555555';
@@ -80,6 +91,48 @@ begin
 exception when check_violation then
   raise notice 'ok: interval_count = 0 rejected';
 end $$;
+
+-- Fixture for checks 11-12: a second task, so upsert_task_recurrence can be tested on its own
+-- without disturbing the run_due_recurrences fixture above.
+insert into tasks (id, workspace_id, title)
+values ('66666666-6666-6666-6666-666666666666',
+        '11111111-1111-1111-1111-111111111111',
+        'Water plants');
+
+-- Check 11: the riskiest claim in the migration — a datetime-local string with no offset resolves
+-- as Pacific, not the session's UTC.
+select public.upsert_task_recurrence(
+  '66666666-6666-6666-6666-666666666666', 'daily', 1, '2026-07-30T09:00', 0, true
+);
+
+select extract(hour from next_run_at at time zone 'America/Los_Angeles') = 9
+       as local_time_resolved_pacific
+from public.task_rules where task_id = '66666666-6666-6666-6666-666666666666';
+
+-- Check 12: on conflict, a second call updates the existing rule rather than inserting a second
+-- one for the same task.
+select public.upsert_task_recurrence(
+  '66666666-6666-6666-6666-666666666666', 'weekly', 2, '2026-08-01T10:00', 3, false
+);
+
+select
+  count(*) = 1                  as still_one_row,
+  bool_and(frequency = 'weekly')                as frequency_updated,
+  bool_and(interval_count = 2)                  as interval_updated,
+  bool_and(default_due_offset_hours = 3)        as offset_updated,
+  bool_and(is_active = false)                   as is_active_updated
+from public.task_rules where task_id = '66666666-6666-6666-6666-666666666666';
+
+-- Check 13: both RPCs stay locked to service_role — the grant posture, not just the function body.
+select has_function_privilege(
+  'authenticated', 'public.run_due_recurrences()', 'execute'
+) = false as rpc_run_due_locked_down;
+
+select has_function_privilege(
+  'authenticated',
+  'public.upsert_task_recurrence(uuid, text, int, text, int, boolean)',
+  'execute'
+) = false as rpc_upsert_locked_down;
 
 -- Check 10: deleting the task deletes the rule.
 delete from tasks where id = '44444444-4444-4444-4444-444444444444';
