@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 6: Task Updates & Speech-to-Text** - Text updates on a task; speech only at the input layer
 - [ ] **Phase 6.5: App-Wide UI/UX Polish** (INSERTED) - Task panel polish plus the whole-app design system: dark mode, semantic tokens, icon consolidation, reduced motion (absorbs the former Phase 8)
 - [x] **Phase 7: Recurring Tasks** - Rule-driven task generation (code-complete, verified on DEV
-  2026-07-29; production deploy PENDING)
+  2026-07-29; shipped to production 2026-07-30)
 
 **Task Detail & Editing** was the original Phase 3. It was largely built outside the planning loop
 (`edit-task-modal.tsx`, `updateTask`, assignee management), so it is not carried as a separate phase.
@@ -144,7 +144,7 @@ Plans:
   1. A rule produces the next instance on schedule
   2. The generator is idempotent for a repeated `next_run_at` — a retry cannot double-create
 **Status**: code-complete and verified on DEV (`task-manager-dev`, `mcdpiuiayfljzvnhtqto`)
-2026-07-29 — see `07-VERIFICATION.md`. Production deploy is a separate, PENDING decision; nothing
+2026-07-29 — see `07-VERIFICATION.md`. Shipped to production 2026-07-30 (run 30501921797); nothing
 in this phase has been merged to `main` or applied to production.
 **Plans**: 10 tasks (see `.superpowers/sdd/2026-07-28-recurring-tasks/progress.md`)
 
@@ -179,7 +179,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7
 | 5. Task Prioritization | 1/1 | Complete | 2026-07-26 |
 | 6. Task Updates & Speech-to-Text | 8/8 | Code landed; manual verification checklist still open | - |
 | 6.5. App-Wide UI/UX Polish | 6/6 | Complete — visual pass done in both colour schemes | 2026-07-26 |
-| 7. Recurring Tasks | 10/10 | Code-complete, verified on DEV — production deploy PENDING | 2026-07-29 (dev) |
+| 7. Recurring Tasks | 10/10 | Complete — shipped, migrations 012-014 live on production | 2026-07-30 |
 | ~~8. Design Polish~~ | - | Folded into 6.5 (2026-07-26) | - |
 
 **Superseded:** the old "Phase 5: Task and workspace lifecycle" entry. Task deletion, editing, and

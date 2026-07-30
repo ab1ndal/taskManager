@@ -3,15 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Phase 7 (recurring tasks) code-complete and verified on DEV 2026-07-29; production deploy PENDING, a separate human decision
-last_updated: "2026-07-29T00:00:00.000Z"
+stopped_at: Phase 7 (recurring tasks) SHIPPED 2026-07-30 — merged to main as cdae388, migrations 012-014 applied to production, cron job live
+last_updated: "2026-07-30T00:20:00.000Z"
 progress:
-  # Counted from ROADMAP.md's progress table: phases 1, 2, 3, 5 and 6.5 complete; 4 in progress
-  # (one plan and the deferred manual checks open); 6 code-landed with dictation still manual;
-  # 7 code-complete and dev-verified, production deploy pending (not counted as complete here
-  # since it has not shipped).
+  # Counted from ROADMAP.md's progress table: phases 1, 2, 3, 5, 6.5 and 7 complete; 4 in progress
+  # (one plan and the deferred manual checks open); 6 code-landed with dictation still manual.
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 27
   completed_plans: 26
   percent: 71
@@ -24,8 +22,8 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users can create, manage, and complete tasks across household and work workspaces — with frictionless workspace onboarding and full task lifecycle control.
-**Current focus:** Phase 07 — recurring tasks: code-complete and verified on dev; production deploy
-is a pending human decision
+**Current focus:** Phase 07 shipped 2026-07-30. Next focus is unset — Phase 04's deferred manual
+checks and the open followups across 06.5 and 07 are the outstanding work.
 
 ## Current Position
 
@@ -38,17 +36,19 @@ Phase: 06.5 (app-wide-ui-polish) — COMPLETE. Followups F1-F10 and F13-F18 clos
 Still open: F11 (offline/service worker), F12 (real icons), F19 (perceived latency, unmeasured),
 plus F22 (production email delivery limited to team addresses) — all in `06.5-FOLLOWUPS.md`. F20 and
 F21 closed 2026-07-27.
-Phase: 07 (recurring-tasks) — CODE-COMPLETE, verified on dev (`task-manager-dev`,
-`mcdpiuiayfljzvnhtqto`) 2026-07-29; see `07-VERIFICATION.md`. Production deploy (merge to `main`,
-which auto-applies migrations 012/013 via `deploy-migrations.yml`) is explicitly PENDING — a
-separate human decision, not blocked on anything left to build. Open followups in
-`07-FOLLOWUPS.md`, most notably F4 (production `task_rules` row count unverified — check before
-merging) and F1 (a pre-existing, unrelated optimistic-row race that surfaces a raw error string).
-Next: the production deploy decision (Phase 7 Step 4, deliberately not taken in Task 10), then
-whatever the roadmap picks up after Phase 7.
+Phase: 07 (recurring-tasks) — SHIPPED 2026-07-30. Merged to `main` as `cdae388` (PR #5);
+`deploy-migrations.yml` run 30501921797 applied migrations 012, 013 and 014 to production
+(`xamdgvxziobpptcfymug`) and the `run-due-recurrences` cron job is live there. Dev
+(`task-manager-dev`, `mcdpiuiayfljzvnhtqto`) is at 014 as well. See `07-VERIFICATION.md`.
+F4 is closed — 012's `not null` column add succeeding proves production's `task_rules` was empty.
+Remaining followups in `07-FOLLOWUPS.md`: F1 (a pre-existing, unrelated optimistic-row race that
+surfaces a raw error string), F2 and F3 (accepted limitations), F5 (theoretical e2e race).
+Next: no phase in flight. Outstanding work is Phase 04's two deferred manual checks and the open
+followups in `06.5-FOLLOWUPS.md` and `07-FOLLOWUPS.md`.
 
-All work has been landing directly on `main` (not a feature branch) since phase 03, and `main` is
-now pushed to `origin`.
+Phases 03-06.5 landed directly on `main`. Phase 07 broke that pattern: it was built on
+`feat/recurring-tasks` and merged via PR #5 (rebase merge, so the branch's commits appear on `main`
+with new SHAs). The branch is deleted; `main` is pushed.
 
 ## Accumulated Context
 
@@ -135,10 +135,11 @@ now pushed to `origin`.
 - Recurrence has no per-occurrence history. The one-row model means nothing records that a given
   occurrence was completed; task_updates cannot fill it because member_id is not null and the
   generator does not know who completed the task. Accepted in Phase 07.
-- Phase 07 production deploy is PENDING — a human decision, not a blocked task. Before merging to
-  `main`, `07-FOLLOWUPS.md` F4 needs a check of production's `task_rules` row count: migration 012
-  adds a `not null` column plus two validating `check` constraints that abort the migration if any
-  existing row fails them. Dev had zero rows, so this path was never exercised there.
+- ~~Phase 07 production deploy is PENDING~~ — shipped 2026-07-30, run 30501921797. F4 closed:
+  production's `task_rules` was empty, proven by 012's `not null` column add succeeding. Note the
+  correction — production was already at migration 011, not 009; that figure had been inferred from
+  dev's state rather than observed. Never infer one Supabase project's migration state from the
+  other's.
 
 ### Resolved concerns
 

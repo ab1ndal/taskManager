@@ -1,9 +1,9 @@
 # Phase 07 — Recurring Tasks: Verification Record
 
 Written 2026-07-29, Task 10, from `.superpowers/sdd/2026-07-28-recurring-tasks/progress.md` (the
-accurate task-by-task ledger) and the Task 2/3 reports it summarizes. Production status: **PENDING**
-— everything below is dev-only (`task-manager-dev`, `mcdpiuiayfljzvnhtqto`) unless stated otherwise.
-No production deploy has happened as of this record.
+accurate task-by-task ledger) and the Task 2/3 reports it summarizes. Production status: **SHIPPED
+2026-07-30** — see section 8. Sections 1-7 were written before the deploy and describe dev only
+(`task-manager-dev`, `mcdpiuiayfljzvnhtqto`) unless stated otherwise.
 
 ## 1. Migration state
 
@@ -23,9 +23,11 @@ $ supabase migration list --linked
 
 Local project link resolves to `mcdpiuiayfljzvnhtqto` (`.env.local`:
 `NEXT_PUBLIC_SUPABASE_URL=https://mcdpiuiayfljzvnhtqto.supabase.co`) — this is `task-manager-dev`,
-not production. 001-013 applied on both local and remote columns. Production
-(`xamdgvxziobpptcfymug`) has not been touched by this phase; its migration state is unverified and
-out of scope for this record.
+not production. 001-013 applied on both local and remote columns. Migration 014 was added later, by
+the final review's fix wave, and applied to dev the same way; dev is at 014.
+
+Production was untouched at the time this section was written. It has since been deployed — see
+section 8, which also corrects an assumption made here about production's migration state.
 
 ## 2. Cron job
 
@@ -202,6 +204,21 @@ all green throughout the phase at every task boundary.
 
 ## 8. Production status
 
-**PENDING.** This record covers dev only. Production (`xamdgvxziobpptcfymug`) migration state,
-`cron.job` registration, and `task_rules` row count (see 07-FOLLOWUPS.md F4) are all unverified as
-of this record. No merge to `main`, no push, and no production deploy has happened in this phase.
+**SHIPPED 2026-07-30.** Merged to `main` as `cdae388` (PR #5, rebase merge — the branch's commits
+were replayed onto `main` with new SHAs). `deploy-migrations.yml` run `30501921797` applied
+migrations 012, 013 and 014 to production (`xamdgvxziobpptcfymug`) at 00:11 UTC and succeeded.
+
+Two things that record corrects:
+
+- **Production was already at migration 011, not 009.** The 009 figure asserted earlier in this
+  phase was inferred from `task-manager-dev`'s state rather than observed — dev happened to be two
+  migrations behind. Only 012-014 were pending on production. Do not infer one project's migration
+  state from the other's.
+- **`task_rules` was empty on production.** This was never verifiable before the merge (no
+  production credentials exist in the development environment), and the risk was accepted knowingly.
+  Migration 012's `add column task_id uuid not null` completing is itself the proof — it could not
+  have succeeded against a non-empty table. 07-FOLLOWUPS.md F4 is closed on that evidence.
+
+`cron.job` registration on production is not independently verified, for the same
+credentials reason, but `cron.schedule('run-due-recurrences', ...)` runs inside migration 013, which
+applied successfully — the migration would have failed otherwise.

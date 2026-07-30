@@ -1,7 +1,7 @@
 # Phase 7 — Followups
 
 Raised 2026-07-29, at Phase 7 close. Nothing here blocks the dev-side sign-off; production deploy
-is separately PENDING (see 07-VERIFICATION.md) and is not decided by this list.
+shipped 2026-07-30 (see 07-VERIFICATION.md section 8), which closed F4.
 
 Each item states what is true today, why it matters, and what "done" looks like.
 
@@ -43,20 +43,27 @@ write a per-occurrence record without either loosening that constraint or invent
 Accepted in the phase 7 spec. Would need its own occurrence-log table plus a decision on how the
 generator (which runs as `service_role` on a schedule, not as any member) attributes a record.
 
-### F4 — Production `task_rules` row count is unverified — OPEN, BLOCKS PRODUCTION DEPLOY
+### F4 — Production `task_rules` row count was unverified — CLOSED 2026-07-30, resolved by the deploy
 
 Migration 012 does `alter table task_rules add column task_id uuid not null` plus two `check`
 constraints (`interval_count > 0`, the narrowed `frequency` enum) that validate every existing row.
 All three abort the migration if `task_rules` is non-empty on production and any row fails to
 satisfy them. Dev had zero rows in this table, so this was never actually exercised there.
 
-Because migrations auto-apply to production on merge via `.github/workflows/deploy-migrations.yml`,
-a non-empty, non-conforming table fails the deploy loudly rather than corrupting data — this is a
-deploy-blocker, not a silent-corruption risk. Still, it should be checked before merging to `main`.
+The count could not be checked ahead of the merge: production is a separate Supabase project and no
+credentials for it exist in the development environment — `.env.local` targets `task-manager-dev`
+only, and the connection pooler rejects the production tenant with those credentials in every
+region. The risk was accepted knowingly, on the basis that a non-empty, non-conforming table fails
+the deploy loudly rather than corrupting data.
 
-**Done:** before merging this branch, run `select count(*) from public.task_rules;` against
-production (`xamdgvxziobpptcfymug`) and, if non-zero, confirm every row already has a resolvable
-`task_id`, a positive `interval_count`, and a `frequency` in `('daily','weekly','monthly')`.
+**Outcome:** run `30501921797` applied 012, 013 and 014 to production successfully at
+2026-07-30T00:11 UTC. Migration 012 completing is itself the proof that `task_rules` was empty on
+production — the `not null` column add could not have succeeded otherwise. No action remains.
+
+**Correction recorded here because it was asserted wrongly during the phase:** production was
+already at migration **011**, not 009. That figure was inferred from dev's state rather than
+observed, and dev happened to be two migrations behind. Only 012-014 were pending on production.
+Do not infer one project's migration state from the other's.
 
 ### F5 — Theoretical live-cron race in e2e test 2 — OPEN, LOW RISK
 
