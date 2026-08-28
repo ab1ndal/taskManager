@@ -1,6 +1,6 @@
 # Kanban Board View — Design
 
-Date: 2026-08-26 (revised 2026-08-27: shared per-workspace columns; 2026-08-28: explicit destination on delete)
+Date: 2026-08-26 (revised 2026-08-27: shared per-workspace columns; 2026-08-28: per-task destinations on delete)
 Status: approved, not yet implemented
 
 ## Goal
@@ -122,13 +122,27 @@ workspace, and the task is a root task.
 Deleting a column is the second transactional operation, because it reassigns tasks and then drops
 the row:
 
-`public.delete_board_column(p_column_id uuid, p_target_column_id uuid)`
+`public.delete_board_column(p_column_id uuid, p_moves jsonb)`
 
-Same security-definer treatment. It asserts the caller is a member of the column's workspace, that
-the target column is a different column in the same workspace, and that the column being deleted is
-not the workspace's last one. It then moves every task off the doomed column onto the target and
-deletes it, so no task is ever briefly columnless and a concurrent insert into the deleted column
-cannot slip through.
+`p_moves` is an array of `{ "task_id": uuid, "target_column_id": uuid }` — one entry per task, since
+the user chooses a destination for each task individually.
+
+Same security-definer treatment. It asserts:
+
+- the caller is a member of the column's workspace;
+- the column is not the workspace's last one;
+- every target column is a different column in the same workspace;
+- **`p_moves` covers exactly the tasks currently in the column** — no task missing, no task listed
+  that isn't there.
+
+That last assertion is the concurrency guard. The dialog lists tasks it read a moment earlier; if
+someone else adds a task to that column, or moves one out, while the dialog is open, the coverage
+check fails and the action returns "This column changed — reopen the dialog" rather than deleting a
+column whose contents the user never saw. Without it, a task added mid-dialog would either block the
+delete on the FK or be relocated by nobody's decision.
+
+It then applies each move and deletes the column, all in one transaction, so no task is ever briefly
+columnless and a concurrent insert into the doomed column cannot slip through.
 
 ## Server actions
 
@@ -232,19 +246,37 @@ Because columns are shared, the tab states plainly that changes apply to everyon
 ### Deleting a column
 
 Delete never guesses a destination. It opens a dialog built on the existing `confirm-dialog.tsx`
-(rather than `delete-confirm-dialog.tsx`, which has no room for a choice):
+(rather than `delete-confirm-dialog.tsx`, which has no room for choices), listing every task in the
+column with its own destination select:
 
-> **Delete "Blocked"?** 12 tasks are in this column. Move them to:
-> `[ In Progress ▾ ]`
+> **Delete "Blocked"?**
+> 3 tasks are in this column. Choose where each one goes.
+>
+> Move all to `[ In Progress ▾ ]`
+>
+> | Task | Move to |
+> |---|---|
+> | Renew car insurance | `[ In Progress ▾ ]` |
+> | Fix the garage light | `[ Follow-up ▾ ]` |
+> | Call the plumber | `[ Not Started ▾ ]` |
+>
 > This applies to everyone in Household.
+> `[ Cancel ]` `[ Delete column ]`
 
-- The select lists the workspace's other columns; it defaults to the deleted column's left neighbor,
-  or its right neighbor when deleting the leftmost.
-- An empty column skips the select entirely and reads "This column is empty." — still confirmed,
-  since the deletion is shared, but nothing to choose.
-- Deleting the terminal column adds the warning that completed tasks will vanish from the board.
-- Confirm calls `deleteBoardColumn({ columnId, targetColumnId })`, which is one transaction, so a
-  failure leaves both the column and its tasks exactly as they were.
+- Each select lists the workspace's other columns. All rows start on the deleted column's left
+  neighbor, or its right neighbor when deleting the leftmost, so a user who wants one destination for
+  everything just confirms.
+- "Move all to" is a convenience that sets every row at once; individual rows can then be changed. It
+  is not a separate mode — the payload is always per-task.
+- The list scrolls inside the dialog with `max-h`, and titles truncate to one line. Tasks are ordered
+  by the viewer's own priority, so the top of the list is the work they care about most.
+- An empty column shows no list and reads "This column is empty." — still confirmed, since the
+  deletion is shared, but nothing to choose.
+- Deleting the terminal column adds the warning that completed tasks will vanish from the board;
+  completed tasks appear in the list like any other.
+- Confirm calls `deleteBoardColumn({ columnId, moves })`, one transaction, so a failure leaves both
+  the column and its tasks exactly as they were. If the column changed while the dialog was open, the
+  action reports that and the dialog reloads its list instead of deleting.
 
 ## Testing
 
@@ -257,8 +289,10 @@ Unit:
 
 Action tests against `src/test/supabase-fake.ts`, mirroring `src/app/tasks/actions.test.ts`:
 - Drop into the terminal column completes the task; drag out reopens it
-- Deleting a column moves its tasks to the chosen target column and removes the column
-- Deleting a column without a target, while it still holds tasks, is rejected
+- Deleting a column applies each task's chosen destination — two tasks going to different columns
+- Deleting a column whose tasks are only partly covered by `moves` is rejected and deletes nothing
+- Deleting a column while a task was added to it mid-dialog is rejected on the coverage check
+- Deleting an empty column with an empty `moves` array succeeds
 - A target column in another workspace is rejected
 - Deleting a workspace's last column is rejected
 - Renaming a column leaves every task's `board_column_id` untouched
@@ -272,7 +306,8 @@ this environment).
 
 E2E: create a column, recolor it, rename it and confirm its cards stay put, drag a card across
 columns, drag into done and confirm the list view shows it completed, expand the done column, then
-delete a column and confirm its tasks appear in the destination chosen in the dialog. The due-date input is already masked in screenshot
+delete a column after sending two of its tasks to different destinations, and confirm each landed
+where it was sent. The due-date input is already masked in screenshot
 baselines.
 
 ## Out of scope
