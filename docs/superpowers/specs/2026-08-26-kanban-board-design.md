@@ -1,6 +1,6 @@
 # Kanban Board View — Design
 
-Date: 2026-08-26 (revised 2026-08-27: columns and status are shared per workspace, not per user)
+Date: 2026-08-26 (revised 2026-08-27: shared per-workspace columns; 2026-08-28: explicit destination on delete)
 Status: approved, not yet implemented
 
 ## Goal
@@ -61,20 +61,29 @@ normalized name.
 ### tasks (altered)
 
 ```
-board_column_id uuid null references board_columns(id) on delete set null
+board_column_id uuid null references board_columns(id) on delete restrict
 ```
 
 Shared status: one column per task, so a move is a move for everyone.
 
-Two properties this relies on:
+Nullable only in the sense that subtasks must have it null. For root tasks it is effectively
+mandatory, enforced by check constraint together with migration 011's workspace rule:
 
-- **`null` is legal and means "the workspace's first column by position."** No backfill of existing
-  task rows is needed, and `on delete set null` means deleting a column drops its cards back to the
-  first column rather than losing them. Fail-safe by construction.
-- **Trigger `board_column_workspace_matches_task`** rejects a write where the column's `workspace_id`
-  differs from the task's own workspace, and rejects any non-null `board_column_id` on a subtask
-  (subtasks carry no workspace — migration 011). A cross-table condition can't be a check constraint,
-  so this is a trigger.
+```
+check ((parent_task_id is null) = (board_column_id is not null))
+```
+
+So a root task always has a column and a subtask never does — the same shape migration 011 already
+uses for `workspace_id`. Deleting a column can therefore never leave a task columnless: the FK is
+`restrict`, and the only way to remove a column is the explicit reassign-then-delete RPC below.
+
+**Trigger `board_column_workspace_matches_task`** rejects a write where the column's `workspace_id`
+differs from the task's own workspace. A cross-table condition can't be a check constraint, so this
+is a trigger.
+
+An earlier draft made `board_column_id` nullable with "null means the workspace's first column," to
+avoid a backfill. That was dropped: it meant deleting the leftmost column silently relocated every
+null-column task, which is precisely the invisible movement the destination prompt exists to prevent.
 
 ### RLS
 
@@ -90,6 +99,12 @@ Two properties this relies on:
 `createWorkspace` so every code path (including `joinWorkspaceByDirectory` and any future import)
 gets columns. The migration also backfills every existing workspace.
 
+Because `board_column_id` is mandatory for root tasks, the migration runs in order: create the table,
+seed all existing workspaces, backfill every existing root task to its workspace's leftmost
+non-terminal column, and only then add the check constraint. New tasks get their column in
+`createTaskWithSubtasks`, which picks the same leftmost non-terminal column of the target workspace —
+a small change to an existing action in `src/app/tasks/actions.ts`.
+
 ## Atomicity
 
 A drop writes two tables: `tasks.board_column_id` (shared) and `task_assignments.member_sort_key`
@@ -104,6 +119,17 @@ membership itself rather than trusting the caller. Called through `src/lib/supab
 The function asserts: caller is a member of the task's workspace, the target column belongs to that
 workspace, and the task is a root task.
 
+Deleting a column is the second transactional operation, because it reassigns tasks and then drops
+the row:
+
+`public.delete_board_column(p_column_id uuid, p_target_column_id uuid)`
+
+Same security-definer treatment. It asserts the caller is a member of the column's workspace, that
+the target column is a different column in the same workspace, and that the column being deleted is
+not the workspace's last one. It then moves every task off the doomed column onto the target and
+deletes it, so no task is ever briefly columnless and a concurrent insert into the deleted column
+cannot slip through.
+
 ## Server actions
 
 `src/app/board/actions.ts`, using `ActionResult` and the `action-run.ts` wrapper, matching
@@ -116,11 +142,19 @@ workspace, and the task is a root task.
 - `loadOlderDone({ before })` — keyset pagination on `completed_at` (not offset; offset drifts when a
   task is reopened mid-scroll). Returns up to 50 older completed tasks.
 - `createBoardColumn`, `renameBoardColumn`, `setBoardColumnColor`, `reorderBoardColumn`,
-  `deleteBoardColumn` — each scoped to a workspace the caller belongs to.
+  `deleteBoardColumn({ columnId, targetColumnId })` — each scoped to a workspace the caller belongs to.
+  `deleteBoardColumn` calls the RPC above; `targetColumnId` is required whenever the column holds
+  tasks.
+- `countTasksInColumn({ columnId })` — a `head: true` count, so the delete dialog can say how many
+  tasks are about to move without fetching them.
+
+Renaming is in place: it updates `board_columns.name` and touches no task. Every task keeps its
+column id, so a rename can never move anything. Renaming to a name that already exists in that
+workspace (case-insensitively) fails on the unique index and surfaces as a field error.
 
 Guards: a workspace's last remaining column cannot be deleted. Deleting the terminal column is
-permitted but warns that completed cards will no longer appear on the board. Renaming to an existing
-name (case-insensitively) fails on the unique index and surfaces as a field error.
+permitted but warns that completed tasks will no longer appear on the board, since completed tasks
+render in the terminal column.
 
 Zod schemas in `src/app/board/schemas.ts`. Color validated against a 20-member slug union, mirroring
 the DB check constraint.
@@ -191,23 +225,43 @@ The existing `/profile` content moves to the Profile tab verbatim. `/profile` re
 Board tab: a workspace selector, then a draggable list of that workspace's columns. Each row has a
 drag handle, a name input, a color swatch popover (twenty tab20 chips in a 5×4 grid), a
 terminal-column radio (exactly one selected), and delete. An add-column row sits at the bottom.
-Fields save on blur, optimistically, with a toast on failure.
+Rename and color save on blur, optimistically, with a toast on failure.
 
-Because columns are shared, the tab states plainly that changes apply to everyone in the workspace,
-and delete asks for confirmation via the existing `delete-confirm-dialog.tsx`.
+Because columns are shared, the tab states plainly that changes apply to everyone in the workspace.
+
+### Deleting a column
+
+Delete never guesses a destination. It opens a dialog built on the existing `confirm-dialog.tsx`
+(rather than `delete-confirm-dialog.tsx`, which has no room for a choice):
+
+> **Delete "Blocked"?** 12 tasks are in this column. Move them to:
+> `[ In Progress ▾ ]`
+> This applies to everyone in Household.
+
+- The select lists the workspace's other columns; it defaults to the deleted column's left neighbor,
+  or its right neighbor when deleting the leftmost.
+- An empty column skips the select entirely and reads "This column is empty." — still confirmed,
+  since the deletion is shared, but nothing to choose.
+- Deleting the terminal column adds the warning that completed tasks will vanish from the board.
+- Confirm calls `deleteBoardColumn({ columnId, targetColumnId })`, which is one transaction, so a
+  failure leaves both the column and its tasks exactly as they were.
 
 ## Testing
 
 Unit:
 - Color-slug validation against the tab20 union
-- Column grouping, including `null` board_column_id falling into the first column
+- Column grouping by column id
 - Merge-by-name grouping: shared color vs neutral on disagreement, minimum position wins
 - The 7-day done filter
 - Neighbor-key math for cross-column drops
 
 Action tests against `src/test/supabase-fake.ts`, mirroring `src/app/tasks/actions.test.ts`:
 - Drop into the terminal column completes the task; drag out reopens it
-- Deleting a column nulls its tasks' `board_column_id`
+- Deleting a column moves its tasks to the chosen target column and removes the column
+- Deleting a column without a target, while it still holds tasks, is rejected
+- A target column in another workspace is rejected
+- Deleting a workspace's last column is rejected
+- Renaming a column leaves every task's `board_column_id` untouched
 - A column id from another workspace is rejected
 - A subtask cannot be given a column
 - Dropping into a merged column name the card's workspace lacks is rejected
@@ -216,8 +270,9 @@ Action tests against `src/test/supabase-fake.ts`, mirroring `src/app/tasks/actio
 Migration: dry-run against the dev Supabase project inside `BEGIN … ROLLBACK` (no local Postgres in
 this environment).
 
-E2E: create a column, recolor it, drag a card across columns, drag into done and confirm the list
-view shows it completed, expand the done column. The due-date input is already masked in screenshot
+E2E: create a column, recolor it, rename it and confirm its cards stay put, drag a card across
+columns, drag into done and confirm the list view shows it completed, expand the done column, then
+delete a column and confirm its tasks appear in the destination chosen in the dialog. The due-date input is already masked in screenshot
 baselines.
 
 ## Out of scope
