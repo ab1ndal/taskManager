@@ -343,3 +343,71 @@ it("returns both tasks of a tie straddling a page boundary, across two pages, wi
   expect(seenIds).toContain(TIE_LOW);
   expect(seenIds).toContain(TIE_HIGH);
 });
+
+// Regression guard for round 2's finding: the query must stay bounded by DONE_PAGE_SIZE + 1 +
+// DONE_TIE_ALLOWANCE in the database rather than fetching every matching row and paging in Node.
+// The fake has no notion of query cost, so this cannot prove boundedness by itself (see the
+// findings file) — it pins the pagination contract (at most one page, hasMore true when more exist)
+// that the bounded query has to keep honouring, alongside `.limit()` being visible in the diff.
+it("returns at most one page and reports more remaining when far more completed tasks exist", async () => {
+  const tables = seed();
+  const COUNT = 120;
+  for (let i = 0; i < COUNT; i++) {
+    const id = `c2000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+    const at = new Date(Date.UTC(2026, 0, 1) - i * 60_000).toISOString();
+    (tables.tasks as Row[]).push({
+      id,
+      workspace_id: WS1,
+      parent_task_id: null,
+      title: `Bulk ${i}`,
+      due_at: null,
+      completed_at: at,
+      board_column_id: COL_DONE,
+    });
+    (tables.task_assignments as Row[]).push({ task_id: id, member_id: M1, member_sort_key: 30_000 + i });
+  }
+  setup({ tables });
+
+  const result = await loadOlderDone({
+    workspaceIds: [WS1],
+    before: new Date("2026-02-01T00:00:00.000Z").toISOString(),
+  });
+
+  expect(result.ok).toBe(true);
+  if (!result.ok) return;
+  expect(result.tasks.length).toBeLessThanOrEqual(50);
+  expect(result.tasks).toHaveLength(50);
+  expect(result.hasMore).toBe(true);
+});
+
+// The done column's "Show older" footer can be offered with nothing on screen yet — the client
+// then has no row to cite and sends only the synthetic cutoff as `before`, no `beforeId`. This must
+// keep working: it is not a degraded fallback, it is the first page's own normal shape.
+it("returns older tasks when before is given without beforeId", async () => {
+  const tables = seed();
+  (tables.tasks as Row[]).push({
+    id: "c0000000-0000-4000-8000-000000000020",
+    workspace_id: WS1,
+    parent_task_id: null,
+    title: "No cursor row cited",
+    due_at: null,
+    completed_at: "2026-07-01T10:00:00+00:00",
+    board_column_id: COL_DONE,
+  });
+  (tables.task_assignments as Row[]).push({
+    task_id: "c0000000-0000-4000-8000-000000000020",
+    member_id: M1,
+    member_sort_key: 4000,
+  });
+  setup({ tables });
+
+  const result = await loadOlderDone({ workspaceIds: [WS1], before: "2026-08-01T00:00:00+00:00" });
+
+  expect(result).toEqual({
+    ok: true,
+    tasks: [
+      expect.objectContaining({ id: "c0000000-0000-4000-8000-000000000020", title: "No cursor row cited" }),
+    ],
+    hasMore: false,
+  });
+});

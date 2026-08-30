@@ -65,8 +65,14 @@ export const loadOlderDoneSchema = z.object({
   before: z.iso.datetime({ offset: true, message: "Expected an ISO timestamp" }),
   /**
    * The id of the row `before` came from, breaking ties when two tasks share a completed_at.
-   * Optional for now — Task 10 wires the client to send it — so a page boundary that lands inside
-   * a tie can still (rarely) skip a row until then; once the client sends it, it cannot.
+   *
+   * Deliberately optional, not just "not wired up yet": the done column's footer can offer "Show
+   * older" even when the initial window is empty on screen but older completed tasks exist, and in
+   * that case the client has no row to cite — it sends only the synthetic cutoff timestamp as
+   * `before` with no `beforeId`. Making this required would break that call outright. The absent
+   * case degrades safely rather than unsafely: loadOlderDone then excludes rows exactly at that
+   * timestamp, which for a synthetic cutoff means at worst skipping a task completed at that exact
+   * instant, not a whole page — see move-actions.ts for the full reasoning.
    */
   beforeId: uuid.optional(),
 });

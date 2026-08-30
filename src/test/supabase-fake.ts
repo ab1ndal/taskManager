@@ -54,7 +54,7 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
   private filters: Filter[] = [];
   private op: Op = "select";
   private payload: Row | null = null;
-  private orderBy: { column: string; ascending: boolean } | null = null;
+  private orderBy: { column: string; ascending: boolean }[] = [];
   private limitN: number | null = null;
   private wantSingle = false;
   private wantMaybeSingle = false;
@@ -130,8 +130,12 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
     return this;
   }
 
+  /**
+   * Successive `.order()` calls compose left to right, mirroring PostgREST: the first call is the
+   * primary key, each further call breaks ties left by the ones before it.
+   */
   order(column: string, options?: { ascending?: boolean }) {
-    this.orderBy = { column, ascending: options?.ascending !== false };
+    this.orderBy.push({ column, ascending: options?.ascending !== false });
     return this;
   }
 
@@ -177,18 +181,22 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
     if (this.countMode) return { data: null, error: null, count: selected.length };
 
     let result = [...selected];
-    if (this.orderBy) {
-      const { column, ascending } = this.orderBy;
+    if (this.orderBy.length > 0) {
+      const keys = this.orderBy;
       result.sort((a, b) => {
-        const x = a[column];
-        const y = b[column];
-        // Postgres orders text and timestamp columns too, so subtraction alone (NaN for strings,
-        // i.e. no reordering at all) would let a missing ORDER BY pass unnoticed in tests.
-        const delta =
-          typeof x === "number" && typeof y === "number"
-            ? x - y
-            : String(x).localeCompare(String(y));
-        return ascending ? delta : -delta;
+        for (const { column, ascending } of keys) {
+          const x = a[column];
+          const y = b[column];
+          // Postgres orders text and timestamp columns too, so subtraction alone (NaN for
+          // strings, i.e. no reordering at all) would let a missing ORDER BY pass unnoticed in
+          // tests.
+          const delta =
+            typeof x === "number" && typeof y === "number"
+              ? x - y
+              : String(x).localeCompare(String(y));
+          if (delta !== 0) return ascending ? delta : -delta;
+        }
+        return 0;
       });
     }
     if (this.limitN !== null) result = result.slice(0, this.limitN);
