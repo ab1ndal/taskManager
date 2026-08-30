@@ -98,10 +98,21 @@ export async function renameBoardColumn(input: RenameBoardColumnInput): Promise<
     await assertColumnMember(columnId, user.id);
 
     const admin = createAdminClient();
-    assertNoError(
-      "rename board column",
-      await admin.from("board_columns").update({ name }).eq("id", columnId)
-    );
+    const { error } = await admin.from("board_columns").update({ name }).eq("id", columnId);
+
+    if (error) {
+      // 23505 is Postgres's unique-violation code; migration 016's board_columns_workspace_name_key
+      // is what fires it here. The caller typed a name a sibling column already has (case-
+      // insensitively) — a condition they can act on, not a bug, so it surfaces as a field error
+      // rather than falling through to action-run's generic message.
+      if (error.code === "23505") {
+        throw new ValidationError(
+          { name: ["That name is already used in this workspace"] },
+          "That name is already used in this workspace"
+        );
+      }
+      throw new Error(`rename board column: ${error.message}`);
+    }
 
     revalidatePath("/board");
     revalidatePath("/settings");

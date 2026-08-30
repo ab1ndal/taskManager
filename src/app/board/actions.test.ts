@@ -4,7 +4,7 @@ jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createFakeSupabase, type Row, type Tables } from "@/test/supabase-fake";
+import { createFakeSupabase, type FailureHook, type Row, type Tables } from "@/test/supabase-fake";
 import { GENERIC_ERROR } from "@/app/tasks/action-result";
 import {
   createBoardColumn,
@@ -53,10 +53,13 @@ function seed(): Tables {
   };
 }
 
-function setup(options: { tables?: Tables; user?: { id: string } | null } = {}) {
+function setup(
+  options: { tables?: Tables; user?: { id: string } | null; failOn?: FailureHook } = {}
+) {
   const fake = createFakeSupabase({
     tables: options.tables ?? seed(),
     user: options.user === undefined ? { id: "auth-user-1" } : options.user,
+    failOn: options.failOn,
   });
   (createClient as jest.Mock).mockResolvedValue(fake);
   (createAdminClient as jest.Mock).mockReturnValue(fake);
@@ -118,6 +121,26 @@ it("renames in place, leaving every task's column untouched", async () => {
 it("refuses to rename a column in another workspace", async () => {
   setup();
   await expectFailure(renameBoardColumn({ columnId: COL_WS2, name: "Parked" }), "not a member of workspace");
+});
+
+it("surfaces a field-level error for a name collision, not the generic message", async () => {
+  // Mutation this catches: falling back to action-run's generic message on any update failure
+  // (dropping the `error.code === "23505"` branch) would make this assert `GENERIC_ERROR` instead
+  // of a specific, actionable message — the two strings differ, so a mutant collapsing the branch
+  // fails this immediately.
+  const fake = setup({
+    failOn: (table, op) =>
+      table === "board_columns" && op === "update"
+        ? { message: 'duplicate key value violates unique constraint "board_columns_workspace_name_key"', code: "23505" }
+        : null,
+  });
+
+  const result = await renameBoardColumn({ columnId: COL_A, name: "In Progress" });
+
+  expect(result).toEqual({ ok: false, error: expect.stringContaining("already used") });
+  if (result.ok) throw new Error("expected failure");
+  expect(result.error).not.toBe(GENERIC_ERROR);
+  expect(columnsIn(fake.tables).find((c) => c.id === COL_A)!.name).toBe("Blocked");
 });
 
 // ─── setBoardColumnColor ─────────────────────────────────────────────────────

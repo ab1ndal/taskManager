@@ -17,7 +17,11 @@ export type Tables = Record<string, Row[]>;
 type Op = "select" | "insert" | "update" | "delete";
 
 /** Return a message to make the matching operation fail, or null to let it through. */
-export type FailureHook = (table: string, op: Op, payload: Row | null) => { message: string } | null;
+export type FailureHook = (
+  table: string,
+  op: Op,
+  payload: Row | null
+) => { message: string; code?: string } | null;
 
 export interface FakeOptions {
   /** Rows visible to the fake, keyed by table name. Mutated in place by writes. */

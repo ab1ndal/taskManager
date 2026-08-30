@@ -59,6 +59,14 @@ all closed 2026-07-27. Full write-ups in `06.5-FOLLOWUPS.md`.
   whether offline is in scope; if yes it is its own slice, not a config flag.
 - **F12** — icons are placeholder art. Needs real artwork at 192, 512, maskable 512 and 180.
 
+## Follow-up from Task 12 (Board settings tab — column editor)
+
+- **Column reordering in Settings** — `src/app/settings/board-columns-editor.tsx` renders each
+  workspace's columns in `position` order with no drag handle; `reorderBoardColumn`
+  (`src/app/board/actions.ts`) exists and is action-tested but nothing here calls it. New columns
+  land at the end via `createBoardColumn`'s own placement. Wiring a second `DragDropContext` (the
+  board already has one, for cards) is separable work, not built here per the task-12 brief.
+
 ## Still open from earlier phases
 
 - Phase 04 — the real-device address-bar-collapse check (U7) needs an actual phone; leaked-password
