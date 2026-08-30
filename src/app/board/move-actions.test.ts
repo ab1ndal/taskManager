@@ -190,12 +190,17 @@ it("signed out, moves nothing", async () => {
 
 // ─── loadOlderDone ───────────────────────────────────────────────────────────
 
+// completed_at literals below are seeded in PostgREST's own serialisation ("+00:00"), not
+// Date.toISOString()'s ("Z") — verified against the dev project's live REST API. Seeding it any
+// other way lets the fake echo back exactly what it was given, which is not what Postgres does,
+// and that mismatch is precisely what hid the production bug this cursor fix addresses.
+
 it("returns completed tasks strictly older than the cursor, newest first", async () => {
   const tables = seed();
   (tables.tasks as Row[]).push(
-    { id: "c0000000-0000-4000-8000-000000000010", workspace_id: WS1, parent_task_id: null, title: "Older", due_at: null, completed_at: "2026-07-01T10:00:00.000Z", board_column_id: COL_DONE },
-    { id: "c0000000-0000-4000-8000-000000000011", workspace_id: WS1, parent_task_id: null, title: "Oldest", due_at: null, completed_at: "2026-06-01T10:00:00.000Z", board_column_id: COL_DONE },
-    { id: "c0000000-0000-4000-8000-000000000012", workspace_id: WS1, parent_task_id: null, title: "Newer", due_at: null, completed_at: "2026-08-20T10:00:00.000Z", board_column_id: COL_DONE }
+    { id: "c0000000-0000-4000-8000-000000000010", workspace_id: WS1, parent_task_id: null, title: "Older", due_at: null, completed_at: "2026-07-01T10:00:00+00:00", board_column_id: COL_DONE },
+    { id: "c0000000-0000-4000-8000-000000000011", workspace_id: WS1, parent_task_id: null, title: "Oldest", due_at: null, completed_at: "2026-06-01T10:00:00+00:00", board_column_id: COL_DONE },
+    { id: "c0000000-0000-4000-8000-000000000012", workspace_id: WS1, parent_task_id: null, title: "Newer", due_at: null, completed_at: "2026-08-20T10:00:00+00:00", board_column_id: COL_DONE }
   );
   (tables.task_assignments as Row[]).push(
     { task_id: "c0000000-0000-4000-8000-000000000010", member_id: M1, member_sort_key: 4000 },
@@ -238,7 +243,7 @@ it("accepts a completed_at value returned from a page as the cursor for the next
     parent_task_id: null,
     title: "Older",
     due_at: null,
-    completed_at: "2026-07-01T10:00:00.000Z",
+    completed_at: "2026-07-01T10:00:00+00:00",
     board_column_id: COL_DONE,
   });
   (tables.task_assignments as Row[]).push({
@@ -259,4 +264,82 @@ it("accepts a completed_at value returned from a page as the cursor for the next
   const secondPage = await loadOlderDone({ workspaceIds: [WS1], before: cursor as string });
 
   expect(secondPage).toEqual({ ok: true, tasks: [], hasMore: false });
+});
+
+// Pins the real format directly, independent of the fake and of the round-trip test above: this is
+// verbatim what dev's REST API returned for a timestamptz column just now. Confirmed failing before
+// loadOlderDoneSchema.before gained { offset: true } — the schema previously accepted only a
+// literal "Z" suffix and rejected a numeric offset outright.
+it("accepts the literal offset-suffixed format PostgREST serialises timestamptz as", async () => {
+  const tables = seed();
+  setup({ tables });
+
+  const result = await loadOlderDone({
+    workspaceIds: [WS1],
+    before: "2026-07-27T16:44:26.319+00:00",
+  });
+
+  expect(result).toEqual({ ok: true, tasks: [], hasMore: false });
+});
+
+// Two tasks sharing a completed_at straddling a page boundary: ordering by completed_at alone and
+// paging with a plain "<" comparison would drop whichever one lands just below the cut, because the
+// next cursor IS that shared value and a strict "<" excludes everything at it. Bulk completion and
+// the recurrence cron both make ties like this plausible.
+it("returns both tasks of a tie straddling a page boundary, across two pages, with no skip and no repeat", async () => {
+  const tables = seed();
+  const TIE_AT = "2026-05-01T00:00:00+00:00";
+  const TIE_HIGH = "c0000000-0000-4000-8000-000000000098"; // sorts after TIE_LOW — the last row of page 1
+  const TIE_LOW = "c0000000-0000-4000-8000-000000000001"; // sorts before TIE_HIGH — must surface on page 2
+
+  // DONE_PAGE_SIZE (50) distinct, newer completed_at values fill page 1 ahead of the tie, so the
+  // 50th slot lands exactly on TIE_HIGH and the boundary falls inside the tied pair.
+  for (let i = 0; i < 49; i++) {
+    const id = `c1000000-0000-4000-8000-0000000000${String(i).padStart(2, "0")}`;
+    const at = new Date(Date.UTC(2026, 7, 1) - i * 60_000).toISOString();
+    (tables.tasks as Row[]).push({
+      id,
+      workspace_id: WS1,
+      parent_task_id: null,
+      title: `Filler ${i}`,
+      due_at: null,
+      completed_at: at,
+      board_column_id: COL_DONE,
+    });
+    (tables.task_assignments as Row[]).push({ task_id: id, member_id: M1, member_sort_key: 10_000 + i });
+  }
+  (tables.tasks as Row[]).push(
+    { id: TIE_HIGH, workspace_id: WS1, parent_task_id: null, title: "Tie high", due_at: null, completed_at: TIE_AT, board_column_id: COL_DONE },
+    { id: TIE_LOW, workspace_id: WS1, parent_task_id: null, title: "Tie low", due_at: null, completed_at: TIE_AT, board_column_id: COL_DONE }
+  );
+  (tables.task_assignments as Row[]).push(
+    { task_id: TIE_HIGH, member_id: M1, member_sort_key: 20_000 },
+    { task_id: TIE_LOW, member_id: M1, member_sort_key: 20_001 }
+  );
+  setup({ tables });
+
+  const firstPage = await loadOlderDone({ workspaceIds: [WS1], before: new Date("2026-09-01T00:00:00.000Z").toISOString() });
+  expect(firstPage.ok).toBe(true);
+  if (!firstPage.ok) return;
+
+  expect(firstPage.tasks).toHaveLength(50);
+  expect(firstPage.hasMore).toBe(true);
+  const last = firstPage.tasks[firstPage.tasks.length - 1];
+  expect(last.id).toBe(TIE_HIGH);
+
+  const secondPage = await loadOlderDone({
+    workspaceIds: [WS1],
+    before: last.completedAt,
+    beforeId: last.id,
+  });
+  expect(secondPage.ok).toBe(true);
+  if (!secondPage.ok) return;
+
+  expect(secondPage.tasks.map((t) => t.id)).toEqual([TIE_LOW]);
+  expect(secondPage.hasMore).toBe(false);
+
+  const seenIds = [...firstPage.tasks, ...secondPage.tasks].map((t) => t.id);
+  expect(new Set(seenIds).size).toBe(seenIds.length);
+  expect(seenIds).toContain(TIE_LOW);
+  expect(seenIds).toContain(TIE_HIGH);
 });

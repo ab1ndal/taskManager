@@ -27,7 +27,7 @@ export interface FakeOptions {
 }
 
 interface Filter {
-  kind: "eq" | "in" | "is" | "not-is" | "lt";
+  kind: "eq" | "in" | "is" | "not-is" | "lt" | "lte";
   column: string;
   value: unknown;
 }
@@ -42,6 +42,9 @@ function matches(row: Row, filters: Filter[]): boolean {
     }
     if (f.kind === "lt") {
       return actual !== undefined && actual !== null && (actual as string | number) < (f.value as string | number);
+    }
+    if (f.kind === "lte") {
+      return actual !== undefined && actual !== null && (actual as string | number) <= (f.value as string | number);
     }
     return Array.isArray(f.value) && f.value.includes(actual);
   });
@@ -119,6 +122,11 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
 
   lt(column: string, value: unknown) {
     this.filters.push({ kind: "lt", column, value });
+    return this;
+  }
+
+  lte(column: string, value: unknown) {
+    this.filters.push({ kind: "lte", column, value });
     return this;
   }
 

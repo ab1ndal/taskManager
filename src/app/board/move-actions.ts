@@ -71,7 +71,15 @@ export async function moveTaskToColumn(input: MoveTaskToColumnInput): Promise<Ac
       .maybeSingle();
 
     assertNoError("load task", { error: taskError });
-    if (!task) throw new Error(`task ${taskId} not found`);
+    if (!task) {
+      // Same "not found" condition the RPC itself would raise for this task id (see rpc-errors.ts) —
+      // routed the same way here, rather than a bare Error, so a stale UI pointing at a just-deleted
+      // task gets the same specific message whichever of the two checks happens to catch it.
+      const message = `task ${taskId} not found`;
+      const known = knownRpcFailure(message);
+      if (!known) throw new Error(message);
+      throw new ValidationError({}, known);
+    }
     if (task.parent_task_id) {
       throw new ForbiddenError(`task ${taskId} is a subtask and has no board column`);
     }
@@ -83,7 +91,12 @@ export async function moveTaskToColumn(input: MoveTaskToColumnInput): Promise<Ac
       .maybeSingle();
 
     assertNoError("load target column", { error: targetError });
-    if (!target) throw new Error(`board column ${columnId} not found`);
+    if (!target) {
+      const message = `board column ${columnId} not found`;
+      const known = knownRpcFailure(message);
+      if (!known) throw new Error(message);
+      throw new ValidationError({}, known);
+    }
 
     const { error: moveError } = await admin.rpc("move_task_to_column", {
       p_task_id: taskId,
@@ -125,13 +138,27 @@ export async function moveTaskToColumn(input: MoveTaskToColumnInput): Promise<Ac
  *
  * Keyset pagination on completed_at rather than an offset: reopening a task while the list is open
  * shifts every later row, so an offset would silently skip a task. A cursor cannot.
+ *
+ * The cursor is the pair (completed_at, id), not completed_at alone: two tasks can share a
+ * completed_at (bulk completion, the recurrence cron), and ordering by completed_at only with a
+ * plain "<" comparison would drop whichever one lands just below the page boundary — the next
+ * cursor IS that shared value, and "<" excludes everything at it. The database is asked for
+ * completed_at <= before (a superset), and the exact composite "strictly after (before, beforeId)"
+ * comparison is done here in TypeScript rather than as a PostgREST `.or(...)` expression: same
+ * result, and it spares the fake an or-expression parser. `beforeId` is optional because Task 10
+ * has not wired the client to send it yet — until then, a page boundary that happens to land inside
+ * a tie can (rarely) still drop a row, same as before this fix, but no worse.
+ *
+ * A tie cluster larger than one page would take more than one round trip to fully traverse (each
+ * page returns at most DONE_PAGE_SIZE of the tied rows before the cursor advances past them) —
+ * acceptable, and worth writing down rather than discovering.
  */
 export async function loadOlderDone(
   input: LoadOlderDoneInput
 ): Promise<ActionResult<{ tasks: DoneTask[]; hasMore: boolean }>> {
   return run("loadOlderDone", async () => {
     const { user } = await requireUser();
-    const { workspaceIds, before } = parseInput(loadOlderDoneSchema, input);
+    const { workspaceIds, before, beforeId } = parseInput(loadOlderDoneSchema, input);
 
     for (const workspaceId of workspaceIds) {
       await assertWorkspaceMember(workspaceId, user.id);
@@ -162,13 +189,29 @@ export async function loadOlderDone(
       .in("workspace_id", workspaceIds)
       .is("parent_task_id", null)
       .not("completed_at", "is", null)
-      .lt("completed_at", before)
-      .order("completed_at", { ascending: false })
-      .limit(DONE_PAGE_SIZE + 1);
+      .lte("completed_at", before);
 
     assertNoError("load older completed tasks", { error: rowError });
 
-    const page = rows ?? [];
+    // Total order over the fetched rows: completed_at desc, id desc as the tie-break — the same
+    // pair the cursor is made of, so the ordering and the cursor comparison below agree.
+    const ordered = [...(rows ?? [])].sort((a, b) => {
+      const aAt = a.completed_at as string;
+      const bAt = b.completed_at as string;
+      if (aAt !== bAt) return aAt < bAt ? 1 : -1;
+      const aId = a.id as string;
+      const bId = b.id as string;
+      return aId < bId ? 1 : aId > bId ? -1 : 0;
+    });
+
+    const isStrictlyAfterCursor = (r: { completed_at: unknown; id: unknown }) => {
+      const completedAt = r.completed_at as string;
+      if (completedAt !== before) return true; // the query already required <= before
+      if (beforeId === undefined) return false; // no prior page to break the tie against
+      return (r.id as string) < beforeId;
+    };
+
+    const page = ordered.filter(isStrictlyAfterCursor);
     const hasMore = page.length > DONE_PAGE_SIZE;
 
     const tasks: DoneTask[] = page.slice(0, DONE_PAGE_SIZE).map((r) => ({
