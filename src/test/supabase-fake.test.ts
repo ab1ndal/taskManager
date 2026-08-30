@@ -347,6 +347,48 @@ describe("query filters — not() and lt()", () => {
   });
 });
 
+describe("query filters — or()", () => {
+  function rows(): Row[] {
+    return [
+      { id: "open", completed_at: null },
+      { id: "recent", completed_at: "2026-08-27T09:00:00.000Z" },
+      { id: "ancient", completed_at: "2026-07-01T09:00:00.000Z" },
+    ];
+  }
+
+  it("keeps a row matching either clause: null or at/after the cutoff", async () => {
+    const fake = createFakeSupabase({ tables: { widgets: rows() } });
+
+    const { data } = await fake
+      .from("widgets")
+      .select()
+      .or("completed_at.is.null,completed_at.gte.2026-08-21T12:00:00.000Z");
+
+    expect((data as Row[]).map((r) => r.id).sort()).toEqual(["open", "recent"]);
+  });
+
+  it("parses a clause's value without splitting on the timestamp's own dots", async () => {
+    // "2026-08-27T09:00:00.000Z" has a "." before the milliseconds — a naive split(".") on the
+    // whole clause would butcher the value instead of stopping after column and operator.
+    const fake = createFakeSupabase({ tables: { widgets: rows() } });
+
+    const { data } = await fake
+      .from("widgets")
+      .select()
+      .or("completed_at.gte.2026-08-27T09:00:00.000Z");
+
+    expect((data as Row[]).map((r) => r.id)).toEqual(["recent"]);
+  });
+
+  it("rejects an operator this fake's or() does not implement", async () => {
+    const fake = createFakeSupabase({ tables: { widgets: rows() } });
+
+    expect(() => fake.from("widgets").select().or("completed_at.neq.null")).toThrow(
+      /unsupported or\(\) operator/
+    );
+  });
+});
+
 describe("query filters — chained order()", () => {
   it("breaks ties on the first key using the second .order() call, mirroring PostgREST", async () => {
     const fake = createFakeSupabase({
