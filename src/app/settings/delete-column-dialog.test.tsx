@@ -10,7 +10,7 @@ HTMLDialogElement.prototype.showModal = jest.fn(function (this: HTMLDialogElemen
   this.setAttribute("open", "");
 });
 
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 
@@ -177,4 +177,92 @@ it("has no accessibility violations", async () => {
   await screen.findByText("Call the plumber");
 
   expect(await axe(container)).toHaveNoViolations();
+});
+
+// A promise whose resolution the test controls, so two loads can be put in flight and resolved out
+// of order.
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+const listOf = (...titles: string[]) => ({
+  ok: true,
+  tasks: titles.map((title, index) => ({ id: `${T1.slice(0, -1)}${index}`, title, completedAt: null })),
+});
+
+it("discards a load that resolves after the dialog unmounts", async () => {
+  const pending = deferred<{ ok: boolean; error?: string }>();
+  (listTasksInColumn as jest.Mock).mockReturnValue(pending.promise);
+  const onClose = jest.fn();
+
+  const { unmount } = render(
+    <DeleteColumnDialog column={blocked} siblings={siblings} onClose={onClose} onDeleted={jest.fn()} />
+  );
+  unmount();
+
+  await act(async () => {
+    pending.resolve({ ok: false, error: "boom" });
+  });
+
+  expect(onClose).not.toHaveBeenCalled();
+  expect(toast).not.toHaveBeenCalled();
+});
+
+it("keeps the newer list when an older load resolves last", async () => {
+  const first = deferred<ReturnType<typeof listOf>>();
+  const second = deferred<ReturnType<typeof listOf>>();
+  (listTasksInColumn as jest.Mock)
+    .mockReturnValueOnce(first.promise)
+    .mockReturnValueOnce(second.promise);
+
+  const { rerender } = render(
+    <DeleteColumnDialog column={blocked} siblings={siblings} onClose={jest.fn()} onDeleted={jest.fn()} />
+  );
+
+  // A new onClose identity re-runs the load effect, retiring the first request mid-flight.
+  rerender(
+    <DeleteColumnDialog column={blocked} siblings={siblings} onClose={jest.fn()} onDeleted={jest.fn()} />
+  );
+  expect(listTasksInColumn).toHaveBeenCalledTimes(2);
+
+  await act(async () => {
+    second.resolve(listOf("Second response"));
+  });
+  await act(async () => {
+    first.resolve(listOf("First response"));
+  });
+
+  expect(screen.getByText("Second response")).toBeInTheDocument();
+  expect(screen.queryByText("First response")).not.toBeInTheDocument();
+});
+
+it("keeps the confirm button disabled while the stale-list reload is in flight", async () => {
+  (deleteBoardColumn as jest.Mock).mockResolvedValue({
+    ok: false,
+    error: "column changed since it was listed",
+  });
+  const reload = deferred<ReturnType<typeof listOf>>();
+  (listTasksInColumn as jest.Mock)
+    .mockResolvedValueOnce(listOf("Call the plumber"))
+    .mockReturnValueOnce(reload.promise);
+
+  render(
+    <DeleteColumnDialog column={blocked} siblings={siblings} onClose={jest.fn()} onDeleted={jest.fn()} />
+  );
+  await screen.findByText("Call the plumber");
+
+  await userEvent.click(screen.getByRole("button", { name: "Delete column" }));
+
+  await waitFor(() => expect(listTasksInColumn).toHaveBeenCalledTimes(2));
+  expect(screen.getByRole("button", { name: "Delete column" })).toBeDisabled();
+
+  await act(async () => {
+    reload.resolve(listOf("Reloaded task"));
+  });
+
+  expect(screen.getByRole("button", { name: "Delete column" })).toBeEnabled();
 });
