@@ -244,7 +244,7 @@ export function createFakeSupabase(options: FakeOptions = {}) {
         // column, is_done excluded explicitly rather than relying on position (016).
         const columns = (tables.board_columns ?? []) as Row[];
         const destinationColumn = columns
-          .filter((c) => c.workspace_id === workspaceId && c.is_done === false)
+          .filter((c) => c.workspace_id === workspaceId && !c.is_done)
           .sort((a, b) => (a.position as number) - (b.position as number))[0];
 
         if (!destinationColumn) {
@@ -297,6 +297,131 @@ export function createFakeSupabase(options: FakeOptions = {}) {
         if (existing) Object.assign(existing, row);
         else rows.push(row);
         tables.task_rules = rows;
+        return { data: null, error: null };
+      }
+
+      // Mirrors migration 020 (supersedes 018): the assignment check is hoisted above every write,
+      // including the both-null branch. That branch used to return before task_assignments was
+      // ever touched, so the "not found" on its update was the only place membership got checked —
+      // a member in the workspace but not assigned to the task could drop a card into an empty
+      // column even though the identical drop into a non-empty column correctly raised. Visibility
+      // here is assignment (docs/db.md), so the check must run on every branch, before any write.
+      if (fnName === "move_task_to_column") {
+        const taskId = params.p_task_id as string;
+        const columnId = params.p_column_id as string;
+        const memberId = params.p_member_id as string;
+        const prevKey = params.p_prev_key as number | null;
+        const nextKey = params.p_next_key as number | null;
+
+        const task = ((tables.tasks ?? []) as Row[]).find((t) => t.id === taskId);
+        if (!task) return { data: null, error: { message: `task ${taskId} not found` } };
+        if (task.parent_task_id) {
+          return {
+            data: null,
+            error: { message: `task ${taskId} is a subtask and has no board column` },
+          };
+        }
+
+        const column = ((tables.board_columns ?? []) as Row[]).find((c) => c.id === columnId);
+        if (!column) return { data: null, error: { message: `board column ${columnId} not found` } };
+        if (column.workspace_id !== task.workspace_id) {
+          return {
+            data: null,
+            error: { message: `board column ${columnId} is not in workspace ${task.workspace_id}` },
+          };
+        }
+
+        const member = ((tables.workspace_members ?? []) as Row[]).find((m) => m.id === memberId);
+        if (!member || member.workspace_id !== task.workspace_id) {
+          return {
+            data: null,
+            error: { message: `member ${memberId} is not in workspace ${task.workspace_id}` },
+          };
+        }
+
+        const assignment = ((tables.task_assignments ?? []) as Row[]).find(
+          (a) => a.task_id === taskId && a.member_id === memberId
+        );
+        if (!assignment) {
+          return {
+            data: null,
+            error: { message: `member ${memberId} is not assigned to task ${taskId}` },
+          };
+        }
+
+        task.board_column_id = columnId;
+
+        // Same key arithmetic as reorderTask in src/app/tasks/actions.ts: midpoint between
+        // neighbours, or a full step beyond the one neighbour that exists. Both null means the
+        // destination column is empty, so the existing key stands and only the column changes.
+        if (prevKey === null && nextKey === null) return { data: null, error: null };
+
+        assignment.member_sort_key =
+          prevKey === null ? nextKey! - 1000 : nextKey === null ? prevKey + 1000 : (prevKey + nextKey) / 2;
+
+        return { data: null, error: null };
+      }
+
+      // Mirrors migration 021 (supersedes 018/020's lock-order fix; same observable behaviour here
+      // since the fake has no concurrent callers). The coverage check reads a snapshot of which
+      // tasks are in the column; the relocation write below re-asserts board_column_id === columnId
+      // per task rather than trusting that snapshot, so a task that stopped being in this column for
+      // any reason is not dragged back into the destination someone else chose for it.
+      if (fnName === "delete_board_column") {
+        const columnId = params.p_column_id as string;
+        const moves = (params.p_moves ?? []) as { task_id: string; target_column_id: string }[];
+        const columns = (tables.board_columns ?? []) as Row[];
+        const column = columns.find((c) => c.id === columnId);
+
+        if (!column) return { data: null, error: { message: `board column ${columnId} not found` } };
+
+        const siblings = columns.filter(
+          (c) => c.workspace_id === column.workspace_id && c.id !== columnId
+        );
+        if (siblings.filter((c) => !c.is_done).length === 0) {
+          return {
+            data: null,
+            error: {
+              message: `cannot delete the last non-terminal column of workspace ${column.workspace_id}`,
+            },
+          };
+        }
+
+        const taskRows = (tables.tasks ?? []) as Row[];
+        const actual = taskRows
+          .filter((t) => t.board_column_id === columnId)
+          .map((t) => t.id as string)
+          .sort();
+        const requested = moves.map((m) => m.task_id).sort();
+
+        if (actual.join() !== requested.join()) {
+          return {
+            data: null,
+            error: { message: `column ${columnId} changed since it was listed` },
+          };
+        }
+
+        const badTarget = moves.some(
+          (m) =>
+            m.target_column_id === columnId ||
+            !siblings.some((c) => c.id === m.target_column_id)
+        );
+        if (badTarget) {
+          return {
+            data: null,
+            error: {
+              message: `every destination must be a different column in workspace ${column.workspace_id}`,
+            },
+          };
+        }
+
+        for (const move of moves) {
+          const task = taskRows.find((t) => t.id === move.task_id);
+          if (task && task.board_column_id === columnId) task.board_column_id = move.target_column_id;
+        }
+
+        tables.board_columns = columns.filter((c) => c.id !== columnId);
+
         return { data: null, error: null };
       }
 
