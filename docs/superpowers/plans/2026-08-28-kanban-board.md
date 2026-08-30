@@ -3638,16 +3638,26 @@ export function BoardClient({
     const terminal = merged.find((c) => c.isDone);
     if (!terminal) return;
 
+    // The cursor is the PAIR (completedAt, id) of the oldest card on screen. Passing `beforeId` is
+    // mandatory, not optional: loadOlderDone falls back to a completed_at-only comparison without it,
+    // and two tasks sharing a completed_at across a page boundary would silently lose one. See the
+    // Task 6 review findings.
     const shown = groupedByKey[terminal.key];
-    const oldest = shown.reduce<string | null>(
-      (acc, t) => (t.completedAt && (acc === null || t.completedAt < acc) ? t.completedAt : acc),
-      null
-    );
+    const oldest = shown.reduce<{ completedAt: string; id: string } | null>((acc, t) => {
+      if (!t.completedAt) return acc;
+      if (acc === null) return { completedAt: t.completedAt, id: t.id };
+      if (t.completedAt < acc.completedAt) return { completedAt: t.completedAt, id: t.id };
+      if (t.completedAt === acc.completedAt && t.id < acc.id) return { completedAt: t.completedAt, id: t.id };
+      return acc;
+    }, null);
 
     setLoadingOlder(true);
     const res = await loadOlderDone({
       workspaceIds,
-      before: oldest ?? new Date(Date.now() - DONE_WINDOW_DAYS * 86_400_000).toISOString(),
+      before:
+        oldest?.completedAt ??
+        new Date(Date.now() - DONE_WINDOW_DAYS * 86_400_000).toISOString(),
+      beforeId: oldest?.id,
     });
     setLoadingOlder(false);
 
