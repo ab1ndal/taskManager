@@ -344,40 +344,90 @@ it("returns both tasks of a tie straddling a page boundary, across two pages, wi
   expect(seenIds).toContain(TIE_HIGH);
 });
 
-// Regression guard for round 2's finding: the query must stay bounded by DONE_PAGE_SIZE + 1 +
-// DONE_TIE_ALLOWANCE in the database rather than fetching every matching row and paging in Node.
-// The fake has no notion of query cost, so this cannot prove boundedness by itself (see the
-// findings file) — it pins the pagination contract (at most one page, hasMore true when more exist)
-// that the bounded query has to keep honouring, alongside `.limit()` being visible in the diff.
-it("returns at most one page and reports more remaining when far more completed tasks exist", async () => {
+// Regression guard for round 3's finding: a single .lte(completed_at, before) query with a fixed
+// tie allowance has a ceiling — `before` never advances while a tie cluster drains, so every round
+// trip re-fetches the same bounded window and rows past the ceiling are permanently unreachable.
+// The fix is two individually-bounded queries (tie-drain, only when beforeId is present, plus
+// strictly-older) instead. A prior version of this test asserted only the pagination outcome
+// (<=50 tasks, hasMore true) with 120 untied rows — traced by review to pass even with `.limit()`
+// removed entirely, because the fake returns pre-sorted rows and nothing there depended on the
+// bound. Replaced with two tests below that each name a mutation they catch.
+
+// Mutation caught: dropping `.limit(...)` from the older-completed-tasks query (or from the
+// tie-drain query), i.e. reverting to an unbounded fetch. The query log records what was actually
+// asked of the database, independent of what the fixture happens to return, so this fails the
+// moment either bound is removed — unlike a black-box assertion on the resulting page.
+it("issues both loadOlderDone queries bounded to DONE_PAGE_SIZE + 1, never unbounded", async () => {
   const tables = seed();
-  const COUNT = 120;
-  for (let i = 0; i < COUNT; i++) {
-    const id = `c2000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
-    const at = new Date(Date.UTC(2026, 0, 1) - i * 60_000).toISOString();
+  taskIn(tables, T1).completed_at = "2026-07-01T00:00:00+00:00";
+  const fake = setup({ tables });
+
+  await loadOlderDone({
+    workspaceIds: [WS1],
+    before: "2026-07-01T00:00:00+00:00",
+    beforeId: "c0000000-0000-4000-8000-000000000099",
+  });
+
+  const taskQueries = fake.queryLog.filter((q) => q.table === "tasks" && q.limit !== null);
+  // Both the tie-drain query (beforeId present, so it runs) and the older query must appear, and
+  // neither may be unbounded.
+  expect(taskQueries.length).toBeGreaterThanOrEqual(2);
+  for (const q of taskQueries) {
+    expect(q.limit).toBe(51); // DONE_PAGE_SIZE (50) + 1
+  }
+});
+
+// Mutation caught: reverting to one .lte(completed_at, before) query with a fixed allowance (as
+// round 2 shipped) instead of the two-query split. With that version, a tie cluster larger than the
+// allowance is permanently unreachable past the ceiling because `before` never changes while the
+// cluster drains — this test's cluster (110 rows) is deliberately larger than round 2's ceiling
+// (DONE_PAGE_SIZE + 1 + DONE_TIE_ALLOWANCE = 101), so reintroducing that bug would strand the last
+// ~9 rows and fail the "every row reachable" assertion below.
+it("walks every row of a tie cluster larger than the old fixed-allowance ceiling", async () => {
+  const tables = seed();
+  const TIE_AT = "2026-05-01T00:00:00+00:00";
+  const CLUSTER_SIZE = 110;
+  const ids: string[] = [];
+  for (let i = 0; i < CLUSTER_SIZE; i++) {
+    const id = `c3000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+    ids.push(id);
     (tables.tasks as Row[]).push({
       id,
       workspace_id: WS1,
       parent_task_id: null,
-      title: `Bulk ${i}`,
+      title: `Tied ${i}`,
       due_at: null,
-      completed_at: at,
+      completed_at: TIE_AT,
       board_column_id: COL_DONE,
     });
-    (tables.task_assignments as Row[]).push({ task_id: id, member_id: M1, member_sort_key: 30_000 + i });
+    (tables.task_assignments as Row[]).push({ task_id: id, member_id: M1, member_sort_key: 40_000 + i });
   }
   setup({ tables });
 
-  const result = await loadOlderDone({
-    workspaceIds: [WS1],
-    before: new Date("2026-02-01T00:00:00.000Z").toISOString(),
-  });
+  const seen: string[] = [];
+  let before = new Date("2026-09-01T00:00:00.000Z").toISOString();
+  let beforeId: string | undefined;
+  let hasMore = true;
+  let pages = 0;
 
-  expect(result.ok).toBe(true);
-  if (!result.ok) return;
-  expect(result.tasks.length).toBeLessThanOrEqual(50);
-  expect(result.tasks).toHaveLength(50);
-  expect(result.hasMore).toBe(true);
+  while (hasMore) {
+    pages++;
+    expect(pages).toBeLessThanOrEqual(10); // guard against an infinite loop if hasMore never settles
+    const result = await loadOlderDone(
+      beforeId === undefined ? { workspaceIds: [WS1], before } : { workspaceIds: [WS1], before, beforeId }
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    seen.push(...result.tasks.map((t) => t.id));
+    hasMore = result.hasMore;
+    const last = result.tasks[result.tasks.length - 1];
+    before = last.completedAt;
+    beforeId = last.id;
+  }
+
+  expect(new Set(seen).size).toBe(seen.length); // no repeats
+  expect(seen.sort()).toEqual([...ids].sort()); // no gaps — the old ceiling would strand the tail
 });
 
 // The done column's "Show older" footer can be offered with nothing on screen yet — the client

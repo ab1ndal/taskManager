@@ -413,3 +413,42 @@ describe("query filters — chained order()", () => {
     expect((data as Row[]).map((r) => r.id)).toEqual(["b", "a", "c"]);
   });
 });
+
+describe("query log", () => {
+  // Mutation caught: forgetting to push onto queryLog in Query.run() (or pushing before .limit()/
+  // .order() have been called), which would make a query-shape assertion elsewhere in the suite
+  // pass vacuously — an empty or incomplete log entry can't distinguish a bounded query from an
+  // unbounded one.
+  it("records the table, filters, order and limit of an issued select", async () => {
+    const fake = createFakeSupabase({ tables: { widgets: [{ id: "a" }] } });
+
+    await fake
+      .from("widgets")
+      .select()
+      .eq("id", "a")
+      .order("id", { ascending: false })
+      .limit(5);
+
+    expect(fake.queryLog).toEqual([
+      {
+        table: "widgets",
+        filters: [{ kind: "eq", column: "id", value: "a" }],
+        orderBy: [{ column: "id", ascending: false }],
+        limit: 5,
+      },
+    ]);
+  });
+
+  // Mutation caught: recording only successful queries, or skipping the log on a failed one — a
+  // bound belongs to the query that was issued, not to whether it happened to succeed.
+  it("records a select that fails, not just ones that succeed", async () => {
+    const fake = createFakeSupabase({
+      tables: { widgets: [] },
+      failOn: () => ({ message: "boom" }),
+    });
+
+    await fake.from("widgets").select().limit(1);
+
+    expect(fake.queryLog).toEqual([{ table: "widgets", filters: [], orderBy: [], limit: 1 }]);
+  });
+});

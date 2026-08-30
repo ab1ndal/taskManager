@@ -27,12 +27,25 @@ export interface FakeOptions {
   failOn?: FailureHook;
 }
 
-interface Filter {
+export interface Filter {
   kind: "eq" | "in" | "is" | "not-is" | "lt" | "lte" | "or";
   column: string;
   value: unknown;
   /** Only present for kind "or": the comma-separated conditions PostgREST's `.or()` takes. */
   subs?: OrCondition[];
+}
+
+/**
+ * One issued select, recorded the moment it resolves — table, every filter, the order keys in call
+ * order, and the limit. Exists so a test can assert a query was *shaped* a certain way (bounded,
+ * ordered a particular way) rather than only asserting the data that came back, which a bug in the
+ * bound (e.g. a dropped `.limit()`) does not necessarily change for a given fixture.
+ */
+export interface QueryLogEntry {
+  table: string;
+  filters: Filter[];
+  orderBy: { column: string; ascending: boolean }[];
+  limit: number | null;
 }
 
 /** One `column.op.value` clause out of an `.or("a.op.b,c.op.d")` expression. */
@@ -103,7 +116,8 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
   constructor(
     private readonly table: string,
     private readonly tables: Tables,
-    private readonly failOn?: FailureHook
+    private readonly failOn?: FailureHook,
+    private readonly queryLog?: QueryLogEntry[]
   ) {}
 
   private rows(): Row[] {
@@ -201,6 +215,17 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
   }
 
   private run() {
+    // Recorded regardless of outcome — a query is "issued" whether or not it then fails or matches
+    // anything, and a bound belongs to the query's shape, not its result.
+    if (this.op === "select") {
+      this.queryLog?.push({
+        table: this.table,
+        filters: [...this.filters],
+        orderBy: [...this.orderBy],
+        limit: this.limitN,
+      });
+    }
+
     const failure = this.failOn?.(this.table, this.op, this.payload);
     if (failure) return { data: null, error: failure, count: null };
 
@@ -272,10 +297,13 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
 export function createFakeSupabase(options: FakeOptions = {}) {
   const tables = options.tables ?? {};
   const user = options.user === undefined ? { id: "auth-user-1" } : options.user;
+  const queryLog: QueryLogEntry[] = [];
 
   return {
     tables,
-    from: (table: string) => new Query(table, tables, options.failOn),
+    /** Every select issued through `from()`, in call order. See `QueryLogEntry`. */
+    queryLog,
+    from: (table: string) => new Query(table, tables, options.failOn, queryLog),
     rpc: async (fnName: string, params: Record<string, unknown>) => {
       if (fnName === "assign_task_member") {
         const taskId = params.p_task_id as string;
