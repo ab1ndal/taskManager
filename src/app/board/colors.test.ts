@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { TAB20_SLUGS, DEFAULT_BOARD_COLUMNS, isTab20Slug } from "./colors";
 
 describe("tab20 palette", () => {
@@ -34,5 +36,19 @@ describe("tab20 palette", () => {
     for (const column of DEFAULT_BOARD_COLUMNS) {
       expect(isTab20Slug(column.color)).toBe(true);
     }
+  });
+
+  it("keeps the SQL check constraint's slugs in lockstep with TAB20_SLUGS", () => {
+    const migration = readFileSync(
+      join(__dirname, "../../../supabase/migrations/015_board_columns.sql"),
+      "utf8",
+    );
+    const constraintMatch = migration.match(
+      /board_columns_color_valid check \(color in \(([\s\S]*?)\)\)/,
+    );
+    expect(constraintMatch).not.toBeNull();
+
+    const sqlSlugs = Array.from(constraintMatch![1].matchAll(/'([^']+)'/g)).map((m) => m[1]);
+    expect(new Set(sqlSlugs)).toEqual(new Set(TAB20_SLUGS));
   });
 });
