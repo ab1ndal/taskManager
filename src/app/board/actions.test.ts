@@ -5,6 +5,7 @@ jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createFakeSupabase, type Row, type Tables } from "@/test/supabase-fake";
+import { GENERIC_ERROR } from "@/app/tasks/action-result";
 import {
   createBoardColumn,
   deleteBoardColumn,
@@ -213,4 +214,21 @@ it("refuses a destination in another workspace", async () => {
 it("refuses to delete a column in another workspace", async () => {
   setup();
   await expectFailure(deleteBoardColumn({ columnId: COL_WS2, moves: [] }), "not a member of workspace");
+});
+
+it("collapses an rpc failure we did not author to the generic message, without leaking its text", async () => {
+  const fake = setup();
+  const leaked = "permission denied for table board_columns";
+  const originalRpc = fake.rpc.bind(fake);
+  jest.spyOn(fake, "rpc").mockImplementation(async (fnName: string, params: Record<string, unknown>) =>
+    fnName === "delete_board_column" ? { data: null, error: { message: leaked } } : originalRpc(fnName, params)
+  );
+  const logged = jest.spyOn(console, "error").mockImplementation(() => {});
+
+  const result = await deleteBoardColumn({ columnId: COL_A, moves: [{ taskId: T1, targetColumnId: COL_B }, { taskId: T2, targetColumnId: COL_DONE }] });
+
+  expect(result).toEqual({ ok: false, error: GENERIC_ERROR });
+  expect(JSON.stringify(result)).not.toContain("permission denied");
+  expect(logged).toHaveBeenCalledWith(expect.stringContaining(leaked));
+  logged.mockRestore();
 });
