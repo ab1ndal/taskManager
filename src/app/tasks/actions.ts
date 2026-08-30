@@ -238,6 +238,25 @@ export async function createTaskWithSubtasks(
     // INSERT ... RETURNING would come back empty. See tasks/todo.md.
     const parentId = crypto.randomUUID();
 
+    // Migration 015 requires every root task to carry a board column, so this is part of creating a
+    // task, not a board-only concern. The leftmost non-terminal column is the "new work" column:
+    // is_done is excluded explicitly rather than relying on position, because a workspace may have
+    // reordered its terminal column to the front.
+    const { data: firstColumn, error: firstColumnError } = await admin
+      .from("board_columns")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("is_done", false)
+      .order("position", { ascending: true })
+      .limit(1);
+
+    assertNoError("load first board column", { error: firstColumnError });
+
+    const boardColumnId = firstColumn?.[0]?.id as string | undefined;
+    if (!boardColumnId) {
+      throw new Error(`workspace ${workspaceId} has no non-terminal board column`);
+    }
+
     assertNoError(
       "create task",
       await admin.from("tasks").insert({
@@ -246,6 +265,7 @@ export async function createTaskWithSubtasks(
         description: description ?? null,
         due_at: dueAt ? `${dueAt}T00:00:00Z` : null,
         workspace_id: workspaceId,
+        board_column_id: boardColumnId,
       })
     );
 
