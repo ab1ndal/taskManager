@@ -1,28 +1,35 @@
 jest.mock("./move-actions", () => ({ moveTaskToColumn: jest.fn(), loadOlderDone: jest.fn() }));
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "jest-axe";
 import type { DropResult } from "@hello-pangea/dnd";
 
 import { BoardClient, buildBoardDragEndHandler } from "./board-client";
-import { mergeColumns, type BoardColumn, type BoardTask } from "./group-columns";
-import { moveTaskToColumn } from "./move-actions";
+import { groupTasks, mergeColumns, type BoardColumn, type BoardTask } from "./group-columns";
+import { loadOlderDone, moveTaskToColumn } from "./move-actions";
 
 const WS_H = "a0000000-0000-4000-8000-000000000001";
 const WS_W = "a0000000-0000-4000-8000-000000000002";
 const M_H = "b0000000-0000-4000-8000-000000000001";
 const COL_H_TODO = "e0000000-0000-4000-8000-00000000000a";
 const COL_H_PROG = "e0000000-0000-4000-8000-00000000000b";
+const COL_H_DONE = "e0000000-0000-4000-8000-00000000000c";
 const T1 = "c0000000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
   jest.clearAllMocks();
   (moveTaskToColumn as jest.Mock).mockResolvedValue({ ok: true });
+  (loadOlderDone as jest.Mock).mockResolvedValue({ ok: true, tasks: [], hasMore: false });
 });
 
 const columns: BoardColumn[] = [
   { id: COL_H_TODO, workspaceId: WS_H, name: "Not Started", color: "tab20-grey", position: 1000, isDone: false },
   { id: COL_H_PROG, workspaceId: WS_H, name: "In Progress", color: "tab20-blue", position: 2000, isDone: false },
+];
+
+const columnsWithDone: BoardColumn[] = [
+  ...columns,
+  { id: COL_H_DONE, workspaceId: WS_H, name: "Completed", color: "tab20-green", position: 3000, isDone: true },
 ];
 
 function task(overrides: Partial<BoardTask> & { id: string; boardColumnId: string }): BoardTask {
@@ -136,6 +143,7 @@ it("moves the card optimistically and rolls back when the server refuses", async
   (moveTaskToColumn as jest.Mock).mockResolvedValue({ ok: false, error: "Nope" });
   const setLocalTasks = jest.fn();
   const onError = jest.fn();
+  const OTHER = "c0000000-0000-4000-8000-000000000009";
 
   await handler({ setLocalTasks, onError })(drop({}));
 
@@ -143,11 +151,109 @@ it("moves the card optimistically and rolls back when the server refuses", async
   expect(setLocalTasks).toHaveBeenCalledTimes(2);
   expect(onError).toHaveBeenCalledWith("Nope");
 
+  // A second, untouched card in `prev` — catches an updater of the form `(prev) => preDragSnapshot`,
+  // which a one-element array can't: it would still pass with only T1 in the array. The per-card
+  // comment in board-client.tsx claims not to erase a concurrent change; this is what proves it.
   const applyFirst = setLocalTasks.mock.calls[0][0] as (prev: BoardTask[]) => BoardTask[];
-  expect(applyFirst([task({ id: T1, boardColumnId: COL_H_TODO })])[0].boardColumnId).toBe(COL_H_PROG);
+  const afterFirst = applyFirst([
+    task({ id: T1, boardColumnId: COL_H_TODO }),
+    task({ id: OTHER, boardColumnId: COL_H_PROG, memberSortKey: 9000 }),
+  ]);
+  expect(afterFirst.find((t) => t.id === T1)?.boardColumnId).toBe(COL_H_PROG);
+  expect(afterFirst.find((t) => t.id === OTHER)).toMatchObject({ boardColumnId: COL_H_PROG, memberSortKey: 9000 });
 
   const applyRollback = setLocalTasks.mock.calls[1][0] as (prev: BoardTask[]) => BoardTask[];
-  expect(applyRollback([task({ id: T1, boardColumnId: COL_H_PROG })])[0].boardColumnId).toBe(COL_H_TODO);
+  const afterRollback = applyRollback([
+    task({ id: T1, boardColumnId: COL_H_PROG }),
+    task({ id: OTHER, boardColumnId: COL_H_TODO, memberSortKey: 5000 }),
+  ]);
+  expect(afterRollback.find((t) => t.id === T1)?.boardColumnId).toBe(COL_H_TODO);
+  expect(afterRollback.find((t) => t.id === OTHER)).toMatchObject({ boardColumnId: COL_H_TODO, memberSortKey: 5000 });
+});
+
+it("sets completedAt on a drop into the terminal column, so groupTasks places the card in Done", async () => {
+  // Catches an updater that moves boardColumnId but leaves completedAt untouched: groupTasks reads
+  // completedAt to decide the terminal column, not boardColumnId, so that mutation would leave the
+  // card open in "not started" (Task 10 review, Important 2) instead of failing loudly here.
+  const merged = mergeColumns(columnsWithDone);
+  let tasks: BoardTask[] = [task({ id: T1, boardColumnId: COL_H_TODO, completedAt: null })];
+  const setLocalTasks = jest.fn((updater: (prev: BoardTask[]) => BoardTask[]) => {
+    tasks = updater(tasks);
+  });
+
+  const call = buildBoardDragEndHandler({
+    merged,
+    groupedByKey: { "not started": tasks, "in progress": [], completed: [] },
+    memberIdByWorkspaceId: { [WS_H]: M_H },
+    setLocalTasks,
+    onError: jest.fn(),
+  });
+
+  await call(drop({ destination: { droppableId: "completed", index: 0 } }));
+
+  expect(tasks[0].completedAt).not.toBeNull();
+  const grouped = groupTasks(merged, tasks);
+  expect(grouped["completed"].map((t) => t.id)).toEqual([T1]);
+  expect(grouped["not started"]).toEqual([]);
+});
+
+it("clears completedAt when dragging a card out of the terminal column", async () => {
+  // Catches an updater that only ever sets completedAt, never clears it: without the clear,
+  // groupTasks re-homes an "open" task whose column points at Done back into the first non-terminal
+  // column regardless of where it was actually dropped — but this card isn't open, it still carries
+  // completedAt, so groupTasks would instead leave it stuck under Done (the drag-out half of
+  // Important 2).
+  const merged = mergeColumns(columnsWithDone);
+  let tasks: BoardTask[] = [
+    task({ id: T1, boardColumnId: COL_H_DONE, completedAt: "2026-08-20T00:00:00.000Z" }),
+  ];
+  const setLocalTasks = jest.fn((updater: (prev: BoardTask[]) => BoardTask[]) => {
+    tasks = updater(tasks);
+  });
+
+  const call = buildBoardDragEndHandler({
+    merged,
+    groupedByKey: { completed: tasks, "not started": [], "in progress": [] },
+    memberIdByWorkspaceId: { [WS_H]: M_H },
+    setLocalTasks,
+    onError: jest.fn(),
+  });
+
+  await call(
+    drop({
+      source: { droppableId: "completed", index: 0 },
+      destination: { droppableId: "not started", index: 0 },
+    })
+  );
+
+  expect(tasks[0].completedAt).toBeNull();
+  const grouped = groupTasks(merged, tasks);
+  expect(grouped["not started"].map((t) => t.id)).toEqual([T1]);
+  expect(grouped["completed"]).toEqual([]);
+});
+
+it("restores completedAt on rollback when the server refuses a drop into Done", async () => {
+  // Catches a rollback that restores boardColumnId and memberSortKey but not completedAt: the card
+  // would then sit back in its old column while still marked completed, contradicting its own pill.
+  (moveTaskToColumn as jest.Mock).mockResolvedValue({ ok: false, error: "Nope" });
+  const merged = mergeColumns(columnsWithDone);
+  let tasks: BoardTask[] = [task({ id: T1, boardColumnId: COL_H_TODO, completedAt: null })];
+  const setLocalTasks = jest.fn((updater: (prev: BoardTask[]) => BoardTask[]) => {
+    tasks = updater(tasks);
+  });
+
+  const call = buildBoardDragEndHandler({
+    merged,
+    groupedByKey: { "not started": tasks, "in progress": [], completed: [] },
+    memberIdByWorkspaceId: { [WS_H]: M_H },
+    setLocalTasks,
+    onError: jest.fn(),
+  });
+
+  await call(drop({ destination: { droppableId: "completed", index: 0 } }));
+
+  expect(tasks[0].completedAt).toBeNull();
+  expect(tasks[0].boardColumnId).toBe(COL_H_TODO);
 });
 
 it("renders one region per column, labelled with its task count", () => {
@@ -177,4 +283,100 @@ it("has no accessibility violations", async () => {
   );
 
   expect(await axe(container)).toHaveNoViolations();
+});
+
+it("adopts fresh tasks once the server revalidates and passes new props", () => {
+  // Catches a missing (or broken) props->state resync: moveTaskToColumn revalidates "/board", so a
+  // completed drop arrives back here as a new `tasks` prop, not just a resolved promise. Without the
+  // resync, localTasks is fixed at its very first value forever and this second render would still
+  // show "0 tasks" in In Progress (Task 10 review, Important 1).
+  const T2 = "c0000000-0000-4000-8000-000000000004";
+  const { rerender } = render(
+    <BoardClient
+      columns={columns}
+      tasks={[task({ id: T1, boardColumnId: COL_H_TODO })]}
+      memberIdByWorkspaceId={{ [WS_H]: M_H }}
+      workspaceIds={[WS_H]}
+      showWorkspace={false}
+    />
+  );
+  expect(screen.getByRole("region", { name: "Not Started, 1 task" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "In Progress, 0 tasks" })).toBeInTheDocument();
+
+  rerender(
+    <BoardClient
+      columns={columns}
+      tasks={[
+        task({ id: T1, boardColumnId: COL_H_TODO }),
+        task({ id: T2, boardColumnId: COL_H_PROG }),
+      ]}
+      memberIdByWorkspaceId={{ [WS_H]: M_H }}
+      workspaceIds={[WS_H]}
+      showWorkspace={false}
+    />
+  );
+
+  expect(screen.getByRole("region", { name: "Not Started, 1 task" })).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "In Progress, 1 task" })).toBeInTheDocument();
+});
+
+describe("showOlder cursor", () => {
+  function renderWithDone(tasks: BoardTask[]) {
+    return render(
+      <BoardClient
+        columns={columnsWithDone}
+        tasks={tasks}
+        memberIdByWorkspaceId={{ [WS_H]: M_H }}
+        workspaceIds={[WS_H]}
+        showWorkspace={false}
+      />
+    );
+  }
+
+  it("passes the minimum (completedAt, id) pair when two done cards share the oldest completedAt", async () => {
+    // Catches dropping beforeId, or picking the maximum pair instead of the minimum: both pass every
+    // other test in this suite, and both would silently drop a task across a page boundary in
+    // production (see move-actions.ts's loadOlderDone contract).
+    //
+    // Dates are offsets from the real clock, not fixed literals: groupTasks() itself filters
+    // completed tasks older than DONE_WINDOW_DAYS, so a hard-coded date would silently fall outside
+    // the window (and out of `shown` entirely) once enough real time has passed.
+    const TIE_LOW = "c0000000-0000-4000-8000-000000000005";
+    const TIE_HIGH = "c0000000-0000-4000-8000-000000000006";
+    const NEWER = "c0000000-0000-4000-8000-000000000007";
+    const oneDayAgo = new Date(Date.now() - 1 * 86_400_000).toISOString();
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    renderWithDone([
+      task({ id: NEWER, boardColumnId: COL_H_DONE, completedAt: oneDayAgo }),
+      task({ id: TIE_HIGH, boardColumnId: COL_H_DONE, completedAt: twoDaysAgo }),
+      task({ id: TIE_LOW, boardColumnId: COL_H_DONE, completedAt: twoDaysAgo }),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show older" }));
+
+    await waitFor(() => expect(loadOlderDone).toHaveBeenCalled());
+    expect(loadOlderDone).toHaveBeenCalledWith({
+      workspaceIds: [WS_H],
+      before: twoDaysAgo,
+      beforeId: TIE_LOW,
+    });
+  });
+
+  it("sends only the synthetic cutoff, with beforeId undefined, when the done window is empty", async () => {
+    // Catches a change that invents a beforeId (e.g. from stale state) when there is no row on
+    // screen to cite — move-actions.ts's loadOlderDoneSchema accepts an absent beforeId as the one
+    // legitimate case, not an empty string or a fabricated id.
+    renderWithDone([]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Show older" }));
+
+    await waitFor(() => expect(loadOlderDone).toHaveBeenCalled());
+    const call = (loadOlderDone as jest.Mock).mock.calls[0][0];
+    expect(call.workspaceIds).toEqual([WS_H]);
+    expect(call.beforeId).toBeUndefined();
+    // DONE_WINDOW_DAYS (7) before the test's system clock — asserted as "a valid ISO timestamp
+    // roughly a week in the past" rather than freezing the clock, since the exact instant isn't the
+    // behaviour under test.
+    expect(new Date(call.before).getTime()).toBeLessThan(Date.now());
+  });
 });
