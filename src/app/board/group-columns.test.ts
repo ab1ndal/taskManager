@@ -153,6 +153,19 @@ describe("groupTasks", () => {
     expect(DONE_WINDOW_DAYS).toBe(7);
   });
 
+  it("includes a task completed exactly DONE_WINDOW_DAYS before now (inclusive boundary)", () => {
+    // NOW is 2026-08-28T12:00:00.000Z; exactly 7 days earlier is 2026-08-21T12:00:00.000Z.
+    // groupTasks's own comparison is `completedAt < windowStart`, so equality does not exclude —
+    // pinning that as the actual behaviour, not the one this test would prefer.
+    const grouped = groupTasks(
+      columns,
+      [task({ id: "on-boundary", boardColumnId: "h2", workspaceId: WS_H, completedAt: "2026-08-21T12:00:00.000Z" })],
+      NOW
+    );
+
+    expect(grouped["completed"].map((t) => t.id)).toEqual(["on-boundary"]);
+  });
+
   it("drops a completed task entirely when no terminal column exists", () => {
     const noTerminal = mergeColumns([column({ id: "h1", workspaceId: WS_H, name: "Not Started" })]);
 

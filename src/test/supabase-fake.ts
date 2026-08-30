@@ -6,8 +6,9 @@
  * authorization query broke them all (tasks/lessons.md L5). This fake answers by table and filter
  * instead, so tests assert on resulting state rather than on call sequence.
  *
- * It implements only the query surface these actions use: eq / in / is / order / limit / single on
- * select, `{ count: "exact", head: true }`, and insert / update / delete.
+ * It implements only the query surface these actions use: eq / in / is / not / lt / lte / or /
+ * order / limit / single / maybeSingle on select, `{ count: "exact", head: true }`, and
+ * insert / update / delete.
  */
 
 export type Row = Record<string, unknown>;
@@ -27,9 +28,46 @@ export interface FakeOptions {
 }
 
 interface Filter {
-  kind: "eq" | "in" | "is" | "not-is" | "lt" | "lte";
+  kind: "eq" | "in" | "is" | "not-is" | "lt" | "lte" | "or";
   column: string;
   value: unknown;
+  /** Only present for kind "or": the comma-separated conditions PostgREST's `.or()` takes. */
+  subs?: OrCondition[];
+}
+
+/** One `column.op.value` clause out of an `.or("a.op.b,c.op.d")` expression. */
+interface OrCondition {
+  column: string;
+  op: "is" | "eq" | "gte" | "lte";
+  value: unknown;
+}
+
+/**
+ * PostgREST's `.or()` expression is a comma-separated list of `column.op.value` clauses. Splitting
+ * naively on every "." would also split inside an ISO timestamp's fractional seconds
+ * ("...00.000Z"), so each clause is parsed with a regex that only takes the first two dots as
+ * separators and leaves the rest — dots and all — as the value.
+ */
+function parseOrExpr(expr: string): OrCondition[] {
+  return expr.split(",").map((clause) => {
+    const match = /^([^.]+)\.([^.]+)\.(.*)$/.exec(clause);
+    if (!match) throw new Error(`fake supabase: unparseable or() clause "${clause}"`);
+    const [, column, op, rawValue] = match;
+    if (op !== "is" && op !== "eq" && op !== "gte" && op !== "lte") {
+      throw new Error(`fake supabase: unsupported or() operator "${op}"`);
+    }
+    const value = rawValue === "null" ? null : rawValue;
+    return { column, op, value };
+  });
+}
+
+function evalCondition(row: Row, { column, op, value }: OrCondition): boolean {
+  const actual = row[column];
+  if (op === "is") return actual === value || (value === null && actual === undefined);
+  if (op === "eq") return actual === value;
+  if (actual === undefined || actual === null) return false;
+  if (op === "gte") return (actual as string | number) >= (value as string | number);
+  return (actual as string | number) <= (value as string | number); // lte
 }
 
 function matches(row: Row, filters: Filter[]): boolean {
@@ -46,6 +84,7 @@ function matches(row: Row, filters: Filter[]): boolean {
     if (f.kind === "lte") {
       return actual !== undefined && actual !== null && (actual as string | number) <= (f.value as string | number);
     }
+    if (f.kind === "or") return (f.subs ?? []).some((sub) => evalCondition(row, sub));
     return Array.isArray(f.value) && f.value.includes(actual);
   });
 }
@@ -117,6 +156,12 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
   not(column: string, operator: string, value: unknown) {
     if (operator !== "is") throw new Error(`fake supabase: unsupported not() operator "${operator}"`);
     this.filters.push({ kind: "not-is", column, value });
+    return this;
+  }
+
+  /** `.or("completed_at.is.null,completed_at.gte.2026-01-01")` — the only shape this codebase calls. */
+  or(expr: string) {
+    this.filters.push({ kind: "or", column: "", value: null, subs: parseOrExpr(expr) });
     return this;
   }
 
