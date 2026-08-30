@@ -71,6 +71,16 @@ it("redirects to the profile tab for an unknown tab value", async () => {
   expect(mockRedirect).toHaveBeenCalledWith("/settings?tab=profile");
 });
 
+it("redirects to the profile tab for an empty tab value", async () => {
+  // Mutation this catches: a guard that only checks falsiness loosely (e.g. `if (tab && tab !==
+  // "profile" && tab !== "board")`) would treat `tab=` (present but empty) as falsy and skip the
+  // redirect, silently rendering Profile while leaving the invalid `?tab=` in the URL.
+  await expect(
+    SettingsPage({ searchParams: Promise.resolve({ tab: "" }) })
+  ).rejects.toThrow("REDIRECT:/settings?tab=profile");
+  expect(mockRedirect).toHaveBeenCalledWith("/settings?tab=profile");
+});
+
 it("does not redirect for the bare /settings URL", async () => {
   // Mutation this catches: widening the redirect condition to fire on `tab === undefined` too
   // (e.g. dropping the `tab !== undefined` guard), which would send a plain /settings visit into
