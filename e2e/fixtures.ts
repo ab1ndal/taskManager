@@ -155,6 +155,24 @@ export async function seed(): Promise<SeedResult> {
   const memberId = members.find((m) => m.auth_user_id === user.id)!.id;
   const otherMemberId = members.find((m) => m.auth_user_id === other.id)!.id;
 
+  // Migration 015's seed trigger already gave this workspace five columns; every root task needs
+  // one (tasks_board_column_matches_root), so the fixture picks the same leftmost non-terminal
+  // column createTaskWithSubtasks does — is_done excluded explicitly, ordered by position, first
+  // row. A missing column means the trigger didn't run, so this fails loudly rather than letting
+  // the insert's constraint violation speak for it.
+  const { data: firstColumn, error: firstColumnErr } = await admin
+    .from("board_columns")
+    .select("id")
+    .eq("workspace_id", ws.id)
+    .eq("is_done", false)
+    .order("position", { ascending: true })
+    .limit(1);
+  if (firstColumnErr) throw firstColumnErr;
+  const boardColumnId = firstColumn?.[0]?.id as string | undefined;
+  if (!boardColumnId) {
+    throw new Error(`workspace ${ws.id} has no non-terminal board column to seed tasks into`);
+  }
+
   const taskSpecs = [
     { title: "Overdue: pay the water bill", due_at: isoDaysFromNow(-3) },
     { title: "Today: take the bins out", due_at: new Date().toISOString() },
@@ -168,7 +186,14 @@ export async function seed(): Promise<SeedResult> {
 
   const { data: tasks, error: taskErr } = await admin
     .from("tasks")
-    .insert(taskSpecs.map((t) => ({ ...t, workspace_id: ws.id, created_by_member_id: memberId })))
+    .insert(
+      taskSpecs.map((t) => ({
+        ...t,
+        workspace_id: ws.id,
+        created_by_member_id: memberId,
+        board_column_id: boardColumnId,
+      }))
+    )
     .select("id, title");
   if (taskErr) throw taskErr;
 
