@@ -82,6 +82,12 @@ export default async function BoardPage({ searchParams }: { searchParams: Search
 
   // Completed work older than the done window is fetched on demand by loadOlderDone, so the initial
   // query stays bounded however long the history is.
+  //
+  // The rule's rationale is that an impure call "can produce unstable results that update
+  // unpredictably when the component happens to re-render." This is an async Server Component: it
+  // runs once per request and never re-renders, so that hazard cannot occur here — reading the
+  // clock per request is the intended behaviour, not a bug the rule is right to catch.
+  // eslint-disable-next-line react-hooks/purity -- see comment above; no re-render exists to make this unstable.
   const doneCutoff = new Date(Date.now() - DONE_WINDOW_DAYS * 86_400_000).toISOString();
 
   const { data: taskRows } = myTaskIds.length
