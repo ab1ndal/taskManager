@@ -50,6 +50,24 @@ async function assertColumnMember(
   return { workspaceId };
 }
 
+/**
+ * 23505 is Postgres's unique-violation code; migration 016's board_columns_workspace_name_key is
+ * what fires it on either an insert or an update. The caller typed a name a sibling column already
+ * has (case-insensitively) — a condition they can act on, not a bug, so it surfaces as a field
+ * error rather than falling through to action-run's generic message. Any other error is rethrown
+ * as-is so `step` still identifies which write failed.
+ */
+function assertNoNameCollision(step: string, { error }: { error: { message: string; code?: string } | null }): void {
+  if (!error) return;
+  if (error.code === "23505") {
+    throw new ValidationError(
+      { name: ["That name is already used in this workspace"] },
+      "That name is already used in this workspace"
+    );
+  }
+  throw new Error(`${step}: ${error.message}`);
+}
+
 export async function createBoardColumn(
   input: CreateBoardColumnInput
 ): Promise<ActionResult<{ columnId: string }>> {
@@ -74,7 +92,7 @@ export async function createBoardColumn(
     const position = ((last?.[0]?.position as number | undefined) ?? 0) + 1000;
     const columnId = crypto.randomUUID();
 
-    assertNoError(
+    assertNoNameCollision(
       "create board column",
       await admin
         .from("board_columns")
@@ -98,21 +116,10 @@ export async function renameBoardColumn(input: RenameBoardColumnInput): Promise<
     await assertColumnMember(columnId, user.id);
 
     const admin = createAdminClient();
-    const { error } = await admin.from("board_columns").update({ name }).eq("id", columnId);
-
-    if (error) {
-      // 23505 is Postgres's unique-violation code; migration 016's board_columns_workspace_name_key
-      // is what fires it here. The caller typed a name a sibling column already has (case-
-      // insensitively) — a condition they can act on, not a bug, so it surfaces as a field error
-      // rather than falling through to action-run's generic message.
-      if (error.code === "23505") {
-        throw new ValidationError(
-          { name: ["That name is already used in this workspace"] },
-          "That name is already used in this workspace"
-        );
-      }
-      throw new Error(`rename board column: ${error.message}`);
-    }
+    assertNoNameCollision(
+      "rename board column",
+      await admin.from("board_columns").update({ name }).eq("id", columnId)
+    );
 
     revalidatePath("/board");
     revalidatePath("/settings");

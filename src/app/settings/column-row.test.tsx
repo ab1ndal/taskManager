@@ -4,7 +4,7 @@ jest.mock("@/app/board/actions", () => ({
 }));
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 
@@ -48,10 +48,10 @@ it("does not call the server when the name is unchanged", async () => {
   expect(renameBoardColumn).not.toHaveBeenCalled();
 });
 
-it("restores the previous name and says so when the rename fails", async () => {
+it("restores the previous name and says so when the rename fails generically", async () => {
   // Mutation this catches: a rollback that resets state but skips the toast (or vice versa) —
   // both assertions must hold, so dropping either half of the rollback breaks this test.
-  (renameBoardColumn as jest.Mock).mockResolvedValue({ ok: false, error: "Name already used" });
+  (renameBoardColumn as jest.Mock).mockResolvedValue({ ok: false, error: "Could not rename the column" });
   render(<ColumnRow column={column} siblings={[]} nonTerminalSiblingCount={1} onDeleted={jest.fn()} />);
 
   const input = screen.getByLabelText("Column name");
@@ -59,8 +59,65 @@ it("restores the previous name and says so when the rename fails", async () => {
   await userEvent.type(input, "Blocked");
   await userEvent.tab();
 
-  expect(toast).toHaveBeenCalledWith("Name already used", "error");
+  expect(toast).toHaveBeenCalledWith("Could not rename the column", "error");
   expect(input).toHaveValue("In Progress");
+});
+
+it("shows a field-level name error in place, keeps the typed text, and does not toast", async () => {
+  // Mutation this catches: routing a `fieldErrors.name` failure through the toast/rollback branch
+  // instead of the field-error branch — both the visible error text and "no toast" would fail on a
+  // mutant that dropped the `fieldError` check, and a mutant that still rolled back the input would
+  // fail the `toHaveValue` assertion.
+  (renameBoardColumn as jest.Mock).mockResolvedValue({
+    ok: false,
+    error: "That name is already used in this workspace",
+    fieldErrors: { name: ["That name is already used in this workspace"] },
+  });
+  render(<ColumnRow column={column} siblings={[]} nonTerminalSiblingCount={1} onDeleted={jest.fn()} />);
+
+  const input = screen.getByLabelText("Column name");
+  await userEvent.clear(input);
+  await userEvent.type(input, "Blocked");
+  await userEvent.tab();
+
+  expect(screen.getByText("That name is already used in this workspace")).toBeInTheDocument();
+  expect(toast).not.toHaveBeenCalled();
+  expect(input).toHaveValue("Blocked");
+  expect(input).toHaveAttribute("aria-invalid", "true");
+});
+
+it("does not let a slower failing rename overwrite a faster successful one", async () => {
+  // Mutation this catches: rolling back to `column.name` (the prop, frozen at mount) instead of the
+  // last value that actually saved. Reproduces the exact race from the finding: an earlier rename
+  // is still in flight when a second, faster rename to a different name succeeds; when the first
+  // one then resolves as a failure, a rollback keyed off the stale prop would wipe the second
+  // rename's already-saved value back to the original "In Progress" — this asserts it survives.
+  let resolveFirst!: (value: { ok: boolean; error?: string }) => void;
+  (renameBoardColumn as jest.Mock)
+    .mockImplementationOnce(
+      () => new Promise((resolve) => { resolveFirst = resolve; })
+    )
+    .mockResolvedValueOnce({ ok: true });
+
+  render(<ColumnRow column={column} siblings={[]} nonTerminalSiblingCount={1} onDeleted={jest.fn()} />);
+  const input = screen.getByLabelText("Column name");
+
+  await userEvent.clear(input);
+  await userEvent.type(input, "First");
+  await userEvent.tab(); // fires the first (slow) rename, left pending
+
+  await userEvent.clear(input);
+  await userEvent.type(input, "Second");
+  await userEvent.tab(); // fires the second (fast) rename, resolves immediately below
+
+  await waitFor(() => expect(renameBoardColumn).toHaveBeenCalledTimes(2));
+  expect(input).toHaveValue("Second");
+
+  resolveFirst({ ok: false, error: "Name already used" });
+  await waitFor(() => expect(toast).toHaveBeenCalledWith("Name already used", "error"));
+
+  // The stale failure must not have clobbered the newer, already-saved value.
+  expect(input).toHaveValue("Second");
 });
 
 it("saves a colour immediately", async () => {
@@ -103,7 +160,7 @@ it("disables delete when it is the workspace's only non-terminal column", () => 
   // isDone check, would flip this to enabled.
   render(<ColumnRow column={column} siblings={[]} nonTerminalSiblingCount={0} onDeleted={jest.fn()} />);
 
-  expect(screen.getByRole("button", { name: "Delete In Progress" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Delete In Progress" })).toHaveAttribute("aria-disabled", "true");
 });
 
 it("enables delete when another non-terminal column exists", () => {
@@ -112,7 +169,30 @@ it("enables delete when another non-terminal column exists", () => {
   // column exists alongside this one.
   render(<ColumnRow column={column} siblings={[]} nonTerminalSiblingCount={1} onDeleted={jest.fn()} />);
 
-  expect(screen.getByRole("button", { name: "Delete In Progress" })).not.toBeDisabled();
+  expect(screen.getByRole("button", { name: "Delete In Progress" })).not.toHaveAttribute("aria-disabled");
+});
+
+it("keeps the guarded delete button focusable and announces why, unlike a real disabled control", async () => {
+  // Mutation this catches: reverting to the `disabled` attribute — a disabled button cannot
+  // receive focus via Tab, so the `tab()` navigation below would land somewhere else and the
+  // `toHaveFocus` assertion would fail; the `aria-describedby` id must also resolve to real,
+  // rendered text (an axe check alone can't tell the tooltip/description are actually reachable).
+  render(<ColumnRow column={column} siblings={[]} nonTerminalSiblingCount={0} onDeleted={jest.fn()} />);
+
+  const deleteButton = screen.getByRole("button", { name: "Delete In Progress" });
+  const input = screen.getByLabelText("Column name");
+  input.focus();
+  await userEvent.tab(); // color picker sits before the name input in DOM order... tab from name goes to delete
+  expect(deleteButton).toHaveFocus();
+
+  const describedById = deleteButton.getAttribute("aria-describedby");
+  expect(describedById).toBeTruthy();
+  expect(document.getElementById(describedById!)).toHaveTextContent(
+    "A workspace needs at least one active column, so this cannot be deleted."
+  );
+
+  await userEvent.click(deleteButton);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 it("has no accessibility violations, including the disabled-delete guard", async () => {
@@ -135,5 +215,5 @@ it("never disables delete for a terminal column, even with no other non-terminal
     <ColumnRow column={{ ...column, isDone: true }} siblings={[]} nonTerminalSiblingCount={0} onDeleted={jest.fn()} />
   );
 
-  expect(screen.getByRole("button", { name: "Delete In Progress" })).not.toBeDisabled();
+  expect(screen.getByRole("button", { name: "Delete In Progress" })).not.toHaveAttribute("aria-disabled");
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Plus, Users } from "lucide-react";
 
 import { createBoardColumn } from "@/app/board/actions";
@@ -28,7 +28,9 @@ export function BoardColumnsEditor({
 }) {
   const router = useRouter();
   const [newName, setNewName] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const errorId = useId();
 
   async function addColumn(event: React.FormEvent) {
     event.preventDefault();
@@ -42,10 +44,18 @@ export function BoardColumnsEditor({
     setSaving(false);
 
     if (!result.ok) {
+      const fieldError = result.fieldErrors?.name?.[0];
+      if (fieldError) {
+        // Field-level error: keep the typed name in place, editable, with the reason attached to
+        // the input — the same treatment a rename collision gets in ColumnRow.
+        setNameError(fieldError);
+        return;
+      }
       toast(result.error ?? "Could not add the column", "error");
       return;
     }
 
+    setNameError(null);
     setNewName("");
     router.refresh();
   }
@@ -74,23 +84,35 @@ export function BoardColumnsEditor({
         ))}
       </ul>
 
-      <form onSubmit={addColumn} className="mt-3 flex items-center gap-2">
-        <input
-          aria-label={`New column name for ${workspaceName}`}
-          value={newName}
-          maxLength={40}
-          placeholder="Add a column"
-          onChange={(event) => setNewName(event.target.value)}
-          className="min-h-11 flex-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 text-sm placeholder:text-[var(--color-text-secondary)]"
-        />
-        <button
-          type="submit"
-          disabled={saving || newName.trim().length === 0}
-          className="flex min-h-11 items-center gap-1.5 rounded-sm bg-[var(--color-accent)] px-4 text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
-        >
-          <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
-          Add
-        </button>
+      <form onSubmit={addColumn} className="mt-3 flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <input
+            aria-label={`New column name for ${workspaceName}`}
+            aria-describedby={nameError ? errorId : undefined}
+            aria-invalid={nameError ? true : undefined}
+            value={newName}
+            maxLength={40}
+            placeholder="Add a column"
+            onChange={(event) => {
+              setNewName(event.target.value);
+              if (nameError) setNameError(null);
+            }}
+            className="min-h-11 flex-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 text-sm placeholder:text-[var(--color-text-secondary)]"
+          />
+          <button
+            type="submit"
+            disabled={saving || newName.trim().length === 0}
+            className="flex min-h-11 items-center gap-1.5 rounded-sm bg-[var(--color-accent)] px-4 text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
+          >
+            <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+            Add
+          </button>
+        </div>
+        {nameError && (
+          <span id={errorId} className="px-1 text-xs text-[var(--color-danger-text)]">
+            {nameError}
+          </span>
+        )}
       </form>
     </section>
   );

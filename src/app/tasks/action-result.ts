@@ -11,6 +11,11 @@
  * database errors can carry schema details.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export type ActionResult<T extends object = {}> = ({ ok: true } & T) | { ok: false; error: string };
+export type ActionResult<T extends object = {}> =
+  | ({ ok: true } & T)
+  // `fieldErrors` is optional and additive: every existing caller that only reads `{ ok, error }`
+  // compiles and behaves exactly as before. Only `run()` populates it, and only for a
+  // `ValidationError` — see action-run.ts.
+  | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
 export const GENERIC_ERROR = "Something went wrong. Please try again.";
