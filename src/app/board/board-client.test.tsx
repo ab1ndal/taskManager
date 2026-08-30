@@ -232,6 +232,47 @@ it("clears completedAt when dragging a card out of the terminal column", async (
   expect(grouped["completed"]).toEqual([]);
 });
 
+it("leaves completedAt untouched when reordering within Done at a different index", async () => {
+  // Catches stamping a fresh completedAt whenever the destination column is terminal, without
+  // checking whether the card was already completed. Source and destination are both "completed"
+  // here, only the index differs, so the early-return-on-identical-drop guard does not apply and
+  // this code path runs. The server's move_task_to_column only calls completeTask/reopenTask when
+  // terminal-ness actually changes, so an unconditional stamp here would optimistically jump the
+  // card to the top of Done's newest-first sort and then snap back once the props resync landed —
+  // a flash the user did not cause (Task 10 review, round 2).
+  const ORIGINAL_COMPLETED_AT = "2026-08-20T00:00:00.000Z";
+  const merged = mergeColumns(columnsWithDone);
+  const other = task({
+    id: "c0000000-0000-4000-8000-000000000008",
+    boardColumnId: COL_H_DONE,
+    completedAt: "2026-08-25T00:00:00.000Z",
+  });
+  let tasks: BoardTask[] = [
+    task({ id: T1, boardColumnId: COL_H_DONE, completedAt: ORIGINAL_COMPLETED_AT }),
+    other,
+  ];
+  const setLocalTasks = jest.fn((updater: (prev: BoardTask[]) => BoardTask[]) => {
+    tasks = updater(tasks);
+  });
+
+  const call = buildBoardDragEndHandler({
+    merged,
+    groupedByKey: { completed: [tasks[0], other], "not started": [], "in progress": [] },
+    memberIdByWorkspaceId: { [WS_H]: M_H },
+    setLocalTasks,
+    onError: jest.fn(),
+  });
+
+  await call(
+    drop({
+      source: { droppableId: "completed", index: 0 },
+      destination: { droppableId: "completed", index: 1 },
+    })
+  );
+
+  expect(tasks.find((t) => t.id === T1)?.completedAt).toBe(ORIGINAL_COMPLETED_AT);
+});
+
 it("restores completedAt on rollback when the server refuses a drop into Done", async () => {
   // Catches a rollback that restores boardColumnId and memberSortKey but not completedAt: the card
   // would then sit back in its old column while still marked completed, contradicting its own pill.
