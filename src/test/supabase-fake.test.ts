@@ -296,3 +296,41 @@ describe("delete_board_column", () => {
     expect((t.board_columns as Row[])).toHaveLength(1);
   });
 });
+
+describe("query filters — not() and lt()", () => {
+  function rows(): Row[] {
+    return [
+      { id: "1", completed_at: null },
+      { id: "2", completed_at: "2026-06-01T00:00:00.000Z" },
+      { id: "3", completed_at: "2026-08-01T00:00:00.000Z" },
+    ];
+  }
+
+  it("not('col', 'is', null) excludes rows where the column is null", async () => {
+    const fake = createFakeSupabase({ tables: { widgets: rows() } });
+
+    const { data } = await fake.from("widgets").select().not("completed_at", "is", null);
+
+    expect((data as Row[]).map((r) => r.id).sort()).toEqual(["2", "3"]);
+  });
+
+  it("lt('col', value) keeps only rows strictly less than the value", async () => {
+    const fake = createFakeSupabase({ tables: { widgets: rows() } });
+
+    const { data } = await fake
+      .from("widgets")
+      .select()
+      .not("completed_at", "is", null)
+      .lt("completed_at", "2026-07-01T00:00:00.000Z");
+
+    expect((data as Row[]).map((r) => r.id)).toEqual(["2"]);
+  });
+
+  it("not() rejects an operator this fake does not implement", async () => {
+    const fake = createFakeSupabase({ tables: { widgets: rows() } });
+
+    expect(() => fake.from("widgets").select().not("completed_at", "eq", null)).toThrow(
+      /unsupported not\(\) operator/
+    );
+  });
+});
