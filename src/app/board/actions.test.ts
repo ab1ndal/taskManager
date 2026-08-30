@@ -11,6 +11,7 @@ import {
   deleteBoardColumn,
   listTasksInColumn,
   renameBoardColumn,
+  reorderBoardColumn,
   setBoardColumnColor,
 } from "./actions";
 
@@ -26,6 +27,7 @@ const COL_DONE = "e0000000-0000-4000-8000-00000000000d";
 const COL_WS2 = "e0000000-0000-4000-8000-00000000000f";
 const T1 = "c0000000-0000-4000-8000-000000000001";
 const T2 = "c0000000-0000-4000-8000-000000000002";
+const T3 = "c0000000-0000-4000-8000-000000000003";
 
 /** WS1 has three columns and two tasks in COL_A; WS2 exists so cross-workspace cases are real. */
 function seed(): Tables {
@@ -156,6 +158,26 @@ it("returns an empty list for a column with no tasks", async () => {
   expect(await listTasksInColumn({ columnId: COL_B })).toEqual({ ok: true, tasks: [] });
 });
 
+it("includes a task the caller has no assignment for, sorted last", async () => {
+  const tables = seed();
+  (tables.tasks as Row[]).push({
+    id: T3,
+    workspace_id: WS1,
+    parent_task_id: null,
+    completed_at: null,
+    title: "Nobody's task",
+    board_column_id: COL_A,
+  });
+  // Deliberately no task_assignments row for T3/M1: the caller isn't assigned to it.
+  setup({ tables });
+
+  const result = await listTasksInColumn({ columnId: COL_A });
+
+  expect(result.ok).toBe(true);
+  const tasks = (result as { ok: true; tasks: { id: string }[] }).tasks;
+  expect(tasks.map((t) => t.id)).toEqual([T1, T2, T3]);
+});
+
 // ─── deleteBoardColumn ───────────────────────────────────────────────────────
 
 it("applies each task's own destination and removes the column", async () => {
@@ -216,6 +238,19 @@ it("refuses to delete a column in another workspace", async () => {
   await expectFailure(deleteBoardColumn({ columnId: COL_WS2, moves: [] }), "not a member of workspace");
 });
 
+it("refuses to delete the workspace's last non-terminal column", async () => {
+  const tables = seed();
+  // Drop COL_B so WS1 has exactly one non-terminal column (COL_A) left, plus the terminal COL_DONE.
+  tables.board_columns = (tables.board_columns as Row[]).filter((c) => c.id !== COL_B);
+  const fake = setup({ tables });
+
+  await expectFailure(
+    deleteBoardColumn({ columnId: COL_A, moves: [] }),
+    "cannot delete the last non-terminal column of workspace"
+  );
+  expect(columnsIn(fake.tables).some((c) => c.id === COL_A)).toBe(true);
+});
+
 it("collapses an rpc failure we did not author to the generic message, without leaking its text", async () => {
   const fake = setup();
   const leaked = "permission denied for table board_columns";
@@ -231,4 +266,24 @@ it("collapses an rpc failure we did not author to the generic message, without l
   expect(JSON.stringify(result)).not.toContain("permission denied");
   expect(logged).toHaveBeenCalledWith(expect.stringContaining(leaked));
   logged.mockRestore();
+});
+
+// ─── reorderBoardColumn ──────────────────────────────────────────────────────
+
+it("writes the midpoint position between two neighbours", async () => {
+  const fake = setup();
+
+  const result = await reorderBoardColumn({ columnId: COL_A, prevPosition: 2000, nextPosition: 3000 });
+
+  expect(result.ok).toBe(true);
+  expect(columnsIn(fake.tables).find((c) => c.id === COL_A)!.position).toBe(2500);
+});
+
+it("does nothing when there is no neighbour on either side", async () => {
+  const fake = setup();
+
+  const result = await reorderBoardColumn({ columnId: COL_A, prevPosition: null, nextPosition: null });
+
+  expect(result.ok).toBe(true);
+  expect(columnsIn(fake.tables).find((c) => c.id === COL_A)!.position).toBe(1000);
 });
