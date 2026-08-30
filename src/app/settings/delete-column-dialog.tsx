@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { deleteBoardColumn, listTasksInColumn, type ColumnTask } from "@/app/board/actions";
 import type { BoardColumn } from "@/app/board/group-columns";
@@ -41,32 +41,44 @@ export function DeleteColumnDialog({
     [...siblings].sort((a, b) => a.position - b.position)[0]?.id ??
     "";
 
+  // Every load claims a generation. A response whose generation is no longer current belongs to a
+  // superseded load or to an unmounted dialog, and is discarded rather than written to state.
+  const generationRef = useRef(0);
+
   const load = useCallback(() => {
+    const generation = ++generationRef.current;
+
     return listTasksInColumn({ columnId: column.id }).then((result) => {
+      if (generation !== generationRef.current) return false;
+
       if (!result.ok) {
         toast(result.error ?? "Could not load this column's tasks", "error");
         onClose();
-        return;
+        return false;
       }
 
       setTasks(result.tasks);
       setTargetByTaskId(Object.fromEntries(result.tasks.map((task) => [task.id, defaultTarget])));
+      return true;
     });
   }, [column.id, defaultTarget, onClose]);
 
   useEffect(() => {
     void load();
+    // Bumping the generation on unmount (and before a re-run) retires whatever load is in flight.
+    return () => {
+      generationRef.current += 1;
+    };
   }, [load]);
 
   async function confirm() {
-    if (!tasks) return;
+    if (!tasks || busy) return;
 
     setBusy(true);
     const result = await deleteBoardColumn({
       columnId: column.id,
       moves: tasks.map((task) => ({ taskId: task.id, targetColumnId: targetByTaskId[task.id] })),
     });
-    setBusy(false);
 
     if (result.ok) {
       onDeleted();
@@ -75,12 +87,15 @@ export function DeleteColumnDialog({
 
     // The RPC's coverage check failed: someone changed the column while this dialog was open. Show
     // what is actually there now rather than deleting a column whose contents were never seen.
+    // `busy` stays true across the reload, so a second click cannot confirm against the old list.
     if (result.error?.includes("changed since it was listed")) {
       toast("This column changed — check the list and try again.", "error");
-      void load();
+      const applied = await load();
+      if (applied) setBusy(false);
       return;
     }
 
+    setBusy(false);
     toast(result.error ?? "Could not delete the column", "error");
   }
 
