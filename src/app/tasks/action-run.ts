@@ -20,11 +20,13 @@ export async function run<T extends object>(
   try {
     return { ok: true, ...(await body()) };
   } catch (error) {
-    if (
-      error instanceof ValidationError ||
-      error instanceof ForbiddenError ||
-      error instanceof UnauthorizedError
-    ) {
+    if (error instanceof ValidationError) {
+      // fieldErrors is `{}` for a hand-thrown ValidationError with no per-field detail (e.g. an
+      // authorization-shaped check that still wants the ValidationError message-passthrough
+      // behaviour) — forwarding it unconditionally is harmless since callers treat it as optional.
+      return { ok: false, error: error.message, fieldErrors: error.fieldErrors };
+    }
+    if (error instanceof ForbiddenError || error instanceof UnauthorizedError) {
       return { ok: false, error: error.message };
     }
 

@@ -70,11 +70,11 @@ it("does not submit a blank name", async () => {
   expect(createBoardColumn).not.toHaveBeenCalled();
 });
 
-it("toasts and does not refresh or clear the field when adding fails", async () => {
+it("toasts and does not refresh or clear the field when adding fails generically", async () => {
   // Mutation this catches: swallowing a failed createBoardColumn result and refreshing/clearing
   // anyway — the assertions on mockRefresh and the input's value would both still pass a mutant
   // that dropped the `if (!result.ok) return;` early exit only if this test didn't check them.
-  (createBoardColumn as jest.Mock).mockResolvedValue({ ok: false, error: "Name already used" });
+  (createBoardColumn as jest.Mock).mockResolvedValue({ ok: false, error: "Something went wrong" });
   render(
     <BoardColumnsEditor workspaceId="ws-1" workspaceName="Household" columns={[notStarted]} />
   );
@@ -83,19 +83,39 @@ it("toasts and does not refresh or clear the field when adding fails", async () 
   await userEvent.type(input, "Waiting");
   await userEvent.click(screen.getByRole("button", { name: "Add" }));
 
-  expect(toast).toHaveBeenCalledWith("Name already used", "error");
+  expect(toast).toHaveBeenCalledWith("Something went wrong", "error");
   expect(mockRefresh).not.toHaveBeenCalled();
   expect(input).toHaveValue("Waiting");
 });
 
-it("counts non-terminal siblings per row, excluding the row itself and the done column", () => {
-  // Mutation this catches: computing the count from `columns.length` (a whole-array size, the
-  // brief's original wrong guard) instead of filtering out both the row itself and terminal
-  // columns — with two non-terminal columns plus one done column, a length-based mutant would
-  // report 3 or 2 for every row instead of 1 for each non-terminal row and (irrelevantly) for the
-  // done row, so "Not Started" and "In Progress" would wrongly show their delete button enabled
-  // OR disabled depending on the miscount, and this fixture is built so only the correct formula
-  // lands on 1.
+it("shows a field-level error and keeps the typed name on a name collision, without a toast", async () => {
+  // Mutation this catches: routing a `fieldErrors.name` failure through the generic toast branch
+  // instead of the field-error branch — the toast assertion (`not.toHaveBeenCalled`) and the
+  // on-screen error text would both fail on a mutant that dropped the `fieldError` check.
+  (createBoardColumn as jest.Mock).mockResolvedValue({
+    ok: false,
+    error: "That name is already used in this workspace",
+    fieldErrors: { name: ["That name is already used in this workspace"] },
+  });
+  render(
+    <BoardColumnsEditor workspaceId="ws-1" workspaceName="Household" columns={[notStarted]} />
+  );
+
+  const input = screen.getByLabelText("New column name for Household");
+  await userEvent.type(input, "Not Started");
+  await userEvent.click(screen.getByRole("button", { name: "Add" }));
+
+  expect(screen.getByText("That name is already used in this workspace")).toBeInTheDocument();
+  expect(toast).not.toHaveBeenCalled();
+  expect(input).toHaveValue("Not Started");
+  expect(mockRefresh).not.toHaveBeenCalled();
+});
+
+it("keeps non-terminal columns' delete enabled when a sibling exists, and the done column always enabled", () => {
+  // This checks the happy-path outcome only: a `columns.length`-based miscount would also leave
+  // every button here enabled (three columns total is still nonzero for every row), so it cannot
+  // by itself distinguish the correct exclude-self-and-done formula from that bug — the sole-column
+  // case below is what actually catches it.
   render(
     <BoardColumnsEditor
       workspaceId="ws-1"
@@ -104,21 +124,36 @@ it("counts non-terminal siblings per row, excluding the row itself and the done 
     />
   );
 
-  expect(screen.getByRole("button", { name: "Delete Not Started" })).not.toBeDisabled();
-  expect(screen.getByRole("button", { name: "Delete In Progress" })).not.toBeDisabled();
-  // The done column is never blocked by this rule regardless of count.
-  expect(screen.getByRole("button", { name: "Delete Completed" })).not.toBeDisabled();
+  expect(screen.getByRole("button", { name: "Delete Not Started" })).not.toHaveAttribute("aria-disabled");
+  expect(screen.getByRole("button", { name: "Delete In Progress" })).not.toHaveAttribute("aria-disabled");
+  expect(screen.getByRole("button", { name: "Delete Completed" })).not.toHaveAttribute("aria-disabled");
 });
 
 it("disables delete on the sole non-terminal column even when a done column also exists", () => {
-  // Mutation this catches: a guard that counts the done column as a "sibling" that keeps delete
-  // enabled — done columns must not count, so with only one non-terminal column and one done
-  // column, deleting the non-terminal one must still be blocked.
+  // Mutation this catches: a guard that counts the done column as a countable sibling, or one
+  // computed from `columns.length` without excluding self/done — either way count would be nonzero
+  // here (2 total columns), so delete would wrongly stay enabled instead of guarded.
   render(
     <BoardColumnsEditor workspaceId="ws-1" workspaceName="Household" columns={[notStarted, done]} />
   );
 
-  expect(screen.getByRole("button", { name: "Delete Not Started" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Delete Not Started" })).toHaveAttribute("aria-disabled", "true");
+});
+
+it("treats a guarded delete click as a no-op instead of opening the dialog", async () => {
+  // Mutation this catches: using the disabled attribute (or omitting the onClick guard) — with
+  // aria-disabled + a no-op handler, a click must not flip `confirmingDelete`, which this proves by
+  // asserting the dialog's own content never appears. A regression back to a real `disabled`
+  // attribute would still pass this particular click assertion, which is why Important-3's fix is
+  // also checked directly against the button's attributes in the sibling test above.
+  render(
+    <BoardColumnsEditor workspaceId="ws-1" workspaceName="Household" columns={[notStarted, done]} />
+  );
+
+  const deleteButton = screen.getByRole("button", { name: "Delete Not Started" });
+  await userEvent.click(deleteButton);
+
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 it("has no accessibility violations", async () => {

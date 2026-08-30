@@ -76,8 +76,12 @@ function setup(options: { tables?: Tables; user?: { id: string } | null; failOn?
  * resolved value. `expected` is matched as a substring of the message.
  */
 async function expectFailure(promise: Promise<{ ok: boolean }>, expected: string) {
+  // objectContaining, not toEqual: a ValidationError now also carries an (often empty)
+  // `fieldErrors` object (see action-run.ts), which these call sites are not asserting on.
   const result = await promise;
-  expect(result).toEqual({ ok: false, error: expect.stringContaining(expected) });
+  expect(result).toEqual(
+    expect.objectContaining({ ok: false, error: expect.stringContaining(expected) })
+  );
 }
 
 const tasksIn = (t: Tables) => t.tasks as Row[];

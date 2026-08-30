@@ -61,7 +61,11 @@ const keyFor = (t: Tables, id: string) =>
   (t.task_assignments as Row[]).find((r) => r.task_id === id && r.member_id === M1)!.member_sort_key;
 
 async function expectFailure(promise: Promise<{ ok: boolean }>, expected: string) {
-  expect(await promise).toEqual({ ok: false, error: expect.stringContaining(expected) });
+  // objectContaining, not toEqual: a ValidationError now also carries an (often empty)
+  // `fieldErrors` object (see action-run.ts), which these call sites are not asserting on.
+  expect(await promise).toEqual(
+    expect.objectContaining({ ok: false, error: expect.stringContaining(expected) })
+  );
 }
 
 // ─── moveTaskToColumn ────────────────────────────────────────────────────────

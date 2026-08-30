@@ -144,7 +144,10 @@ describe("setTaskRecurrence", () => {
 
     const result = await setTaskRecurrence({ ...validInput, taskId: SUB1 });
 
-    expect(result).toEqual({ ok: false, error: expect.stringContaining("subtask") });
+    // objectContaining: this is a ValidationError, which now also carries `fieldErrors`.
+    expect(result).toEqual(
+      expect.objectContaining({ ok: false, error: expect.stringContaining("subtask") })
+    );
     expect(rpcSpy).not.toHaveBeenCalled();
   });
 });

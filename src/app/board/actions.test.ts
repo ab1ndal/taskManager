@@ -70,7 +70,11 @@ const columnsIn = (t: Tables) => t.board_columns as Row[];
 const tasksIn = (t: Tables) => t.tasks as Row[];
 
 async function expectFailure(promise: Promise<{ ok: boolean }>, expected: string) {
-  expect(await promise).toEqual({ ok: false, error: expect.stringContaining(expected) });
+  // objectContaining, not toEqual: a ValidationError now also carries an (often empty)
+  // `fieldErrors` object (see action-run.ts), which these call sites are not asserting on.
+  expect(await promise).toEqual(
+    expect.objectContaining({ ok: false, error: expect.stringContaining(expected) })
+  );
 }
 
 // ─── createBoardColumn ───────────────────────────────────────────────────────
@@ -127,7 +131,8 @@ it("surfaces a field-level error for a name collision, not the generic message",
   // Mutation this catches: falling back to action-run's generic message on any update failure
   // (dropping the `error.code === "23505"` branch) would make this assert `GENERIC_ERROR` instead
   // of a specific, actionable message — the two strings differ, so a mutant collapsing the branch
-  // fails this immediately.
+  // fails this immediately. The `fieldErrors.name` assertion additionally catches throwing a plain
+  // `Error` instead of a `ValidationError` (message would match but `fieldErrors` would be absent).
   const fake = setup({
     failOn: (table, op) =>
       table === "board_columns" && op === "update"
@@ -137,10 +142,34 @@ it("surfaces a field-level error for a name collision, not the generic message",
 
   const result = await renameBoardColumn({ columnId: COL_A, name: "In Progress" });
 
-  expect(result).toEqual({ ok: false, error: expect.stringContaining("already used") });
+  expect(result).toEqual(
+    expect.objectContaining({ ok: false, error: expect.stringContaining("already used") })
+  );
   if (result.ok) throw new Error("expected failure");
   expect(result.error).not.toBe(GENERIC_ERROR);
+  expect(result.fieldErrors).toEqual({ name: [expect.stringContaining("already used")] });
   expect(columnsIn(fake.tables).find((c) => c.id === COL_A)!.name).toBe("Blocked");
+});
+
+it("surfaces the same field-level error for createBoardColumn on a name collision", async () => {
+  // Mutation this catches: lifting the message but not the ValidationError/fieldErrors channel for
+  // create (e.g. still throwing a plain Error on 23505 here) — the disclosed gap from round 1.
+  const fake = setup({
+    failOn: (table, op) =>
+      table === "board_columns" && op === "insert"
+        ? { message: 'duplicate key value violates unique constraint "board_columns_workspace_name_key"', code: "23505" }
+        : null,
+  });
+
+  const result = await createBoardColumn({ workspaceId: WS1, name: "Blocked", color: "tab20-cyan" });
+
+  expect(result).toEqual(
+    expect.objectContaining({ ok: false, error: expect.stringContaining("already used") })
+  );
+  if (result.ok) throw new Error("expected failure");
+  expect(result.error).not.toBe(GENERIC_ERROR);
+  expect(result.fieldErrors).toEqual({ name: [expect.stringContaining("already used")] });
+  expect(columnsIn(fake.tables).filter((c) => c.name === "Blocked")).toHaveLength(1);
 });
 
 // ─── setBoardColumnColor ─────────────────────────────────────────────────────

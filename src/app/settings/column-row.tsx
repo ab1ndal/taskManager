@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { CheckCircle2, Trash2 } from "lucide-react";
 
 import { renameBoardColumn, setBoardColumnColor } from "@/app/board/actions";
@@ -34,32 +34,59 @@ export function ColumnRow({
   onDeleted: () => void;
 }) {
   const [name, setName] = useState(column.name);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [color, setColor] = useState<Tab20Slug>(column.color);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const captionId = useId();
 
+  // The value the server currently holds, tracked separately from `column.name`/`column.color`
+  // (frozen at this row's mount) so a rollback restores what actually saved last, not a stale
+  // initial prop. Refs, not state: a fast, later save must win even if an earlier, slower save's
+  // failure resolves after it — reading a ref at that moment always sees the latest success.
+  const lastGoodNameRef = useRef(column.name);
+  const lastGoodColorRef = useRef<Tab20Slug>(column.color);
+
   const deleteDisabled = !column.isDone && nonTerminalSiblingCount === 0;
 
   async function saveName() {
-    const trimmed = name.trim();
-    if (trimmed === column.name) return;
+    const attempted = name.trim();
+    if (attempted === lastGoodNameRef.current) return;
 
-    const result = await renameBoardColumn({ columnId: column.id, name: trimmed });
-    if (!result.ok) {
-      setName(column.name);
-      toast(result.error ?? "Could not rename the column", "error");
+    const result = await renameBoardColumn({ columnId: column.id, name: attempted });
+    if (result.ok) {
+      lastGoodNameRef.current = attempted;
+      setNameError(null);
+      return;
     }
+
+    const fieldError = result.fieldErrors?.name?.[0];
+    if (fieldError) {
+      // A field-level error (the name collision case): keep exactly what the user typed, editable
+      // in place, with the reason attached to the input — not a toast that vanishes and a wiped
+      // field the brief specifically asked not to lose.
+      setNameError(fieldError);
+      return;
+    }
+
+    setNameError(null);
+    toast(result.error ?? "Could not rename the column", "error");
+    // Only undo if nothing newer has been typed/saved since this attempt — a faster, later rename
+    // may have already replaced it, and this stale failure must not clobber that.
+    setName((current) => (current === attempted ? lastGoodNameRef.current : current));
   }
 
   async function saveColor(slug: Tab20Slug) {
-    const previous = color;
-    setColor(slug);
+    const attempted = slug;
+    setColor(attempted);
 
-    const result = await setBoardColumnColor({ columnId: column.id, color: slug });
-    if (!result.ok) {
-      setColor(previous);
-      toast(result.error ?? "Could not change the colour", "error");
+    const result = await setBoardColumnColor({ columnId: column.id, color: attempted });
+    if (result.ok) {
+      lastGoodColorRef.current = attempted;
+      return;
     }
+
+    toast(result.error ?? "Could not change the colour", "error");
+    setColor((current) => (current === attempted ? lastGoodColorRef.current : current));
   }
 
   return (
@@ -69,13 +96,26 @@ export function ColumnRow({
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <input
           aria-label="Column name"
-          aria-describedby={column.isDone ? `${captionId}-done` : undefined}
+          aria-describedby={
+            [column.isDone ? `${captionId}-done` : null, nameError ? `${captionId}-name-error` : null]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
+          aria-invalid={nameError ? true : undefined}
           value={name}
           maxLength={40}
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => {
+            setName(event.target.value);
+            if (nameError) setNameError(null);
+          }}
           onBlur={saveName}
           className="min-h-11 rounded-sm border border-transparent bg-transparent px-2 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-border)]"
         />
+        {nameError && (
+          <span id={`${captionId}-name-error`} className="px-2 text-xs text-[var(--color-danger-text)]">
+            {nameError}
+          </span>
+        )}
         {column.isDone && (
           <span
             id={`${captionId}-done`}
@@ -90,11 +130,20 @@ export function ColumnRow({
       <button
         type="button"
         aria-label={`Delete ${column.name}`}
+        aria-disabled={deleteDisabled || undefined}
         aria-describedby={deleteDisabled ? `${captionId}-guard` : undefined}
-        disabled={deleteDisabled}
-        onClick={() => setConfirmingDelete(true)}
+        onClick={() => {
+          // aria-disabled, not the disabled attribute: a disabled button drops out of the tab
+          // order and stops the `title` tooltip from rendering, which is exactly what made the
+          // guard's rationale unreachable to every user — mouse or keyboard. Staying focusable and
+          // handling the click as a no-op keeps both channels live.
+          if (deleteDisabled) return;
+          setConfirmingDelete(true);
+        }}
         title={deleteDisabled ? "A workspace needs at least one active column" : undefined}
-        className="flex min-h-11 min-w-11 items-center justify-center rounded-sm text-[var(--color-danger-text)] hover:bg-[var(--color-danger-surface)] disabled:pointer-events-none disabled:opacity-40"
+        className={`flex min-h-11 min-w-11 items-center justify-center rounded-sm text-[var(--color-danger-text)] ${
+          deleteDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-[var(--color-danger-surface)]"
+        }`}
       >
         <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
         {deleteDisabled && (
