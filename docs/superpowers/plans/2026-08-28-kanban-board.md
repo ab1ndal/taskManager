@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Development order is fixed by `CLAUDE.md`: schema and migrations → RLS → API routes/actions → UI components → tests → polish. Tasks below are ordered accordingly.
-- Migrations are append-only and numbered: the next free numbers are `015` and `016`. Never edit an applied migration.
+- Migrations are append-only and numbered: this feature uses `015` (schema), `016` (Task 1 review fixes), and `017` (RPCs). Never edit an applied migration.
 - No local Postgres exists in this environment. Every migration is dry-run against the **dev** Supabase project inside `BEGIN … ROLLBACK` before being applied. Dev and production are separate projects at different migration levels; state which one you touched.
 - **Applying a migration is `supabase db push`, never `psql -f`.** `tasks/lessons.md` L9: an out-of-band apply leaves `supabase_migrations.schema_migrations` disagreeing with the schema, and every later push inherits that. Verify with `supabase migration list --linked` afterwards. psql is used only for the rolled-back dry-run, which commits nothing.
 - The dev connection for dry-runs is built at run time from `.env.local`; nothing is written to a file. Prepend this to any dry-run command:
@@ -38,7 +38,7 @@ The direct host `db.<ref>.supabase.co` is IPv6-only and unreachable here, and th
 
 **Created:**
 - `supabase/migrations/015_board_columns.sql` — table, RLS, seeding trigger, backfill, `tasks.board_column_id`
-- `supabase/migrations/016_board_column_rpcs.sql` — `move_task_to_column`, `delete_board_column`
+- `supabase/migrations/017_board_column_rpcs.sql` — `move_task_to_column`, `delete_board_column`
 - `src/app/board/colors.ts` — the 20 tab20 slugs, the 5 default columns; no dependencies
 - `src/app/board/schemas.ts` — Zod contracts for every board action
 - `src/app/board/group-columns.ts` — pure grouping: merge-by-name, task→column bucketing, done-window filter, drop-target resolution
@@ -453,8 +453,10 @@ without someone choosing where it goes."
 
 ### Task 2: RPCs — `move_task_to_column` and `delete_board_column`
 
+**Migration number is `017`, not `016`:** Task 1's review found two defects that need their own follow-up migration, which takes `016`. See ledger rulings R7 and R8.
+
 **Files:**
-- Create: `supabase/migrations/016_board_column_rpcs.sql`
+- Create: `supabase/migrations/017_board_column_rpcs.sql`
 
 **Interfaces:**
 - Consumes: `public.board_columns`, `public.tasks.board_column_id` (Task 1).
@@ -464,7 +466,7 @@ without someone choosing where it goes."
 
 - [ ] **Step 1: Write the migration**
 
-Create `supabase/migrations/016_board_column_rpcs.sql`:
+Create `supabase/migrations/017_board_column_rpcs.sql`:
 
 ```sql
 -- Two board operations that span tables, so neither can be a sequence of PostgREST calls.
@@ -592,15 +594,19 @@ begin
     raise exception 'board column % not found', p_column_id;
   end if;
 
-  -- A workspace with no columns cannot hold a task: migration 015 requires every root task to have
-  -- one, so an empty workspace would reject its next insert.
+  -- A workspace with no NON-TERMINAL column cannot hold a new task: migration 015 requires every
+  -- root task to have a column, and createTaskWithSubtasks picks the leftmost non-terminal one, so
+  -- a workspace left with only its Completed column rejects every task insert. Counting all columns
+  -- is not enough — that was Task 1's review finding, and migration 016 enforces the same rule with
+  -- a before-delete trigger for the direct-DELETE path.
   select count(*) into v_remaining
   from public.board_columns
   where workspace_id = v_workspace_id
-    and id <> p_column_id;
+    and id <> p_column_id
+    and not is_done;
 
   if v_remaining = 0 then
-    raise exception 'cannot delete the last column of workspace %', v_workspace_id;
+    raise exception 'cannot delete the last non-terminal column of workspace %', v_workspace_id;
   end if;
 
   if jsonb_typeof(p_moves) is distinct from 'array' then
@@ -655,7 +661,7 @@ grant execute on function public.delete_board_column(uuid, jsonb) to service_rol
 ```bash
 psql "$DEV_DB" -v ON_ERROR_STOP=1 <<'SQL'
 begin;
-\i supabase/migrations/016_board_column_rpcs.sql
+\i supabase/migrations/017_board_column_rpcs.sql
 
 -- A move into a column of another workspace must be refused.
 do $$
@@ -718,7 +724,7 @@ Expected: `db push` applies `016`; the listing then shows `016` on both sides.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add supabase/migrations/016_board_column_rpcs.sql
+git add supabase/migrations/017_board_column_rpcs.sql
 git commit -m "feat(board): add move and delete RPCs for board columns
 
 A drop writes the shared column on tasks and the dragger's own sort key
@@ -876,7 +882,7 @@ describe("delete_board_column", () => {
     expect((t.tasks as Row[])[0].board_column_id).toBe(COL_A);
   });
 
-  it("refuses deleting the workspace's last column", async () => {
+  it("refuses deleting the workspace's last non-terminal column", async () => {
     const t = tables();
     t.board_columns = [(t.board_columns as Row[])[0]];
     (t.tasks as Row[]).forEach((task) => (task.board_column_id = COL_A));
@@ -890,7 +896,7 @@ describe("delete_board_column", () => {
       ],
     });
 
-    expect(error?.message).toMatch(/last column/);
+    expect(error?.message).toMatch(/last non-terminal column/);
     expect((t.board_columns as Row[])).toHaveLength(1);
   });
 });
@@ -906,7 +912,7 @@ Expected: FAIL — `unknown rpc: move_task_to_column`.
 In `src/test/supabase-fake.ts`, insert before the `return { data: null, error: { message: \`unknown rpc: ${fnName}\` } };` line:
 
 ```ts
-      // Mirrors migration 016: the shared column on tasks and the caller's own sort key move
+      // Mirrors migration 017: the shared column on tasks and the caller's own sort key move
       // together, with the same key arithmetic reorderTask uses.
       if (fnName === "move_task_to_column") {
         const taskId = params.p_task_id as string;
@@ -958,7 +964,7 @@ In `src/test/supabase-fake.ts`, insert before the `return { data: null, error: {
         return { data: null, error: null };
       }
 
-      // Mirrors migration 016: p_moves must name exactly the tasks currently in the column, so a
+      // Mirrors migration 017: p_moves must name exactly the tasks currently in the column, so a
       // stale dialog is refused rather than relocating a task nobody chose a destination for.
       if (fnName === "delete_board_column") {
         const columnId = params.p_column_id as string;
@@ -971,10 +977,12 @@ In `src/test/supabase-fake.ts`, insert before the `return { data: null, error: {
         const siblings = columns.filter(
           (c) => c.workspace_id === column.workspace_id && c.id !== columnId
         );
-        if (siblings.length === 0) {
+        if (siblings.filter((c) => !c.is_done).length === 0) {
           return {
             data: null,
-            error: { message: `cannot delete the last column of workspace ${column.workspace_id}` },
+            error: {
+              message: `cannot delete the last non-terminal column of workspace ${column.workspace_id}`,
+            },
           };
         }
 
