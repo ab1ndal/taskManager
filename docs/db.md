@@ -61,6 +61,39 @@ cannot double-create.
 Deleting the task deletes the rule. That is how a recurrence is stopped for good.
 All schedule arithmetic runs in America/Los_Angeles.
 
+### board_columns
+
+id uuid primary key
+workspace_id uuid not null, references workspaces(id) on delete cascade
+
+name text not null
+color text not null                tab20 slug, e.g. tab20-blue
+position numeric not null
+is_done boolean not null
+
+created_at timestamptz not null
+
+Notes
+Columns belong to a workspace and are shared by everyone in it. Any member may add, rename,
+recolour or delete one, and the change is immediately everyone's.
+
+At most one is_done column per workspace, enforced by a partial unique index. That column is the
+terminal one: a task dragged there is completed, and a completed task always renders there.
+
+Names are unique per workspace case-insensitively (board_columns_workspace_name_key over
+(workspace_id, lower(name))). The all-workspaces board merges columns across workspaces by
+lower(name), so two workspaces both having "In Progress" produce one column on screen — the
+uniqueness rule is what keeps that merge unambiguous within a workspace.
+
+color is checked against the twenty tab20 slugs. That list is duplicated in
+src/app/board/colors.ts (TAB20_SLUGS) and in the check constraint; the two must change together.
+
+position orders the columns and is spaced by 1000 so a column can be inserted between two others
+without renumbering. Positions need not be unique; the board sorts by (position, name).
+
+A new workspace gets five columns from a seed trigger: Not Started, In Progress, Blocked,
+Follow-up, Completed (the last is_done).
+
 ### tasks
 
 id uuid primary key
@@ -74,11 +107,25 @@ description text nullable
 due_at timestamptz nullable
 completed_at timestamptz nullable
 
+board_column_id uuid nullable, references board_columns(id) on delete restrict
+
 created_by_member_id uuid nullable
 created_at timestamptz not null
 
 Notes
 Subtasks are rows with parent_task_id set.
+
+Every root task sits in a board column and no subtask does:
+check ((parent_task_id is null) = (board_column_id is not null)). Subtasks appear only inside their
+parent, so the board never has to place one.
+
+The board_column_id FK is on delete restrict, deliberately: a column can only be removed through
+delete_board_column, which reassigns every task in it first. There is no path that silently drops a
+task's column, and no cascade that would delete tasks along with a column.
+
+Completion is not stored twice. completed_at remains the single fact; the board derives a completed
+task's placement from it, which is why a completed task shows in the terminal column whatever
+board_column_id it still carries.
 
 A workspace is recorded once per task tree, on the root task. Migration 011 enforces
 check ((parent_task_id is null) = (workspace_id is not null)), so a subtask cannot carry a workspace
@@ -126,7 +173,8 @@ Audio is never stored.
 
 Indexes should exist on:
 
-tasks.workspace_id, tasks.parent_task_id
+tasks.workspace_id, tasks.parent_task_id, tasks.board_column_id
+board_columns.(workspace_id, position)
 task_assignments.member_id, task_assignments.member_sort_key
 task_rules.next_run_at (partial, where is_active)
 task_updates.task_id, task_updates.created_at

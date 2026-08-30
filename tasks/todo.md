@@ -67,6 +67,22 @@ all closed 2026-07-27. Full write-ups in `06.5-FOLLOWUPS.md`.
   land at the end via `createBoardColumn`'s own placement. Wiring a second `DragDropContext` (the
   board already has one, for cards) is separable work, not built here per the task-12 brief.
 
+## Follow-ups from the kanban board branch (`feat/kanban-board`, 2026-08-30)
+
+- **Column reordering is not wired up.** `position` is respected everywhere and `reorderBoardColumn`
+  (`src/app/board/actions.ts`) exists and is action-tested, but no drag handle calls it. New columns
+  land at the end of the list. Wiring it means a second `DragDropContext` in
+  `src/app/settings/board-columns-editor.tsx`; separable work, deliberately out of the board slice.
+- **Keyboard drag cannot reach a column that is scrolled out of view.** `@hello-pangea/dnd`'s
+  cross-axis keyboard move stops at the last visible column, so on a 1280px-wide window the terminal
+  column is unreachable from the keyboard once five columns are defined. `e2e/board.spec.ts` widens
+  the viewport to keep its drag test about the drop. A fix is either auto-scrolling the strip on a
+  cross-axis move or a keyboard "move to column…" affordance.
+- **The board's drop write is fire-and-forget.** Navigating away immediately after a drop aborts the
+  in-flight server action and the move is lost with no error — the card was only ever placed
+  optimistically. Reproduced in the e2e run (webkit, firefox and mobile Safari) before the test was
+  reordered to wait for the write.
+
 ## Still open from earlier phases
 
 - Phase 04 — the real-device address-bar-collapse check (U7) needs an actual phone; leaked-password

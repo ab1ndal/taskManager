@@ -129,6 +129,17 @@ it, repair immediately: `supabase migration repair --status applied <version>`. 
 `SUPABASE_DB_PASSWORD` on this project; the CLI's passwordless login-role fallback fails with
 "permission denied to alter role".
 
+**Detection and recovery, used again on 2026-08-29 (kanban board, migrations 015-021).** It happened
+again despite the rule above, so the procedure matters more than a stronger prohibition:
+
+1. Detect by inspecting the objects, not the history table: `pg_policies`, `pg_proc`, `pg_indexes`
+   and `information_schema.columns` say what the database actually has. Compare that against the
+   migration files, one file at a time, oldest first.
+2. Establish parity with the last migration that is both applied and recorded: drop or re-create the
+   objects the out-of-band statements left behind so the schema matches that file exactly.
+3. Re-apply forward with `supabase db push`, which then records every version it runs.
+4. Confirm with `supabase migration list --linked` — local and remote columns must match.
+
 **Second rule, learned the hard way here:** a lesson that records a broken state must be re-verified
 before it is acted on, not quoted. `migration list --linked` is one command and would have shown the
 truth immediately.
@@ -328,3 +339,26 @@ raises confidence in the design, not in the transcription — every plan-to-code
 same review a from-scratch implementation would get, and "tests pass" is a different claim from
 "the code is correct," especially for logic a jsdom/jest suite cannot exercise (timing, loop
 termination, transaction boundaries, module export surface).
+
+## L18 — jsdom cannot see layout, and two shipped defects lived exactly there
+
+**Learned:** 2026-08-30, kanban board (Task 14, e2e).
+
+Two defects survived a green 574-test jest suite, a typecheck, a lint pass and a code review, and
+both were caught by the first e2e run that touched them:
+
+- The colour picker's twenty swatches overlapped each other. The popover is absolutely positioned
+  inside a 44px-wide trigger wrapper, so its shrink-to-fit width resolved to roughly one swatch and
+  the five 44px buttons in each grid row stacked on top of one another. Every unit test passed
+  because `getByRole("radio")` finds an element jsdom never lays out; Playwright failed with
+  "tab20-cyan-light intercepts pointer events", which is what a real user's click would have hit.
+  Fix: `w-max` on the grid.
+- `/board`'s column strip made the whole page scroll sideways by 134px — nav included — even though
+  the strip itself clips and scrolls correctly. Its scrollable overflow propagated to the document;
+  `contain-paint` on the strip stops it.
+
+**Rule:** a test that queries the accessibility tree proves the element exists and is labelled, not
+that it is reachable, sized or on top. Anything whose correctness is geometric — overlap, hit
+targets, scroll containment, sticky headers, truncation — needs a real engine. When a component's
+review findings are about sizes (44px targets, grid columns, popover placement), that is the signal
+to add or run the e2e case rather than to trust the unit test that just went green.
