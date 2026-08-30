@@ -333,4 +333,16 @@ describe("query filters — not() and lt()", () => {
       /unsupported not\(\) operator/
     );
   });
+
+  it("lte('col', value) keeps rows less than or equal to the value", async () => {
+    const fake = createFakeSupabase({ tables: { widgets: rows() } });
+
+    const { data } = await fake
+      .from("widgets")
+      .select()
+      .not("completed_at", "is", null)
+      .lte("completed_at", "2026-06-01T00:00:00.000Z");
+
+    expect((data as Row[]).map((r) => r.id)).toEqual(["2"]);
+  });
 });

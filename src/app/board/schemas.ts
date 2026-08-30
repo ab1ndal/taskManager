@@ -57,8 +57,18 @@ export const listTasksInColumnSchema = z.object({ columnId: uuid });
 
 export const loadOlderDoneSchema = z.object({
   workspaceIds: z.array(uuid).min(1, "Name at least one workspace").max(20),
+  // { offset: true } is load-bearing, not decoration: PostgREST serialises timestamptz with a
+  // numeric offset ("+00:00"), not a literal "Z", so every cursor after the first page — which came
+  // back from the server rather than from the client's own Date.toISOString() — would fail this
+  // schema without it. Verified against the dev project's REST API and against zod 4.4.3 directly.
   /** The oldest completed_at already on screen; the next page is strictly older than this. */
-  before: z.iso.datetime("Expected an ISO timestamp"),
+  before: z.iso.datetime({ offset: true, message: "Expected an ISO timestamp" }),
+  /**
+   * The id of the row `before` came from, breaking ties when two tasks share a completed_at.
+   * Optional for now — Task 10 wires the client to send it — so a page boundary that lands inside
+   * a tie can still (rarely) skip a row until then; once the client sends it, it cannot.
+   */
+  beforeId: uuid.optional(),
 });
 
 /**
