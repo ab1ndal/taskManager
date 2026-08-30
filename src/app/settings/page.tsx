@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { TabPill } from "@/app/tasks/tab-pill";
 import { BoardTab } from "./board-tab";
 import { ProfileTab } from "./profile-tab";
@@ -10,7 +11,18 @@ type SearchParams = Promise<{ tab?: string }>;
  */
 export default async function SettingsPage({ searchParams }: { searchParams: SearchParams }) {
   const { tab } = await searchParams;
-  // Anything unrecognised falls back rather than rendering nothing: the tab comes from the URL.
+
+  // A tab value that is neither known tab redirects to normalise the URL rather than just the
+  // rendered content: TabPill decides "active" by comparing the raw param to its own matchValue,
+  // so silently defaulting content to Profile while leaving `tab=nonsense` in the URL would show
+  // Profile's content with no pill highlighted. Redirecting makes the content and the active pill
+  // the same fact. Bare /settings (no tab at all) is left alone — that already renders Profile
+  // with no pill lit, which is correct: the Profile pill only lights up once its own explicit
+  // ?tab=profile link is followed.
+  if (tab !== undefined && tab !== "profile" && tab !== "board") {
+    redirect("/settings?tab=profile");
+  }
+
   const active = tab === "board" ? "board" : "profile";
 
   return (

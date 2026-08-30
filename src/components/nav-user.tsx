@@ -27,7 +27,7 @@ export function NavUser({ name, email }: { name: string; email: string }) {
         href="/settings?tab=profile"
         className="hidden sm:inline-flex items-center min-h-11 text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors"
       >
-        Settings
+        {name || email}
       </Link>
       <Avatar name={name} email={email} size="sm" />
       <button
