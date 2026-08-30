@@ -94,8 +94,19 @@ export function buildBoardDragEndHandler({
     // — a drop into Completed needs completedAt set too, or the card renders back in the leftmost
     // column; a drag out of Completed needs it cleared, or the card snaps back into Completed.
     // Moving between two non-terminal columns touches neither: completedAt is already null there.
+    //
+    // Both branches are guarded by whether completedAt is actually transitioning, not just by which
+    // column is terminal: a reorder *within* Done (source and destination both terminal, different
+    // index only) reaches this code too, since the early return above only bails on an identical
+    // index. Stamping unconditionally on `targetColumn.isDone` would give that reorder a fresh
+    // timestamp the server never applies — move_task_to_column only calls completeTask/reopenTask
+    // when terminal-ness changes — so the card would jump to the top of Done's newest-first sort
+    // and then snap back once the props resync lands. Guarding on `dragged.completedAt === null`
+    // (only transitioning open->done stamps a new time) mirrors the exit guard exactly.
     const completedAt = targetColumn.isDone
-      ? new Date().toISOString()
+      ? dragged.completedAt === null
+        ? new Date().toISOString()
+        : dragged.completedAt
       : dragged.completedAt !== null
         ? null
         : dragged.completedAt;
@@ -152,6 +163,10 @@ export function BoardClient({
   // overlay above is permanent — the board would never pick up a server-side correction or a change
   // made from another tab. Adjusting during render rather than in an effect avoids the extra pass
   // that renders stale rows first (react-hooks/set-state-in-effect) — mirrors tasks-page-client.tsx.
+  // Only localTasks is reset here, not olderDone/doneExpanded/moreOlder: the initial fetch is
+  // bounded to the done window and loadOlderDone only ever returns rows strictly older than its
+  // cursor, so the two populations are disjoint by construction — there is no stale "older" state
+  // for a fresh `tasks` prop to invalidate.
   const [syncedFrom, setSyncedFrom] = useState(tasks);
   if (syncedFrom !== tasks) {
     setSyncedFrom(tasks);
