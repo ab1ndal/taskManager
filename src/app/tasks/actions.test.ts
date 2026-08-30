@@ -24,6 +24,14 @@ const P1 = "d0000000-0000-4000-8000-000000000001";
 const S1 = "d0000000-0000-4000-8000-000000000002";
 const S2 = "d0000000-0000-4000-8000-000000000003";
 
+// WS1's columns, so a created task has somewhere to land.
+const COL_FIRST = "e0000000-0000-4000-8000-00000000000a";
+const COL_SECOND = "e0000000-0000-4000-8000-00000000000b";
+const COL_TERMINAL = "e0000000-0000-4000-8000-00000000000d";
+// WS2's own non-terminal column: once move_task_workspace reassigns board_column_id on a
+// cross-workspace move, WS2 needs somewhere to receive the moved task too.
+const COL_WS2_FIRST = "e0000000-0000-4000-8000-00000000000e";
+
 /**
  * Default fixture: two members of WS1 (M1 is the signed-in user, M2 a colleague), one outsider in
  * WS2, and one task T1 assigned to M1.
@@ -39,6 +47,14 @@ function seed(): Tables {
       { id: T1, workspace_id: WS1, parent_task_id: null, completed_at: null, title: "Task 1" },
     ],
     task_assignments: [{ task_id: T1, member_id: M1, member_sort_key: 1000 }],
+    board_columns: [
+      // COL_TERMINAL sits at position 500 — earlier than COL_FIRST — and is_done: true, to prove the
+      // leftmost-non-terminal lookup excludes it explicitly rather than relying on position.
+      { id: COL_FIRST, workspace_id: WS1, name: "Not Started", color: "tab20-grey", position: 1000, is_done: false },
+      { id: COL_SECOND, workspace_id: WS1, name: "In Progress", color: "tab20-blue", position: 2000, is_done: false },
+      { id: COL_TERMINAL, workspace_id: WS1, name: "Completed", color: "tab20-green", position: 500, is_done: true },
+      { id: COL_WS2_FIRST, workspace_id: WS2, name: "Not Started", color: "tab20-grey", position: 1000, is_done: false },
+    ],
   };
 }
 
@@ -422,6 +438,51 @@ describe("createTaskWithSubtasks", () => {
     expect(tasksIn(fake.tables).find((t) => t.title === "Take trash")).toBeDefined();
     expect(logged).toHaveBeenCalledWith(expect.stringContaining("DB error"));
     logged.mockRestore();
+  });
+
+  it("puts a new task in the workspace's leftmost non-terminal column", async () => {
+    const fake = setup();
+
+    const result = await createTaskWithSubtasks({
+      title: "Buy milk",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+    });
+
+    expect(result.ok).toBe(true);
+    const created = tasksIn(fake.tables).find((t) => t.title === "Buy milk");
+    // COL_TERMINAL sits at position 500 — earlier than COL_FIRST — and is skipped anyway: a new task
+    // is not done.
+    expect(created!.board_column_id).toBe(COL_FIRST);
+  });
+
+  it("leaves subtasks without a column", async () => {
+    const fake = setup();
+
+    await createTaskWithSubtasks({
+      title: "Parent",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [{ title: "Child" }],
+    });
+
+    const child = tasksIn(fake.tables).find((t) => t.title === "Child");
+    expect(child!.board_column_id ?? null).toBeNull();
+  });
+
+  it("fails clearly when the workspace has no usable column", async () => {
+    const tables = seed();
+    tables.board_columns = [
+      { id: COL_TERMINAL, workspace_id: WS1, name: "Completed", color: "tab20-green", position: 500, is_done: true },
+    ];
+    const fake = setup({ tables });
+
+    await expectFailure(
+      createTaskWithSubtasks({ title: "Buy milk", workspaceId: WS1, memberIds: [M1], subtasks: [] }),
+      GENERIC_ERROR
+    );
+    expect(tasksIn(fake.tables).some((t) => t.title === "Buy milk")).toBe(false);
   });
 });
 

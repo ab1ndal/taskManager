@@ -239,7 +239,25 @@ export function createFakeSupabase(options: FakeOptions = {}) {
           };
         }
 
+        // The task's column is workspace-scoped (015), so a move needs a destination column, not
+        // just a destination workspace. Same rule task creation uses: the leftmost non-terminal
+        // column, is_done excluded explicitly rather than relying on position (016).
+        const columns = (tables.board_columns ?? []) as Row[];
+        const destinationColumn = columns
+          .filter((c) => c.workspace_id === workspaceId && c.is_done === false)
+          .sort((a, b) => (a.position as number) - (b.position as number))[0];
+
+        if (!destinationColumn) {
+          return {
+            data: null,
+            error: {
+              message: `workspace ${workspaceId} has no non-terminal board column to receive task ${taskId}`,
+            },
+          };
+        }
+
         target.workspace_id = workspaceId;
+        target.board_column_id = destinationColumn.id;
 
         const affectedIds = [
           taskId,
