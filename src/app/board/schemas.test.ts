@@ -112,4 +112,22 @@ describe("deleteBoardColumnSchema", () => {
       })
     ).toThrow(/once/);
   });
+
+  it("rejects a move whose task id is not a uuid", () => {
+    expect(() =>
+      parseInput(deleteBoardColumnSchema, {
+        columnId: COL,
+        moves: [{ taskId: "not-a-uuid", targetColumnId: COL_B }],
+      })
+    ).toThrow(ValidationError);
+  });
+
+  it("rejects a move whose target column id is not a uuid", () => {
+    expect(() =>
+      parseInput(deleteBoardColumnSchema, {
+        columnId: COL,
+        moves: [{ taskId: TASK, targetColumnId: "not-a-uuid" }],
+      })
+    ).toThrow(ValidationError);
+  });
 });
