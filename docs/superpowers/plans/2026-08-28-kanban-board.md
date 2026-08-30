@@ -453,6 +453,8 @@ without someone choosing where it goes."
 
 ### Task 2: RPCs — `move_task_to_column` and `delete_board_column`
 
+**This task writes TWO migrations, `018` and `019`.** `019` closes a gap the Task 7 review surfaced: see "Migration 019" at the end of this task.
+
 **Migration number is `018`:** Task 1's review produced two follow-up migrations — `016` (move/delete fixes) and `017` (cascade-delete fix). See ledger rulings R7, R8, R9 and R14.
 
 **Files:**
@@ -721,10 +723,52 @@ supabase migration list --linked
 
 Expected: `db push` applies `016`; the listing then shows `016` on both sides.
 
+- [ ] **Step 3b: Write migration `019_recurrence_board_column_reset.sql`**
+
+`public.run_due_recurrences` (migration 014, lines 62-67) reactivates a recurring task by clearing
+`completed_at`, and never touches `board_column_id`. If the task was completed by dragging it into the
+terminal column, its column IS the terminal column — so after reactivation it is an open task sitting
+in Done, which contradicts the rule that the terminal column holds completed work. The cron job
+(`run-due-recurrences`, every 15 minutes) hits this on its own with no user action.
+
+`create or replace function public.run_due_recurrences()` with the body from `014` unchanged except
+that the reactivation update also re-homes a terminal column:
+
+```sql
+      update public.tasks t
+         set completed_at = null,
+             due_at = v_fired
+                      + coalesce(make_interval(hours => r.default_due_offset_hours), interval '0'),
+             -- Reactivation makes the task open again, so it must not stay in the terminal column it
+             -- was dragged into to complete it. Any non-terminal column is a valid landing spot; the
+             -- leftmost is the "new work" column task creation uses.
+             board_column_id = case
+               when exists (
+                 select 1 from public.board_columns bc
+                 where bc.id = t.board_column_id and bc.is_done
+               )
+               then (
+                 select bc.id from public.board_columns bc
+                 where bc.workspace_id = t.workspace_id and not bc.is_done
+                 order by bc.position
+                 limit 1
+               )
+               else t.board_column_id
+             end
+       where t.id = r.task_id;
+```
+
+Preserve everything else in `014` verbatim — the subtask reopen, the `next_run_at` advance, the
+per-rule exception isolation. Restate `014`'s grant block.
+
+Verify inside `BEGIN … ROLLBACK`: a recurring task parked in the terminal column with `next_run_at` in
+the past comes back open AND in a non-terminal column; one parked in a non-terminal column keeps
+exactly the column it had. Paste real output.
+
 - [ ] **Step 4: Commit**
 
 ```bash
-git add supabase/migrations/018_board_column_rpcs.sql
+git add supabase/migrations/018_board_column_rpcs.sql supabase/migrations/019_recurrence_board_column_reset.sql
 git commit -m "feat(board): add move and delete RPCs for board columns
 
 A drop writes the shared column on tasks and the dragger's own sort key
@@ -2693,6 +2737,20 @@ describe("groupTasks", () => {
     expect(grouped["not started"]).toEqual([]);
   });
 
+  it("keeps an open task out of the terminal column even if that is where its column points", () => {
+    // Legacy rows can exist: a task dragged into Done and then reopened before migration 019 and
+    // the reopenTask fix landed. The terminal column means "completed" on this board, so an open
+    // card there would contradict its own pill.
+    const grouped = groupTasks(
+      columns,
+      [task({ id: "reopened", boardColumnId: "h2", workspaceId: WS_H, completedAt: null })],
+      NOW
+    );
+
+    expect(grouped["completed"]).toEqual([]);
+    expect(grouped["not started"].map((t) => t.id)).toEqual(["reopened"]);
+  });
+
   it("ignores a task whose column is not on the board", () => {
     const grouped = groupTasks(columns, [task({ id: "stray", boardColumnId: "gone", workspaceId: WS_H })], NOW);
 
@@ -2853,6 +2911,18 @@ export function groupTasks(
     // A column deleted between the fetch and this render: the card is left out rather than invented
     // into a column the user did not choose. The next load places it properly.
     if (!key) continue;
+
+    // An open task whose column is the terminal one contradicts the board's own rule that the
+    // terminal column holds completed work. Migration 019 and reopenTask both re-home such a task,
+    // but a row written before those landed can still exist, so it renders in the first
+    // non-terminal column rather than as an open card under Done.
+    if (terminal && key === terminal.key) {
+      const firstOpen = merged.find((column) => !column.isDone);
+      if (!firstOpen) continue;
+      grouped[firstOpen.key].push(task);
+      continue;
+    }
+
     grouped[key].push(task);
   }
 
