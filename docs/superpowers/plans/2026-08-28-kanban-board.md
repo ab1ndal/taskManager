@@ -536,6 +536,19 @@ begin
     raise exception 'member % is not in workspace %', p_member_id, v_task_workspace;
   end if;
 
+  -- Visibility is assignment, so this is authorization, not bookkeeping — and it must run before any
+  -- write. The both-null branch below returns without touching task_assignments, so a check placed
+  -- after the column write would never run for a drop into an empty column. Task 2's review caught
+  -- exactly that.
+  perform 1
+  from public.task_assignments
+  where task_id = p_task_id
+    and member_id = p_member_id;
+
+  if not found then
+    raise exception 'member % is not assigned to task %', p_member_id, p_task_id;
+  end if;
+
   update public.tasks
   set board_column_id = p_column_id
   where id = p_task_id;
@@ -620,7 +633,8 @@ begin
   -- deleting now would relocate a task nobody chose a destination for. Refuse instead.
   select coalesce(array_agg(id order by id), '{}') into v_actual
   from public.tasks
-  where board_column_id = p_column_id;
+  where board_column_id = p_column_id
+  for update;
 
   select coalesce(array_agg(task_id order by task_id), '{}') into v_requested
   from jsonb_to_recordset(p_moves) as m(task_id uuid, target_column_id uuid);
@@ -643,10 +657,14 @@ begin
     raise exception 'every destination must be a different column in workspace %', v_workspace_id;
   end if;
 
+  -- `and t.board_column_id = p_column_id` makes the write self-guarding: the coverage check above is
+  -- a read in an earlier snapshot, and updating an FK column locks the NEW referenced row, not the
+  -- old one, so a concurrent move OUT of this column is not blocked by it.
   update public.tasks t
   set board_column_id = m.target_column_id
   from jsonb_to_recordset(p_moves) as m(task_id uuid, target_column_id uuid)
-  where t.id = m.task_id;
+  where t.id = m.task_id
+    and t.board_column_id = p_column_id;
 
   delete from public.board_columns where id = p_column_id;
 end;
@@ -747,11 +765,17 @@ that the reactivation update also re-homes a terminal column:
                  select 1 from public.board_columns bc
                  where bc.id = t.board_column_id and bc.is_done
                )
-               then (
-                 select bc.id from public.board_columns bc
-                 where bc.workspace_id = t.workspace_id and not bc.is_done
-                 order by bc.position
-                 limit 1
+               -- coalesce, never NULL: a NULL write violates 015's root-task check, and 014's
+               -- per-rule exception handler would swallow the abort without advancing next_run_at,
+               -- leaving the rule failing every 15 minutes forever with nothing surfacing.
+               then coalesce(
+                 (
+                   select bc.id from public.board_columns bc
+                   where bc.workspace_id = t.workspace_id and not bc.is_done
+                   order by bc.position
+                   limit 1
+                 ),
+                 t.board_column_id
                )
                else t.board_column_id
              end
