@@ -346,3 +346,28 @@ describe("query filters — not() and lt()", () => {
     expect((data as Row[]).map((r) => r.id)).toEqual(["2"]);
   });
 });
+
+describe("query filters — chained order()", () => {
+  it("breaks ties on the first key using the second .order() call, mirroring PostgREST", async () => {
+    const fake = createFakeSupabase({
+      tables: {
+        widgets: [
+          { id: "a", completed_at: "2026-06-01", tie: "z" },
+          { id: "b", completed_at: "2026-07-01", tie: "y" },
+          { id: "c", completed_at: "2026-06-01", tie: "x" },
+        ],
+      },
+    });
+
+    const { data } = await fake
+      .from("widgets")
+      .select()
+      .order("completed_at", { ascending: false })
+      .order("tie", { ascending: false });
+
+    // "b" is the only distinct completed_at, first. "a" and "c" tie on completed_at, so the second
+    // key breaks it: "z" sorts after "x" descending, so "a" comes before "c" — a single `.order()`
+    // on completed_at alone would have left them in insertion order instead.
+    expect((data as Row[]).map((r) => r.id)).toEqual(["b", "a", "c"]);
+  });
+});

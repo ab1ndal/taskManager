@@ -30,6 +30,14 @@ export type DoneTask = {
 const DONE_PAGE_SIZE = 50;
 
 /**
+ * Rows fetched beyond the page, to absorb the ties at the cursor's own timestamp that the
+ * strictly-after filter will drop. A tie cluster larger than this needs a second round trip, which
+ * the pagination already tolerates — the alternative is an unbounded query that degrades for the
+ * life of the product.
+ */
+const DONE_TIE_ALLOWANCE = 50;
+
+/**
  * Applies a drop: the shared column, the dragger's own position, and — when a terminal column is
  * involved — completion.
  *
@@ -143,15 +151,27 @@ export async function moveTaskToColumn(input: MoveTaskToColumnInput): Promise<Ac
  * completed_at (bulk completion, the recurrence cron), and ordering by completed_at only with a
  * plain "<" comparison would drop whichever one lands just below the page boundary — the next
  * cursor IS that shared value, and "<" excludes everything at it. The database is asked for
- * completed_at <= before (a superset), and the exact composite "strictly after (before, beforeId)"
- * comparison is done here in TypeScript rather than as a PostgREST `.or(...)` expression: same
- * result, and it spares the fake an or-expression parser. `beforeId` is optional because Task 10
- * has not wired the client to send it yet — until then, a page boundary that happens to land inside
- * a tie can (rarely) still drop a row, same as before this fix, but no worse.
+ * completed_at <= before (a superset, ordered completed_at desc, id desc — the same pair the cursor
+ * is made of — and bounded by DONE_PAGE_SIZE + 1 + DONE_TIE_ALLOWANCE), and the exact composite
+ * "strictly after (before, beforeId)" comparison is done here in TypeScript rather than as a
+ * PostgREST `.or(...)` expression: same result, and it spares the fake an or-expression parser.
  *
- * A tie cluster larger than one page would take more than one round trip to fully traverse (each
- * page returns at most DONE_PAGE_SIZE of the tied rows before the cursor advances past them) —
- * acceptable, and worth writing down rather than discovering.
+ * The bound matters on its own: an earlier version of this fix dropped `.order()`/`.limit()` in
+ * favour of doing everything in Node, which meant every "Show older" click fetched and sorted
+ * *every* completed task the caller could see, for the life of the product. Postgres orders and
+ * bounds the fetch; the in-memory sort below is a cheap safeguard that documents the contract, not
+ * the thing doing the work.
+ *
+ * `beforeId` is optional: the done column's footer can offer "Show older" even when nothing is on
+ * screen yet (the initial seven-day window came back empty but older completed tasks exist), and in
+ * that case the client has no row to cite — it sends only the synthetic "seven days ago" cutoff as
+ * `before`. The absent case is safe: the filter then excludes rows exactly at that timestamp, which
+ * for a synthetic cutoff means at worst skipping a task completed at that exact instant, not a
+ * whole page.
+ *
+ * A tie cluster larger than DONE_TIE_ALLOWANCE would take more than one round trip to fully
+ * traverse (each page returns at most DONE_PAGE_SIZE of the tied rows before the cursor advances
+ * past them) — acceptable, and worth writing down rather than discovering.
  */
 export async function loadOlderDone(
   input: LoadOlderDoneInput
@@ -189,12 +209,19 @@ export async function loadOlderDone(
       .in("workspace_id", workspaceIds)
       .is("parent_task_id", null)
       .not("completed_at", "is", null)
-      .lte("completed_at", before);
+      .lte("completed_at", before)
+      .order("completed_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(DONE_PAGE_SIZE + 1 + DONE_TIE_ALLOWANCE);
 
     assertNoError("load older completed tasks", { error: rowError });
 
-    // Total order over the fetched rows: completed_at desc, id desc as the tie-break — the same
-    // pair the cursor is made of, so the ordering and the cursor comparison below agree.
+    // Postgres has already ordered these rows completed_at desc, id desc; this re-sort is a cheap
+    // safeguard against a future change to the query above silently dropping the ORDER BY, not the
+    // thing doing the work. completed_at is compared as a plain string rather than parsed into a
+    // Date: safe because every value here comes from the same timestamptz column serialised by
+    // PostgREST with consistent precision and offset, and lexicographic order agrees with
+    // chronological order for that fixed format.
     const ordered = [...(rows ?? [])].sort((a, b) => {
       const aAt = a.completed_at as string;
       const bAt = b.completed_at as string;
@@ -211,6 +238,11 @@ export async function loadOlderDone(
       return (r.id as string) < beforeId;
     };
 
+    // hasMore reflects the bounded fetch, not the true remaining count: the +1 lookahead beyond
+    // DONE_PAGE_SIZE is what makes it meaningful. A tie cluster that consumes the whole allowance
+    // still reports hasMore truthfully — the allowance only changes how many *extra* tied rows this
+    // one round trip can absorb before the cursor has to advance again, not whether more rows exist
+    // past this page.
     const page = ordered.filter(isStrictlyAfterCursor);
     const hasMore = page.length > DONE_PAGE_SIZE;
 
