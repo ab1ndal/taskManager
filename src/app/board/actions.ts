@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { assertNoError, run } from "@/app/tasks/action-run";
 import { parseInput, ValidationError } from "@/app/tasks/schemas";
+import { knownRpcFailure } from "./rpc-errors";
 import {
   createBoardColumnSchema,
   deleteBoardColumnSchema,
@@ -228,10 +229,16 @@ export async function deleteBoardColumn(input: DeleteBoardColumnInput): Promise<
       p_moves: moves.map((m) => ({ task_id: m.taskId, target_column_id: m.targetColumnId })),
     });
 
-    // The RPC's own checks (stale move list, bad destination, last non-terminal column) are
-    // conditions the caller needs to see and act on, not a bug to hide behind a generic message —
-    // `assertNoError` would collapse them to that, so its message is passed through as-is instead.
-    if (error) throw new ValidationError({}, error.message);
+    if (error) {
+      // The RPC's own checks (stale move list, bad destination, last non-terminal column) are
+      // conditions the caller needs to see and act on, not a bug to hide behind a generic message —
+      // `assertNoError` would collapse them to that. But an unrecognised Postgres error (a cast
+      // failure, a constraint name, permission text) must not be forwarded either: that is exactly
+      // the schema detail action-run.ts's generic path exists to hide.
+      const known = knownRpcFailure(error.message);
+      if (!known) throw new Error(`delete board column: ${error.message}`);
+      throw new ValidationError({}, known);
+    }
 
     revalidatePath("/board");
     revalidatePath("/settings");
