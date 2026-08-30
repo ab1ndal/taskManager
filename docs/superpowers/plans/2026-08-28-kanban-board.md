@@ -15,6 +15,16 @@
 - Development order is fixed by `CLAUDE.md`: schema and migrations → RLS → API routes/actions → UI components → tests → polish. Tasks below are ordered accordingly.
 - Migrations are append-only and numbered: the next free numbers are `015` and `016`. Never edit an applied migration.
 - No local Postgres exists in this environment. Every migration is dry-run against the **dev** Supabase project inside `BEGIN … ROLLBACK` before being applied. Dev and production are separate projects at different migration levels; state which one you touched.
+- **Applying a migration is `supabase db push`, never `psql -f`.** `tasks/lessons.md` L9: an out-of-band apply leaves `supabase_migrations.schema_migrations` disagreeing with the schema, and every later push inherits that. Verify with `supabase migration list --linked` afterwards. psql is used only for the rolled-back dry-run, which commits nothing.
+- The dev connection for dry-runs is built at run time from `.env.local`; nothing is written to a file. Prepend this to any dry-run command:
+
+```bash
+set -a; . ./.env.local; set +a
+export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+DEV_DB="host=aws-0-us-east-2.pooler.supabase.com port=5432 user=postgres.mcdpiuiayfljzvnhtqto dbname=postgres sslmode=require"
+```
+
+The direct host `db.<ref>.supabase.co` is IPv6-only and unreachable here, and the us-west pooler rejects this tenant — dev is in East US (Ohio). Session pooler on 5432, not the transaction pooler on 6543: the dry-runs use DDL, advisory locks and explicit transactions.
 - Server actions are public endpoints. Every action calls `requireUser()` then an authorization assertion from `src/lib/auth.ts`, and parses its input with `parseInput(schema, input)` from `src/app/tasks/schemas.ts`.
 - Every action is wrapped in `run("actionName", async () => {...})` from `src/app/tasks/action-run.ts` and returns `ActionResult`. Supabase errors go through `assertNoError("step", result)`.
 - Cross-table writes use a `security definer` RPC in the `public` schema with `set search_path = ''`, `revoke execute` from `public`, `anon`, `authenticated`, and `grant execute` to `service_role` only. Called via `createAdminClient()`.
@@ -361,7 +371,7 @@ create trigger tasks_board_column_workspace_matches
 No local Postgres exists here, so this runs against the dev project inside a transaction that is rolled back. Read the connection string from the environment, never paste it into a file:
 
 ```bash
-psql "$SUPABASE_DEV_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+psql "$DEV_DB" -v ON_ERROR_STOP=1 <<'SQL'
 begin;
 \i supabase/migrations/015_board_columns.sql
 -- Every workspace got five columns, exactly one terminal.
@@ -381,7 +391,7 @@ Expected: every workspace reports `columns = 5, done = 1`; both counts are `0`; 
 - [ ] **Step 7: Verify the two guards actually reject**
 
 ```bash
-psql "$SUPABASE_DEV_DB_URL" <<'SQL'
+psql "$DEV_DB" <<'SQL'
 begin;
 \i supabase/migrations/015_board_columns.sql
 -- A second terminal column in one workspace must fail.
@@ -394,7 +404,7 @@ SQL
 Expected: `ERROR: duplicate key value violates unique constraint "board_columns_one_done_per_workspace"`.
 
 ```bash
-psql "$SUPABASE_DEV_DB_URL" <<'SQL'
+psql "$DEV_DB" <<'SQL'
 begin;
 \i supabase/migrations/015_board_columns.sql
 -- A column from another workspace must be refused by the trigger.
@@ -413,11 +423,16 @@ Expected: `ERROR: board column ... belongs to workspace ..., not ...`.
 
 - [ ] **Step 8: Apply the migration to dev**
 
+Through the CLI, so the migration history stays consistent (Global Constraints; `tasks/lessons.md` L9):
+
 ```bash
-psql "$SUPABASE_DEV_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/015_board_columns.sql
+supabase db push
+supabase migration list --linked
 ```
 
-Expected: no errors. Production is a separate project and is not touched by this plan.
+Expected: `db push` applies `015` and nothing else; `migration list --linked` then shows `015` on both Local and Remote. Production is a separate project, reached only by the `deploy-migrations` workflow, and is not touched by this plan.
+
+If `db push` reports a password problem, it needs `SUPABASE_DB_PASSWORD` from `.env.local` in the environment — the CLI's passwordless fallback fails on this project with "permission denied to alter role".
 
 - [ ] **Step 9: Commit**
 
@@ -638,7 +653,7 @@ grant execute on function public.delete_board_column(uuid, jsonb) to service_rol
 - [ ] **Step 2: Dry-run and exercise both functions against dev**
 
 ```bash
-psql "$SUPABASE_DEV_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
+psql "$DEV_DB" -v ON_ERROR_STOP=1 <<'SQL'
 begin;
 \i supabase/migrations/016_board_column_rpcs.sql
 
@@ -694,10 +709,11 @@ Expected: two `NOTICE: refused as expected: ...` lines, then `ROLLBACK`. If dev 
 - [ ] **Step 3: Apply to dev**
 
 ```bash
-psql "$SUPABASE_DEV_DB_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/016_board_column_rpcs.sql
+supabase db push
+supabase migration list --linked
 ```
 
-Expected: no errors.
+Expected: `db push` applies `016`; the listing then shows `016` on both sides.
 
 - [ ] **Step 4: Commit**
 
@@ -2024,11 +2040,32 @@ it("refuses a column belonging to another workspace", async () => {
   expect(taskIn(fake.tables, T1).board_column_id).toBe(COL_A);
 });
 
-it("refuses a member id that is not the caller's own", async () => {
+// M1_WS2 is the same human in another workspace, so memberIdsForUser contains it and the action's
+// own guard does not fire — the RPC's workspace check is what rejects this one.
+it("refuses a member id from the caller's other workspace", async () => {
   const fake = setup();
 
   await expectFailure(
     moveTaskToColumn({ taskId: T1, columnId: COL_B, memberId: M1_WS2, prevKey: null, nextKey: null }),
+    "is not in workspace"
+  );
+  expect(taskIn(fake.tables, T1).board_column_id).toBe(COL_A);
+});
+
+// A member belonging to a different person is what the action's own guard exists for.
+it("refuses a member id belonging to someone else", async () => {
+  const tables = seed();
+  const M_OTHER = "b0000000-0000-4000-8000-000000000009";
+  (tables.workspace_members as Row[]).push({
+    id: M_OTHER,
+    workspace_id: WS1,
+    auth_user_id: "auth-user-2",
+    display_name: "Bob",
+  });
+  const fake = setup({ tables });
+
+  await expectFailure(
+    moveTaskToColumn({ taskId: T1, columnId: COL_B, memberId: M_OTHER, prevKey: null, nextKey: null }),
     "does not belong to the current user"
   );
   expect(taskIn(fake.tables, T1).board_column_id).toBe(COL_A);
@@ -2280,7 +2317,7 @@ If `.not("completed_at", "is", null)` or `.lt(...)` are unsupported by the fake,
 - [ ] **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/app/board/move-actions.test.ts`
-Expected: PASS, 11 tests.
+Expected: PASS, 12 tests.
 
 - [ ] **Step 5: Typecheck and commit**
 
@@ -2437,7 +2474,7 @@ npm run dev
 Create a task through the UI in each workspace, then confirm each got a column:
 
 ```bash
-psql "$SUPABASE_DEV_DB_URL" -c "select t.title, bc.name from public.tasks t join public.board_columns bc on bc.id = t.board_column_id order by t.created_at desc limit 5;"
+psql "$DEV_DB" -c "select t.title, bc.name from public.tasks t join public.board_columns bc on bc.id = t.board_column_id order by t.created_at desc limit 5;"
 ```
 
 Expected: the new tasks appear against their workspace's leftmost non-terminal column.
@@ -5053,9 +5090,14 @@ test.describe("kanban board", () => {
     const card = page.getByRole("region", { name: /^Not Started,/ }).getByRole("article").first();
     const title = (await card.getByRole("heading").innerText()).trim();
 
-    // Keyboard drag: space to lift, arrow to move across columns, space to drop. Same approach as
-    // e2e/drag-reorder.spec.ts.
-    await card.focus();
+    // Keyboard drag against the dnd drag handle — NOT the <article>, which is not focusable and
+    // never receives the library's key events. Same locator shape and same lift/move/drop sequence
+    // as keyboardMove() in e2e/drag-reorder.spec.ts; read that helper and follow it.
+    const handle = page
+      .getByRole("region", { name: /^Not Started,/ })
+      .locator("[data-rfd-drag-handle-draggable-id], [data-rbd-drag-handle-draggable-id]")
+      .first();
+    await handle.focus();
     await page.keyboard.press("Space");
     for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight");
     await page.keyboard.press("Space");
