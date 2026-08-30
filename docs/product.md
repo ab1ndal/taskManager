@@ -43,6 +43,31 @@ Subset of Relevant Tasks that are assigned to more than one member
 
 Tasks not assigned to the current user must not be shown.
 
+## Board View
+
+A kanban view of the same tasks the list view shows, at /board.
+
+The board shows root tasks only, as cards carrying title, deadline and workspace. Subtasks,
+descriptions and updates stay in the list view — a card is a glance, not a detail page.
+
+Columns are defined per workspace and shared by that workspace's members. Any member may add,
+rename, recolour or delete a column from Settings → Board, and the change applies to everyone in
+that workspace. The all-workspaces board merges columns of the same name across workspaces.
+
+Moving a task between columns moves it for every assignee. Vertical order within a column stays per
+user — the same member_sort_key ordering the list view uses.
+
+One column per workspace may be marked as the completed column. Dragging a task there completes it,
+with the existing subtask rules; dragging it out reopens it. A completed task always appears in that
+column, whichever column it was in before.
+
+The completed column shows the last 7 days by default and expands on request.
+
+Deleting a column asks where each of its tasks should go, one destination per task. Renaming a
+column never moves a task.
+
+Default columns for a new workspace: Not Started, In Progress, Blocked, Follow-up, Completed.
+
 ## Task Properties
 
 Tasks contain:
