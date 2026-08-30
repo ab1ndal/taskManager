@@ -24,10 +24,10 @@ export function NavUser({ name, email }: { name: string; email: string }) {
   return (
     <div className="flex items-center gap-3">
       <Link
-        href="/profile"
+        href="/settings?tab=profile"
         className="hidden sm:inline-flex items-center min-h-11 text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors"
       >
-        {name || email}
+        Settings
       </Link>
       <Avatar name={name} email={email} size="sm" />
       <button
