@@ -51,7 +51,7 @@ export function ColorPicker({
         aria-label={label}
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex min-h-11 min-w-11 items-center justify-center rounded-sm border border-transparent p-1.5 hover:border-[var(--color-border)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-focus)]"
+        className="flex min-h-11 min-w-11 items-center justify-center rounded-sm border border-transparent p-1.5 hover:border-[var(--color-border)]"
       >
         <span
           className="block h-6 w-6 rounded-full ring-1 ring-inset ring-black/10"
@@ -78,7 +78,7 @@ export function ColorPicker({
                   onChange(slug);
                   setOpen(false);
                 }}
-                className="flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-inset ring-black/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus)]"
+                className="flex h-9 w-9 items-center justify-center rounded-full ring-1 ring-inset ring-black/10"
                 style={{ background: `var(--color-${slug})` }}
               >
                 {selected && (

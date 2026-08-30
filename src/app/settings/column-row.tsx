@@ -72,7 +72,7 @@ export function ColumnRow({
           maxLength={40}
           onChange={(event) => setName(event.target.value)}
           onBlur={saveName}
-          className="min-h-11 rounded-sm border border-transparent bg-transparent px-2 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-border)] focus-visible:border-[var(--color-focus)] focus-visible:outline-none"
+          className="min-h-11 rounded-sm border border-transparent bg-transparent px-2 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-border)]"
         />
         {column.isDone && (
           <span
