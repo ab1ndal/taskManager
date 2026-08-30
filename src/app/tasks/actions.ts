@@ -160,6 +160,60 @@ export async function completeTask(rawTaskId: string): Promise<ActionResult> {
 }
 
 /**
+ * Moves a task out of the terminal column when reopening leaves it sitting there.
+ *
+ * `completeTask` and `move_task_to_column` never touch board_column_id — completion and column are
+ * tracked separately — so a task completed by dragging it into the terminal column keeps that
+ * column when reopened from here, contradicting the rule that the terminal column holds only
+ * completed work (docs/product.md). Only a root task carries a board_column_id (migration 011);
+ * `rootTaskId` must already be one, never a bare subtask id.
+ *
+ * Same re-homing migration 020 gave `run_due_recurrences`: any non-terminal column is a valid
+ * landing spot, and the leftmost is the "new work" column task creation uses. If none exists, the
+ * task is left exactly where it is rather than failing the reopen over it.
+ */
+async function reHomeOutOfTerminalColumn(
+  admin: ReturnType<typeof createAdminClient>,
+  rootTaskId: string
+): Promise<void> {
+  const { data: root, error: rootError } = await admin
+    .from("tasks")
+    .select("workspace_id, board_column_id")
+    .eq("id", rootTaskId)
+    .maybeSingle();
+
+  assertNoError("load task column", { error: rootError });
+  if (!root?.board_column_id) return;
+
+  const { data: column, error: columnError } = await admin
+    .from("board_columns")
+    .select("is_done")
+    .eq("id", root.board_column_id)
+    .maybeSingle();
+
+  assertNoError("load task column", { error: columnError });
+  if (!column?.is_done) return;
+
+  const { data: firstColumn, error: firstColumnError } = await admin
+    .from("board_columns")
+    .select("id")
+    .eq("workspace_id", root.workspace_id)
+    .eq("is_done", false)
+    .order("position", { ascending: true })
+    .limit(1);
+
+  assertNoError("load first board column", { error: firstColumnError });
+
+  const destinationId = firstColumn?.[0]?.id as string | undefined;
+  if (!destinationId) return;
+
+  assertNoError(
+    "re-home reopened task",
+    await admin.from("tasks").update({ board_column_id: destinationId }).eq("id", rootTaskId)
+  );
+}
+
+/**
  * Reopens a completed task. `completeTask` cascades in both directions — completing a parent closes
  * its subtasks, and closing the last open subtask closes the parent — so reopening has to undo the
  * second half: a parent cannot stay complete while one of its subtasks is open again.
@@ -197,6 +251,10 @@ export async function reopenTask(rawTaskId: string): Promise<ActionResult> {
           .eq("id", task.parent_task_id)
       );
     }
+
+    // taskId itself is the root when it has no parent; otherwise the parent just reopened above is.
+    const rootTaskId = (task?.parent_task_id as string | null) ?? taskId;
+    await reHomeOutOfTerminalColumn(admin, rootTaskId);
 
     revalidatePath("/tasks");
     return {};

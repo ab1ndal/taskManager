@@ -27,7 +27,7 @@ export interface FakeOptions {
 }
 
 interface Filter {
-  kind: "eq" | "in" | "is";
+  kind: "eq" | "in" | "is" | "not-is" | "lt";
   column: string;
   value: unknown;
 }
@@ -37,6 +37,12 @@ function matches(row: Row, filters: Filter[]): boolean {
     const actual = row[f.column];
     if (f.kind === "eq") return actual === f.value;
     if (f.kind === "is") return actual === f.value || (f.value === null && actual === undefined);
+    if (f.kind === "not-is") {
+      return !(actual === f.value || (f.value === null && actual === undefined));
+    }
+    if (f.kind === "lt") {
+      return actual !== undefined && actual !== null && (actual as string | number) < (f.value as string | number);
+    }
     return Array.isArray(f.value) && f.value.includes(actual);
   });
 }
@@ -101,6 +107,18 @@ class Query implements PromiseLike<{ data: Row[] | Row | null; error: { message:
 
   is(column: string, value: unknown) {
     this.filters.push({ kind: "is", column, value });
+    return this;
+  }
+
+  /** Only the `not(column, "is", value)` shape is implemented — the one this codebase calls. */
+  not(column: string, operator: string, value: unknown) {
+    if (operator !== "is") throw new Error(`fake supabase: unsupported not() operator "${operator}"`);
+    this.filters.push({ kind: "not-is", column, value });
+    return this;
+  }
+
+  lt(column: string, value: unknown) {
+    this.filters.push({ kind: "lt", column, value });
     return this;
   }
 

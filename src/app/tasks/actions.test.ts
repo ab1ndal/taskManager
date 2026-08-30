@@ -999,7 +999,14 @@ describe("reopenTask", () => {
   function seedCompletedFamily() {
     const tables = seed();
     tables.tasks.push(
-      { id: P1, workspace_id: WS1, parent_task_id: null, completed_at: DONE, title: "Parent" },
+      {
+        id: P1,
+        workspace_id: WS1,
+        parent_task_id: null,
+        completed_at: DONE,
+        title: "Parent",
+        board_column_id: COL_TERMINAL,
+      },
       { id: S1, workspace_id: null, parent_task_id: P1, completed_at: DONE, title: "Sub 1" }
     );
     tables.task_assignments.push(
@@ -1055,6 +1062,40 @@ describe("reopenTask", () => {
     await expectFailure(reopenTask("not-a-uuid"), "Expected a UUID");
 
     expect(tasksIn(tables)[0].completed_at).toBeNull();
+  });
+
+  // completeTask never writes board_column_id, so a task completed by dragging it into the
+  // terminal column keeps that column when reopened from the list view. Left alone, that
+  // contradicts the rule that the terminal column holds only completed work.
+  it("moves the task out of the terminal column when reopened", async () => {
+    const tables = seedCompletedFamily();
+    setup({ tables });
+
+    const result = await reopenTask(P1);
+
+    expect(result.ok).toBe(true);
+    expect(tasksIn(tables).find((t) => t.id === P1)?.board_column_id).toBe(COL_FIRST);
+  });
+
+  it("leaves a task's column alone when it is already non-terminal", async () => {
+    const tables = seedCompletedFamily();
+    tasksIn(tables).find((t) => t.id === P1)!.board_column_id = COL_SECOND;
+    setup({ tables });
+
+    const result = await reopenTask(P1);
+
+    expect(result.ok).toBe(true);
+    expect(tasksIn(tables).find((t) => t.id === P1)?.board_column_id).toBe(COL_SECOND);
+  });
+
+  it("re-homes the parent out of the terminal column when reopening its subtask pulls it open too", async () => {
+    const tables = seedCompletedFamily();
+    setup({ tables });
+
+    const result = await reopenTask(S1);
+
+    expect(result.ok).toBe(true);
+    expect(tasksIn(tables).find((t) => t.id === P1)?.board_column_id).toBe(COL_FIRST);
   });
 });
 
