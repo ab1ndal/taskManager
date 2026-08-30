@@ -43,10 +43,35 @@ function toDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * The deadline pill's text and colour, per docs/product.md: red overdue, yellow due today, green
+ * with time remaining, and green when there is no deadline at all.
+ *
+ * Extracted from bucketTasks so the board can use the same rules rather than a second copy of them.
+ * bucketTasks still owns which *bucket* a task lands in; only the label and variant live here.
+ */
+export function deadlineFor(
+  dueAt: string | null,
+  now: Date
+): { label: string | null; variant: "red" | "yellow" | "green" | null } {
+  if (!dueAt) return { label: null, variant: null };
+
+  const todayStr = toDateStr(now);
+  const dueStr = toDateStr(new Date(dueAt));
+
+  if (dueStr < todayStr) return { label: "Overdue", variant: "red" };
+  if (dueStr === todayStr) return { label: "Due today", variant: "yellow" };
+
+  const todayMidnight = new Date(`${todayStr}T00:00:00Z`);
+  const dueMidnight = new Date(`${dueStr}T00:00:00Z`);
+  const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / (24 * 60 * 60 * 1000));
+
+  return { label: `Due in ${days} day${days !== 1 ? "s" : ""}`, variant: "green" };
+}
+
 export function bucketTasks(tasks: RawTask[], now: Date = new Date()): TaskBuckets {
   const sorted = [...tasks].sort((a, b) => a.member_sort_key - b.member_sort_key);
   const buckets: TaskBuckets = { overdue: [], today: [], upcoming: [], completed: [] };
-  const todayStr = toDateStr(now);
 
   for (const raw of sorted) {
     const t: BucketedTask = { ...raw, shared: raw.assignee_count > 1, deadlineLabel: null, deadlineVariant: null };
@@ -61,24 +86,13 @@ export function bucketTasks(tasks: RawTask[], now: Date = new Date()): TaskBucke
       continue;
     }
 
-    const dueStr = toDateStr(new Date(raw.due_at));
+    const { label, variant } = deadlineFor(raw.due_at, now);
+    t.deadlineLabel = label;
+    t.deadlineVariant = variant;
 
-    if (dueStr < todayStr) {
-      t.deadlineLabel = "Overdue";
-      t.deadlineVariant = "red";
-      buckets.overdue.push(t);
-    } else if (dueStr === todayStr) {
-      t.deadlineLabel = "Due today";
-      t.deadlineVariant = "yellow";
-      buckets.today.push(t);
-    } else {
-      const todayMidnight = new Date(`${todayStr}T00:00:00Z`);
-      const dueMidnight = new Date(`${dueStr}T00:00:00Z`);
-      const days = Math.round((dueMidnight.getTime() - todayMidnight.getTime()) / (24 * 60 * 60 * 1000));
-      t.deadlineLabel = `Due in ${days} day${days !== 1 ? "s" : ""}`;
-      t.deadlineVariant = "green";
-      buckets.upcoming.push(t);
-    }
+    if (variant === "red") buckets.overdue.push(t);
+    else if (variant === "yellow") buckets.today.push(t);
+    else buckets.upcoming.push(t);
   }
 
   return buckets;
