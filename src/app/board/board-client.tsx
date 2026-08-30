@@ -88,10 +88,22 @@ export function buildBoardDragEndHandler({
             ? nextKey - 1000
             : dragged.memberSortKey;
 
+    // groupTasks() renders by completedAt, not boardColumnId: any task with completedAt set lands
+    // in the terminal column regardless of its column, and an open task pointed at the terminal
+    // column is re-homed to the first non-terminal one. So moving boardColumnId alone is not enough
+    // — a drop into Completed needs completedAt set too, or the card renders back in the leftmost
+    // column; a drag out of Completed needs it cleared, or the card snaps back into Completed.
+    // Moving between two non-terminal columns touches neither: completedAt is already null there.
+    const completedAt = targetColumn.isDone
+      ? new Date().toISOString()
+      : dragged.completedAt !== null
+        ? null
+        : dragged.completedAt;
+
     setLocalTasks((prev) =>
       prev.map((t) =>
         t.id === draggableId
-          ? { ...t, boardColumnId: columnId, memberSortKey: optimisticKey }
+          ? { ...t, boardColumnId: columnId, memberSortKey: optimisticKey, completedAt }
           : t
       )
     );
@@ -99,12 +111,19 @@ export function buildBoardDragEndHandler({
     const res = await moveTaskToColumn({ taskId: draggableId, columnId, memberId, prevKey, nextKey });
 
     if (!res.ok) {
-      // Roll back this card only. Replacing the whole array would erase anything else that moved
-      // during the await.
+      // Roll back this card only, and all three fields the optimistic update touched. Replacing
+      // the whole array would erase anything else that moved during the await; restoring only some
+      // of the three fields is exactly how this class of bug (Task 10 review, Important 2)
+      // reappears — a card left in the wrong terminal-vs-open state after a failed drop.
       setLocalTasks((prev) =>
         prev.map((t) =>
           t.id === draggableId
-            ? { ...t, boardColumnId: dragged.boardColumnId, memberSortKey: dragged.memberSortKey }
+            ? {
+                ...t,
+                boardColumnId: dragged.boardColumnId,
+                memberSortKey: dragged.memberSortKey,
+                completedAt: dragged.completedAt,
+              }
             : t
         )
       );
@@ -127,6 +146,18 @@ export function BoardClient({
   showWorkspace: boolean;
 }) {
   const [localTasks, setLocalTasks] = useState(tasks);
+
+  // Server data is the source of truth: moveTaskToColumn revalidates "/board", so a completed drop
+  // arrives here as fresh `tasks` props, not just a resolved promise. Without this, the optimistic
+  // overlay above is permanent — the board would never pick up a server-side correction or a change
+  // made from another tab. Adjusting during render rather than in an effect avoids the extra pass
+  // that renders stale rows first (react-hooks/set-state-in-effect) — mirrors tasks-page-client.tsx.
+  const [syncedFrom, setSyncedFrom] = useState(tasks);
+  if (syncedFrom !== tasks) {
+    setSyncedFrom(tasks);
+    setLocalTasks(tasks);
+  }
+
   /** Older completed tasks the user asked for. Client state: a fresh visit starts collapsed. */
   const [olderDone, setOlderDone] = useState<BoardTask[]>([]);
   const [doneExpanded, setDoneExpanded] = useState(false);
@@ -266,22 +297,38 @@ export function BoardClient({
                 )}
               </Droppable>
 
-              {column.isDone && (
-                <button
-                  type="button"
-                  onClick={showOlder}
-                  disabled={loadingOlder || (doneExpanded && !moreOlder)}
-                  className="min-h-11 w-full rounded-b-lg border-t border-[var(--color-border)] px-3 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-accent-subtle)] disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
-                >
-                  {loadingOlder
-                    ? "Loading…"
-                    : doneExpanded && !moreOlder
-                      ? "No older tasks"
-                      : doneExpanded
-                        ? "Show more"
-                        : "Show older"}
-                </button>
-              )}
+              {column.isDone && (() => {
+                const footerDisabled = loadingOlder || (doneExpanded && !moreOlder);
+                const label = loadingOlder
+                  ? "Loading…"
+                  : doneExpanded && !moreOlder
+                    ? "No older tasks"
+                    : doneExpanded
+                      ? "Show more"
+                      : "Show older";
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // aria-disabled, not the disabled attribute: a disabled button drops out of
+                      // the tab order and keyboard focus lands on <body>, losing the user's place —
+                      // aria-disabled keeps it focusable and this guard keeps it inert.
+                      if (footerDisabled) return;
+                      void showOlder();
+                    }}
+                    aria-disabled={footerDisabled}
+                    aria-busy={loadingOlder}
+                    className="min-h-11 w-full rounded-b-lg border-t border-[var(--color-border)] px-3 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-accent-subtle)] aria-disabled:cursor-default aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
+                  >
+                    {label}
+                    {/* The label change ("Loading…" / "No older tasks") is otherwise silent to a
+                        screen reader: nothing else on the page moves focus or announces it. */}
+                    <span role="status" aria-live="polite" className="sr-only">
+                      {loadingOlder ? "Loading older tasks" : doneExpanded && !moreOlder ? "No older tasks" : ""}
+                    </span>
+                  </button>
+                );
+              })()}
             </section>
           );
         })}

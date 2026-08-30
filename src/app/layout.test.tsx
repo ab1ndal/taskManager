@@ -44,9 +44,12 @@ describe("RootLayout — nav visibility", () => {
     await renderLayout();
     expect(screen.queryByRole("navigation")).not.toBeInTheDocument();
     expect(screen.queryByText("Tasks")).not.toBeInTheDocument();
+    expect(screen.queryByText("Board")).not.toBeInTheDocument();
     expect(screen.queryByText("Workspaces")).not.toBeInTheDocument();
   });
 
+  // Task 10 review, Minor: nothing previously asserted the Board link exists — deleting its entry
+  // from nav-links.tsx's `links` array broke nothing in the suite.
   it("renders nav when signed in", async () => {
     mockGetUser.mockResolvedValue({
       data: { user: { id: "u1", email: "user@example.com", user_metadata: {} } },
@@ -54,6 +57,7 @@ describe("RootLayout — nav visibility", () => {
     await renderLayout();
     expect(screen.getByRole("navigation")).toBeInTheDocument();
     expect(screen.getByText("Tasks")).toBeInTheDocument();
+    expect(screen.getByText("Board")).toBeInTheDocument();
     expect(screen.getByText("Workspaces")).toBeInTheDocument();
     expect(screen.getByTestId("nav-user")).toBeInTheDocument();
   });
