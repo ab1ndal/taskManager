@@ -78,6 +78,35 @@
   --color-kind-work-surface: #e0f2fe;
   --color-kind-work-text: #0369a1;
 
+  /*
+   * tab20, the palette board columns choose from. Stored as slugs on board_columns.color, so these
+   * token names are part of the contract — see TAB20_SLUGS in src/app/board/colors.ts.
+   *
+   * One token per colour, not three: the column header tint and the card rail are both derived with
+   * color-mix() at the point of use, which keeps the dark-mode block below to twenty lines instead
+   * of sixty and guarantees tint and rail can never disagree.
+   */
+  --color-tab20-blue: #1f77b4;
+  --color-tab20-blue-light: #6baed6;
+  --color-tab20-orange: #d95f02;
+  --color-tab20-orange-light: #fdae6b;
+  --color-tab20-green: #2c8c2c;
+  --color-tab20-green-light: #74c476;
+  --color-tab20-red: #c62828;
+  --color-tab20-red-light: #ef8a8a;
+  --color-tab20-purple: #7c5cbf;
+  --color-tab20-purple-light: #b39ddb;
+  --color-tab20-brown: #8c564b;
+  --color-tab20-brown-light: #c49c94;
+  --color-tab20-pink: #c2185b;
+  --color-tab20-pink-light: #f48fb1;
+  --color-tab20-grey: #6b6878;
+  --color-tab20-grey-light: #b0aec2;
+  --color-tab20-olive: #827717;
+  --color-tab20-olive-light: #c5c76a;
+  --color-tab20-cyan: #00838f;
+  --color-tab20-cyan-light: #6fc7d1;
+
   /* Inverted surface — toasts */
   --color-inverse-surface: #26232f;
   --color-inverse-text: #f6f5f9;
@@ -134,6 +163,27 @@
     --color-kind-household-text: #c7c4fb;
     --color-kind-work-surface: #14344a;
     --color-kind-work-text: #a5d8fb;
+
+    --color-tab20-blue: #6baed6;
+    --color-tab20-blue-light: #9ecae1;
+    --color-tab20-orange: #fdae6b;
+    --color-tab20-orange-light: #fdd0a2;
+    --color-tab20-green: #74c476;
+    --color-tab20-green-light: #a1d99b;
+    --color-tab20-red: #ef8a8a;
+    --color-tab20-red-light: #f7b6b6;
+    --color-tab20-purple: #b39ddb;
+    --color-tab20-purple-light: #d1c4e9;
+    --color-tab20-brown: #c49c94;
+    --color-tab20-brown-light: #ddc0b9;
+    --color-tab20-pink: #f48fb1;
+    --color-tab20-pink-light: #f8bbd0;
+    --color-tab20-grey: #b0aec2;
+    --color-tab20-grey-light: #cfcdd9;
+    --color-tab20-olive: #c5c76a;
+    --color-tab20-olive-light: #dcdda0;
+    --color-tab20-cyan: #6fc7d1;
+    --color-tab20-cyan-light: #a5dde3;
 
     --color-inverse-surface: #ece9f4;
     --color-inverse-text: #1c1a24;

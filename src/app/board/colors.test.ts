@@ -52,3 +52,16 @@ describe("tab20 palette", () => {
     expect(new Set(sqlSlugs)).toEqual(new Set(TAB20_SLUGS));
   });
 });
+
+describe("tab20 CSS tokens", () => {
+  const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+  const darkBlock = css.slice(css.indexOf("@media (prefers-color-scheme: dark)"));
+
+  it.each(TAB20_SLUGS)("declares --color-%s in the light theme", (slug) => {
+    expect(css).toContain(`--color-${slug}:`);
+  });
+
+  it.each(TAB20_SLUGS)("redeclares --color-%s in the dark theme", (slug) => {
+    expect(darkBlock).toContain(`--color-${slug}:`);
+  });
+});
