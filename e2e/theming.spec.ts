@@ -105,10 +105,27 @@ const SURFACES = [
     },
   },
   {
-    name: "/profile",
+    // `/profile` redirects here; naming the real URL keeps the walk honest about what it measured.
+    name: "/settings?tab=profile",
     open: async (page: Page) => {
-      await page.goto("/profile");
+      await page.goto("/settings?tab=profile");
       await expect(page.locator("main")).toBeVisible();
+    },
+  },
+  {
+    // The board tab carries the twenty tab20 swatches and the column rows — the densest colour
+    // surface in the app, and the only place the palette is shown against the page background.
+    name: "/settings?tab=board",
+    open: async (page: Page) => {
+      await page.goto("/settings?tab=board");
+      await expect(page.getByRole("heading", { name: "Board" })).toBeVisible();
+    },
+  },
+  {
+    name: "/board",
+    open: async (page: Page) => {
+      await page.goto("/board");
+      await expect(page.getByRole("article").first()).toBeVisible();
     },
   },
   {

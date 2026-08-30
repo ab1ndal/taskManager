@@ -141,7 +141,7 @@ export function ColorPicker({
           role="radiogroup"
           aria-label={label}
           onKeyDown={onGroupKeyDown}
-          className="absolute left-0 top-full z-10 mt-1 grid grid-cols-5 gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-xl"
+          className="absolute left-0 top-full z-10 mt-1 grid w-max grid-cols-5 gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-xl"
         >
           {TAB20_SLUGS.map((slug, index) => {
             const selected = slug === value;
@@ -158,7 +158,11 @@ export function ColorPicker({
                 aria-checked={selected}
                 tabIndex={index === activeIndex ? 0 : -1}
                 onClick={() => pick(slug)}
-                className="flex min-h-11 min-w-11 items-center justify-center rounded-full ring-1 ring-inset ring-black/10"
+                // h-11 w-11 with `w-max` on the grid above: the popover is absolutely positioned inside
+                // a 44px-wide trigger wrapper, so its shrink-to-fit width came out at one swatch and the
+                // five 44px buttons overlapped each other. Caught in e2e, where a click on one swatch was
+                // intercepted by the next.
+                className="flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-inset ring-black/10"
                 style={{ background: `var(--color-${slug})` }}
               >
                 {selected && (

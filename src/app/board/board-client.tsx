@@ -252,7 +252,14 @@ export function BoardClient({
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="isolate flex gap-4 overflow-x-auto px-4 pb-6 pt-1">
+      {/*
+        `contain-paint` is load-bearing, not decoration: without it this strip's scrollable overflow
+        propagates to the document, and the whole page — nav included — scrolls sideways by the
+        amount the columns exceed the viewport, even though the strip itself clips and scrolls
+        correctly. e2e/layout.spec.ts asserts the page does not scroll horizontally, which is what
+        caught it.
+      */}
+      <div className="isolate flex gap-4 overflow-x-auto px-4 pb-6 pt-1 contain-paint">
         {merged.map((column) => {
           const items = groupedByKey[column.key] ?? [];
           // A merged column whose workspaces disagree on colour (color === null) stays neutral —
