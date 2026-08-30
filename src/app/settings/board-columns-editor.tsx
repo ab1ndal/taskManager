@@ -65,6 +65,7 @@ export function BoardColumnsEditor({
           <ColumnRow
             key={column.id}
             column={column}
+            siblings={columns.filter((c) => c.id !== column.id)}
             nonTerminalSiblingCount={
               columns.filter((c) => c.id !== column.id && !c.isDone).length
             }

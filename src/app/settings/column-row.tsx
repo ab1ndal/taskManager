@@ -24,10 +24,12 @@ import { DeleteColumnDialog } from "./delete-column-dialog";
  */
 export function ColumnRow({
   column,
+  siblings,
   nonTerminalSiblingCount,
   onDeleted,
 }: {
   column: BoardColumn;
+  siblings: BoardColumn[];
   nonTerminalSiblingCount: number;
   onDeleted: () => void;
 }) {
@@ -105,6 +107,7 @@ export function ColumnRow({
       {confirmingDelete && (
         <DeleteColumnDialog
           column={column}
+          siblings={siblings}
           onClose={() => setConfirmingDelete(false)}
           onDeleted={() => {
             setConfirmingDelete(false);
