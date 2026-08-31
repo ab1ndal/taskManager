@@ -63,6 +63,9 @@ column, whichever column it was in before.
 
 The completed column shows the last 7 days by default and expands on request.
 
+Columns can be dragged into a different order from Settings → Board, including the completed column:
+the board renders whatever order the columns are given.
+
 Deleting a column asks where each of its tasks should go, one destination per task. Renaming a
 column never moves a task.
 

@@ -4,6 +4,7 @@ jest.mock("@/app/board/actions", () => ({
   createBoardColumn: jest.fn(),
   renameBoardColumn: jest.fn(),
   setBoardColumnColor: jest.fn(),
+  reorderBoardColumn: jest.fn(),
 }));
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
@@ -11,9 +12,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "jest-axe";
 
-import { createBoardColumn } from "@/app/board/actions";
+import { createBoardColumn, reorderBoardColumn } from "@/app/board/actions";
 import { toast } from "@/components/toaster";
-import { BoardColumnsEditor } from "./board-columns-editor";
+import { BoardColumnsEditor, buildColumnDragEndHandler } from "./board-columns-editor";
 import type { BoardColumn } from "@/app/board/group-columns";
 
 const notStarted: BoardColumn = {
@@ -43,6 +44,7 @@ const done: BoardColumn = {
 beforeEach(() => {
   jest.clearAllMocks();
   (createBoardColumn as jest.Mock).mockResolvedValue({ ok: true, columnId: "new-id" });
+  (reorderBoardColumn as jest.Mock).mockResolvedValue({ ok: true });
 });
 
 it("submits the trimmed name with a neutral default colour, then refreshes and clears the field", async () => {
@@ -166,4 +168,96 @@ it("has no accessibility violations", async () => {
   );
 
   expect(await axe(container)).toHaveNoViolations();
+});
+
+describe("reordering", () => {
+  const columns = [notStarted, inProgress, done];
+
+  /** The shape @hello-pangea/dnd hands onDragEnd; only these fields are read. */
+  function drop(draggableId: string, from: number, to: number) {
+    return {
+      draggableId,
+      source: { droppableId: "columns-ws", index: from },
+      destination: { droppableId: "columns-ws", index: to },
+    } as never;
+  }
+
+  function handlerOver(list: BoardColumn[]) {
+    let state = list;
+    const setColumns = (updater: (prev: BoardColumn[]) => BoardColumn[]) => {
+      state = updater(state);
+    };
+    const onError = jest.fn();
+    const run = buildColumnDragEndHandler({ columns: list, setColumns, onError });
+    return { run, onError, names: () => state.map((c) => c.name), state: () => state };
+  }
+
+  it("gives every row a drag handle", () => {
+    render(
+      <BoardColumnsEditor workspaceId="ws" workspaceName="Household" columns={columns} />
+    );
+
+    for (const name of ["Not Started", "In Progress", "Completed"]) {
+      expect(screen.getByRole("button", { name: `Reorder "${name}"` })).toBeInTheDocument();
+    }
+  });
+
+  it("sends the positions either side of the drop and moves the row optimistically", async () => {
+    // Mutation this catches: sending the dragged column's own neighbours from before the drop
+    // (1000/3000 here) instead of the neighbours it lands between — the row would snap back.
+    const { run, names } = handlerOver(columns);
+
+    await run(drop(done.id, 2, 0));
+
+    expect(reorderBoardColumn).toHaveBeenCalledWith({
+      columnId: done.id,
+      prevPosition: null,
+      nextPosition: 1000,
+    });
+    expect(names()).toEqual(["Completed", "Not Started", "In Progress"]);
+  });
+
+  it("passes a null nextPosition when dropped at the end", () => {
+    // Mutation this catches: reading the neighbour off the pre-drop array, where index 2 still
+    // exists, so the last slot would wrongly report a next neighbour. The prev neighbour is the
+    // done column (3000) because the dragged row is removed before the insert index is applied.
+    const { run } = handlerOver(columns);
+
+    void run(drop(notStarted.id, 0, 2));
+
+    expect(reorderBoardColumn).toHaveBeenCalledWith({
+      columnId: notStarted.id,
+      prevPosition: 3000,
+      nextPosition: null,
+    });
+  });
+
+  it("rolls the moved column back and toasts when the write fails", async () => {
+    // Mutation this catches: dropping the rollback branch — the list would keep an order the server
+    // refused, and the next revalidation would silently undo it with no explanation.
+    (reorderBoardColumn as jest.Mock).mockResolvedValue({ ok: false, error: "nope" });
+    const { run, onError, names } = handlerOver(columns);
+
+    await run(drop(done.id, 2, 0));
+
+    expect(names()).toEqual(["Not Started", "In Progress", "Completed"]);
+    expect(onError).toHaveBeenCalledWith("nope");
+  });
+
+  it("does not write when the drop lands where the column already was", async () => {
+    const { run } = handlerOver(columns);
+
+    await run(drop(inProgress.id, 1, 1));
+    await run({ draggableId: inProgress.id, source: { index: 1 }, destination: null } as never);
+
+    expect(reorderBoardColumn).not.toHaveBeenCalled();
+  });
+
+  it("leaves a sole column alone: there is nothing to order it against", async () => {
+    const { run } = handlerOver([notStarted]);
+
+    await run(drop(notStarted.id, 0, 0));
+
+    expect(reorderBoardColumn).not.toHaveBeenCalled();
+  });
 });
