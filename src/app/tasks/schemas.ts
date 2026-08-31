@@ -95,6 +95,12 @@ export const createTaskWithSubtasksSchema = z.object({
     .max(50, "A task cannot have more than 50 subtasks"),
   /** Present when the Repeats section is on. The task and its rule are written by one action. */
   recurrence: recurrenceSchema.optional(),
+  /**
+   * Set when the task is created from a board column, so it lands where the user asked rather than
+   * in the leftmost open column. Absent from the list view, which has no column to name. The server
+   * still validates it: a column from another workspace, or a terminal one, is refused.
+   */
+  boardColumnId: uuid.optional(),
 });
 
 export const updateTaskSchema = z.object({

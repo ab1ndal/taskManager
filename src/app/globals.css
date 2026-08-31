@@ -116,6 +116,8 @@
 
   /* Elevation */
   --shadow-card: 0 1px 3px rgb(0 0 0 / 0.05), 0 1px 8px rgb(124 92 191 / 0.05);
+  /* A board card while it is held. One step above --shadow-card, not a new scale. */
+  --shadow-lifted: 0 6px 16px rgb(0 0 0 / 0.10), 0 2px 6px rgb(124 92 191 / 0.12);
   --shadow-login: 0 8px 32px rgb(124 92 191 / 0.14), 0 2px 8px rgb(0 0 0 / 0.06);
 }
 
@@ -191,6 +193,7 @@
     --color-scrim: rgb(0 0 0 / 0.6);
 
     --shadow-card: 0 1px 3px rgb(0 0 0 / 0.4), 0 1px 8px rgb(0 0 0 / 0.25);
+    --shadow-lifted: 0 8px 20px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.4);
     --shadow-login: 0 8px 32px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.3);
   }
 }

@@ -203,7 +203,9 @@ describe("createTaskWithSubtasks", () => {
       expect.objectContaining({ task_id: parent!.id, member_id: M1 })
     );
     expect(result).toEqual({ ok: true, subtaskErrors: 0, recurrenceFailed: false });
-    expect(revalidatePath).toHaveBeenCalledTimes(1);
+    // Both views render this task, so both are invalidated.
+    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+    expect(revalidatePath).toHaveBeenCalledWith("/board");
   });
 
   it("inserts subtasks with parent_task_id and converts bare date to UTC midnight", async () => {
@@ -308,7 +310,9 @@ describe("createTaskWithSubtasks", () => {
 
     expect(result).toEqual({ ok: true, subtaskErrors: 1, recurrenceFailed: false });
     expect(tasksIn(tables).find((t) => t.title === "Bad subtask")).toBeUndefined();
-    expect(revalidatePath).toHaveBeenCalledTimes(1);
+    // Both views render this task, so both are invalidated.
+    expect(revalidatePath).toHaveBeenCalledWith("/tasks");
+    expect(revalidatePath).toHaveBeenCalledWith("/board");
   });
 
   it("returns a generic failure and logs the cause when the parent task insert fails", async () => {
@@ -473,6 +477,53 @@ describe("createTaskWithSubtasks", () => {
 
     const child = tasksIn(fake.tables).find((t) => t.title === "Child");
     expect(child!.board_column_id ?? null).toBeNull();
+  });
+
+  it("puts the task in the column the caller named", async () => {
+    const fake = setup();
+
+    await createTaskWithSubtasks({
+      title: "Buy milk",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+      boardColumnId: COL_SECOND,
+    });
+
+    const created = tasksIn(fake.tables).find((t) => t.title === "Buy milk");
+    expect(created!.board_column_id).toBe(COL_SECOND);
+  });
+
+  it("falls back to the leftmost open column when the named one is terminal", async () => {
+    const fake = setup();
+
+    // A new task is by definition not finished, so the board's terminal column is not somewhere it
+    // may be created — however the request got here.
+    await createTaskWithSubtasks({
+      title: "Buy milk",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+      boardColumnId: COL_TERMINAL,
+    });
+
+    const created = tasksIn(fake.tables).find((t) => t.title === "Buy milk");
+    expect(created!.board_column_id).toBe(COL_FIRST);
+  });
+
+  it("falls back to the leftmost open column when the named one belongs to another workspace", async () => {
+    const fake = setup();
+
+    await createTaskWithSubtasks({
+      title: "Buy milk",
+      workspaceId: WS1,
+      memberIds: [M1],
+      subtasks: [],
+      boardColumnId: COL_WS2_FIRST,
+    });
+
+    const created = tasksIn(fake.tables).find((t) => t.title === "Buy milk");
+    expect(created!.board_column_id).toBe(COL_FIRST);
   });
 
   it("fails clearly when the workspace has no usable column", async () => {

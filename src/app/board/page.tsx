@@ -44,10 +44,21 @@ export default async function BoardPage({ searchParams }: { searchParams: Search
     memberIdByWorkspaceId[m.workspace_id as string] = m.id as string;
   });
 
+  // Every workspace the user belongs to, not just the filtered scope: the modals offer a
+  // workspace picker, so a task moved out of the current filter still has to resolve its name.
   const { data: workspaceRows } = await supabase
     .from("workspaces")
     .select("id, name, kind")
-    .in("id", workspaceIds);
+    .in("id", allMyWorkspaceIds);
+
+  // Every member of those workspaces, not just the caller's own rows: the create and edit modals
+  // offer an assignee list, and a task shared with someone else has to show that person by name.
+  // Scoped to `allMyWorkspaceIds` rather than the filtered `workspaceIds` so a card moved to
+  // another of the user's workspaces from the modal still finds its members.
+  const { data: allMemberRows } = await supabase
+    .from("workspace_members")
+    .select("id, workspace_id, display_name")
+    .in("workspace_id", allMyWorkspaceIds);
 
   const workspaceById = new Map(
     (workspaceRows ?? []).map((w) => [w.id as string, { name: w.name as string, kind: w.kind as string }])
@@ -127,6 +138,21 @@ export default async function BoardPage({ searchParams }: { searchParams: Search
     };
   });
 
+  // The shape both task modals expect: a workspace with the members a task can be assigned to.
+  const membersByWorkspaceId = new Map<string, { id: string; display_name: string }[]>();
+  (allMemberRows ?? []).forEach((m) => {
+    const list = membersByWorkspaceId.get(m.workspace_id as string) ?? [];
+    list.push({ id: m.id as string, display_name: m.display_name as string });
+    membersByWorkspaceId.set(m.workspace_id as string, list);
+  });
+
+  const modalWorkspaces = (workspaceRows ?? []).map((w) => ({
+    id: w.id as string,
+    name: w.name as string,
+    kind: w.kind as string,
+    members: membersByWorkspaceId.get(w.id as string) ?? [],
+  }));
+
   return (
     <main>
       <h1 className="px-4 pt-6 text-xl font-semibold tracking-tight">Board</h1>
@@ -136,6 +162,8 @@ export default async function BoardPage({ searchParams }: { searchParams: Search
         memberIdByWorkspaceId={memberIdByWorkspaceId}
         workspaceIds={workspaceIds}
         showWorkspace={workspaceIds.length > 1}
+        workspaces={modalWorkspaces}
+        currentMemberIds={myMemberIds}
       />
     </main>
   );

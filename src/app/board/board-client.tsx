@@ -2,8 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { Plus } from "lucide-react";
 
 import { computeNeighborKeys } from "@/app/tasks/reorder-helpers";
+import { EditTaskModal } from "@/app/tasks/edit-task-modal";
+import { NewTaskModal } from "@/app/tasks/new-task-modal";
+import type { RawTask } from "@/app/tasks/bucket-tasks";
+import type { Workspace } from "@/app/tasks/task-fields";
+import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { toast } from "@/components/toaster";
 import { BoardCard } from "./board-card";
 import {
@@ -15,7 +21,7 @@ import {
   type BoardTask,
   type MergedColumn,
 } from "./group-columns";
-import { loadOlderDone, moveTaskToColumn } from "./move-actions";
+import { loadOlderDone, loadTaskForEdit, moveTaskToColumn } from "./move-actions";
 
 /**
  * Applies a drop.
@@ -149,12 +155,17 @@ export function BoardClient({
   memberIdByWorkspaceId,
   workspaceIds,
   showWorkspace,
+  workspaces,
+  currentMemberIds,
 }: {
   columns: BoardColumn[];
   tasks: BoardTask[];
   memberIdByWorkspaceId: Record<string, string>;
   workspaceIds: string[];
   showWorkspace: boolean;
+  /** Every workspace the user belongs to, with its members. Feeds both task modals. */
+  workspaces: Workspace[];
+  currentMemberIds: string[];
 }) {
   const [localTasks, setLocalTasks] = useState(tasks);
 
@@ -172,6 +183,16 @@ export function BoardClient({
     setSyncedFrom(tasks);
     setLocalTasks(tasks);
   }
+
+  /**
+   * The task behind an opened card. `null` while nothing is open; the id alone while its full row
+   * is still loading, so a slow fetch cannot leave the press with no feedback at all.
+   */
+  const [editingTask, setEditingTask] = useState<RawTask | null>(null);
+  const [openingTaskId, setOpeningTaskId] = useState<string | null>(null);
+
+  /** The column "Add task" was pressed in, so the new task lands there rather than leftmost. */
+  const [addingIn, setAddingIn] = useState<{ columnId: string; workspaceId: string } | null>(null);
 
   /** Older completed tasks the user asked for. Client state: a fresh visit starts collapsed. */
   const [olderDone, setOlderDone] = useState<BoardTask[]>([]);
@@ -196,6 +217,23 @@ export function BoardClient({
     setLocalTasks,
     onError: (message) => toast(message, "error"),
   });
+
+  /**
+   * Opens a card. The board's own query carries four fields per task; the edit modal needs
+   * description, members, subtasks and recurrence, so the rest is fetched here rather than joined
+   * into every render of the board.
+   */
+  async function openTask(taskId: string) {
+    setOpeningTaskId(taskId);
+    const res = await loadTaskForEdit(taskId);
+    setOpeningTaskId(null);
+
+    if (!res.ok) {
+      toast(res.error ?? "Could not open that task", "error");
+      return;
+    }
+    setEditingTask(res.task);
+  }
 
   async function showOlder() {
     const terminal = merged.find((c) => c.isDone);
@@ -253,13 +291,20 @@ export function BoardClient({
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       {/*
-        `contain-paint` is load-bearing, not decoration: without it this strip's scrollable overflow
-        propagates to the document, and the whole page — nav included — scrolls sideways by the
-        amount the columns exceed the viewport, even though the strip itself clips and scrolls
-        correctly. e2e/layout.spec.ts asserts the page does not scroll horizontally, which is what
-        caught it.
+        `relative` is load-bearing, not decoration. The strip scrolls sideways and clips its own
+        columns correctly, but the `sr-only` live region in the Done footer is absolutely
+        positioned: with no positioned ancestor its containing block is the page, so it sat at the
+        strip's scroll width rather than inside it and the whole document — nav included — scrolled
+        sideways. e2e/layout.spec.ts asserts the page does not scroll horizontally, which caught it.
+
+        `contain: paint` was the previous answer here and was wrong. It also makes this div a
+        containing block for *fixed* descendants, and @hello-pangea/dnd lifts a card as
+        `position: fixed` at its viewport coordinates — which were then re-anchored to this div,
+        floating the dragged card ~98px below the cursor so it could not be aimed. `relative`
+        contains the absolute descendant and leaves fixed ones on the viewport, which is the
+        distinction the drag depends on.
       */}
-      <div className="isolate flex gap-4 overflow-x-auto px-4 pb-6 pt-1 contain-paint">
+      <div className="relative isolate flex gap-4 overflow-x-auto px-4 pb-6 pt-1">
         {merged.map((column) => {
           const items = groupedByKey[column.key] ?? [];
           // A merged column whose workspaces disagree on colour (color === null) stays neutral —
@@ -286,38 +331,84 @@ export function BoardClient({
                     {column.name}
                   </h2>
                 </div>
-                <span className="shrink-0 rounded-full bg-[var(--color-surface-sunken)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--color-text-secondary)]">
-                  {items.length}
-                </span>
+                {/* An empty column says so in its body; a `0` here as well is the same fact twice. */}
+                {items.length > 0 && (
+                  <span className="shrink-0 rounded-full bg-[var(--color-surface-sunken)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--color-text-secondary)]">
+                    {items.length}
+                  </span>
+                )}
               </header>
 
               <Droppable droppableId={column.key}>
-                {(provided) => (
+                {(provided, snapshot) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={`flex flex-1 flex-col gap-2 p-2 ${
-                      column.isDone && doneExpanded ? "max-h-[60dvh] overflow-y-auto" : ""
-                    }`}
+                    /*
+                      The hovered column tints while a card is over it. Before this, a drag had no
+                      feedback of any kind: nothing lifted, nothing highlighted, and the only way to
+                      tell where a card would land was to let go and see.
+                    */
+                    className={`flex flex-1 flex-col gap-2 p-2 transition-colors duration-150 ease-out ${
+                      snapshot.isDraggingOver ? "bg-[var(--color-accent-subtle)]" : ""
+                    } ${column.isDone && doneExpanded ? "max-h-[60dvh] overflow-y-auto" : ""}`}
                   >
                     {items.map((task, index) => (
                       <Draggable key={task.id} draggableId={task.id} index={index}>
-                        {(dragProvided) => (
+                        {(dragProvided, dragSnapshot) => (
                           <div
                             ref={dragProvided.innerRef}
                             {...dragProvided.draggableProps}
-                            {...dragProvided.dragHandleProps}
-                            className="rounded-md"
+                            className={`rounded-md ${openingTaskId === task.id ? "opacity-60" : ""}`}
                           >
-                            <BoardCard task={task} showWorkspace={showWorkspace} />
+                            <BoardCard
+                              task={task}
+                              showWorkspace={showWorkspace}
+                              isDragging={dragSnapshot.isDragging}
+                              dragHandleProps={dragProvided.dragHandleProps ?? undefined}
+                              onOpen={task.completedAt ? undefined : () => void openTask(task.id)}
+                            />
                           </div>
                         )}
                       </Draggable>
                     ))}
                     {provided.placeholder}
+
+                    {/*
+                      An empty column used to render as a tall blank rectangle with a `0` beside its
+                      name. Three of five columns looked broken on a normal board. The terminal
+                      column keeps its own footer instead, which already explains itself.
+                    */}
+                    {items.length === 0 && !snapshot.isDraggingOver && (
+                      <p className="grid flex-1 place-content-center px-2 py-6 text-center text-xs text-[var(--color-text-muted)]">
+                        {column.isDone ? "Nothing finished yet." : "Drop a task here, or add one below."}
+                      </p>
+                    )}
                   </div>
                 )}
               </Droppable>
+
+              {/*
+                Adding straight into a column, rather than into whichever column happens to be
+                leftmost. Hidden on the terminal column: a task created as already-completed is not
+                a thing this product has.
+              */}
+              {!column.isDone && (() => {
+                const workspaceId = workspaceIds.length === 1 ? workspaceIds[0] : null;
+                const columnId = workspaceId ? column.columnIdByWorkspaceId[workspaceId] : null;
+                if (!workspaceId || !columnId) return null;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setAddingIn({ columnId, workspaceId })}
+                    aria-label={`Add a task to ${column.name}`}
+                    className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-b-lg border-t border-[var(--color-border)] px-3 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-accent-subtle)] hover:text-[var(--color-accent-text)]"
+                  >
+                    <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+                    Add task
+                  </button>
+                );
+              })()}
 
               {column.isDone && (() => {
                 const footerDisabled = loadingOlder || (doneExpanded && !moreOlder);
@@ -355,6 +446,31 @@ export function BoardClient({
           );
         })}
       </div>
+
+      {/*
+        Both modals are the list view's, unchanged. The board contributes the column context and
+        nothing else — a second editor for the same task would be two places to fix every bug.
+      */}
+      {addingIn && (
+        <NewTaskModal
+          open
+          onClose={() => setAddingIn(null)}
+          workspaces={workspaces}
+          currentMemberIds={currentMemberIds}
+          initialWorkspaceId={addingIn.workspaceId}
+          boardColumnId={addingIn.columnId}
+        />
+      )}
+
+      {editingTask && (
+        <EditTaskModal
+          open
+          task={editingTask}
+          workspaces={workspaces}
+          memberIdByWorkspaceId={memberIdByWorkspaceId}
+          onClose={() => setEditingTask(null)}
+        />
+      )}
     </DragDropContext>
   );
 }

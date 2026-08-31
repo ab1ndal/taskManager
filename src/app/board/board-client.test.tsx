@@ -1,4 +1,27 @@
-jest.mock("./move-actions", () => ({ moveTaskToColumn: jest.fn(), loadOlderDone: jest.fn() }));
+jest.mock("./move-actions", () => ({
+  moveTaskToColumn: jest.fn(),
+  loadOlderDone: jest.fn(),
+  loadTaskForEdit: jest.fn(),
+}));
+
+// The two task modals belong to the list view and are covered by its own tests; here they would
+// only drag next/cache into jsdom through their server actions.
+jest.mock("@/app/tasks/edit-task-modal", () => ({
+  EditTaskModal: () => null,
+}));
+jest.mock("@/app/tasks/new-task-modal", () => ({
+  NewTaskModal: ({ boardColumnId }: { boardColumnId?: string }) => (
+    <div data-testid="new-task-modal" data-column={boardColumnId} />
+  ),
+}));
+
+jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
+
+jest.mock("@/app/tasks/actions", () => ({
+  completeTask: jest.fn(),
+  reopenTask: jest.fn(),
+  deleteTask: jest.fn(),
+}));
 
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "jest-axe";
@@ -6,7 +29,8 @@ import type { DropResult } from "@hello-pangea/dnd";
 
 import { BoardClient, buildBoardDragEndHandler } from "./board-client";
 import { groupTasks, mergeColumns, type BoardColumn, type BoardTask } from "./group-columns";
-import { loadOlderDone, moveTaskToColumn } from "./move-actions";
+import { loadOlderDone, loadTaskForEdit, moveTaskToColumn } from "./move-actions";
+import { toast } from "@/components/toaster";
 
 const WS_H = "a0000000-0000-4000-8000-000000000001";
 const WS_W = "a0000000-0000-4000-8000-000000000002";
@@ -15,16 +39,27 @@ const COL_H_TODO = "e0000000-0000-4000-8000-00000000000a";
 const COL_H_PROG = "e0000000-0000-4000-8000-00000000000b";
 const COL_H_DONE = "e0000000-0000-4000-8000-00000000000c";
 const T1 = "c0000000-0000-4000-8000-000000000001";
+const T2 = "c0000000-0000-4000-8000-000000000002";
+
+beforeAll(() => {
+  HTMLDialogElement.prototype.showModal = jest.fn();
+  HTMLDialogElement.prototype.close = jest.fn();
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
   (moveTaskToColumn as jest.Mock).mockResolvedValue({ ok: true });
   (loadOlderDone as jest.Mock).mockResolvedValue({ ok: true, tasks: [], hasMore: false });
+  (loadTaskForEdit as jest.Mock).mockResolvedValue({ ok: true, task: null });
 });
 
 const columns: BoardColumn[] = [
   { id: COL_H_TODO, workspaceId: WS_H, name: "Not Started", color: "tab20-grey", position: 1000, isDone: false },
   { id: COL_H_PROG, workspaceId: WS_H, name: "In Progress", color: "tab20-blue", position: 2000, isDone: false },
+];
+
+const testWorkspaces = [
+  { id: WS_H, name: "Household", kind: "household", members: [{ id: M_H, display_name: "Ali" }] },
 ];
 
 const columnsWithDone: BoardColumn[] = [
@@ -305,6 +340,8 @@ it("renders one region per column, labelled with its task count", () => {
       memberIdByWorkspaceId={{ [WS_H]: M_H }}
       workspaceIds={[WS_H]}
       showWorkspace={false}
+      workspaces={testWorkspaces}
+      currentMemberIds={[M_H]}
     />
   );
 
@@ -320,6 +357,8 @@ it("has no accessibility violations", async () => {
       memberIdByWorkspaceId={{ [WS_H]: M_H }}
       workspaceIds={[WS_H]}
       showWorkspace={false}
+      workspaces={testWorkspaces}
+      currentMemberIds={[M_H]}
     />
   );
 
@@ -339,6 +378,8 @@ it("adopts fresh tasks once the server revalidates and passes new props", () => 
       memberIdByWorkspaceId={{ [WS_H]: M_H }}
       workspaceIds={[WS_H]}
       showWorkspace={false}
+      workspaces={testWorkspaces}
+      currentMemberIds={[M_H]}
     />
   );
   expect(screen.getByRole("region", { name: "Not Started, 1 task" })).toBeInTheDocument();
@@ -354,6 +395,8 @@ it("adopts fresh tasks once the server revalidates and passes new props", () => 
       memberIdByWorkspaceId={{ [WS_H]: M_H }}
       workspaceIds={[WS_H]}
       showWorkspace={false}
+      workspaces={testWorkspaces}
+      currentMemberIds={[M_H]}
     />
   );
 
@@ -370,6 +413,8 @@ describe("showOlder cursor", () => {
         memberIdByWorkspaceId={{ [WS_H]: M_H }}
         workspaceIds={[WS_H]}
         showWorkspace={false}
+        workspaces={testWorkspaces}
+        currentMemberIds={[M_H]}
       />
     );
   }
@@ -419,5 +464,99 @@ describe("showOlder cursor", () => {
     // roughly a week in the past" rather than freezing the clock, since the exact instant isn't the
     // behaviour under test.
     expect(new Date(call.before).getTime()).toBeLessThan(Date.now());
+  });
+});
+
+
+describe("adding a task from a column", () => {
+  function renderBoard() {
+    return render(
+      <BoardClient
+        columns={columns}
+        tasks={[task({ id: T1, boardColumnId: COL_H_TODO })]}
+        memberIdByWorkspaceId={{ [WS_H]: M_H }}
+        workspaceIds={[WS_H]}
+        showWorkspace={false}
+        workspaces={testWorkspaces}
+        currentMemberIds={[M_H]}
+      />
+    );
+  }
+
+  it("opens the create modal against the column that was pressed", () => {
+    renderBoard();
+
+    expect(screen.queryByTestId("new-task-modal")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add a task to In Progress" }));
+
+    expect(screen.getByTestId("new-task-modal")).toHaveAttribute("data-column", COL_H_PROG);
+  });
+
+  it("offers no add control on the terminal column", () => {
+    render(
+      <BoardClient
+        columns={columnsWithDone}
+        tasks={[]}
+        memberIdByWorkspaceId={{ [WS_H]: M_H }}
+        workspaceIds={[WS_H]}
+        showWorkspace={false}
+        workspaces={testWorkspaces}
+        currentMemberIds={[M_H]}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Add a task to Not Started" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add a task to Completed" })).not.toBeInTheDocument();
+  });
+
+  it("says what an empty column is for instead of leaving it blank", () => {
+    renderBoard();
+
+    expect(screen.getByText("Drop a task here, or add one below.")).toBeInTheDocument();
+  });
+});
+
+describe("opening a card", () => {
+  it("fetches the full task and does not fetch for a completed card", async () => {
+    (loadTaskForEdit as jest.Mock).mockResolvedValue({ ok: true, task: null });
+    render(
+      <BoardClient
+        columns={columnsWithDone}
+        tasks={[
+          task({ id: T1, boardColumnId: COL_H_TODO }),
+          task({ id: T2, boardColumnId: COL_H_DONE, completedAt: "2026-08-28T09:00:00.000Z" }),
+        ]}
+        memberIdByWorkspaceId={{ [WS_H]: M_H }}
+        workspaceIds={[WS_H]}
+        showWorkspace={false}
+        workspaces={testWorkspaces}
+        currentMemberIds={[M_H]}
+      />
+    );
+
+    fireEvent.click(screen.getAllByText("Call the plumber")[1]);
+    expect(loadTaskForEdit).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getAllByText("Call the plumber")[0]);
+    await waitFor(() => expect(loadTaskForEdit).toHaveBeenCalledWith(T1));
+  });
+
+  it("toasts rather than opening an empty modal when the task cannot be loaded", async () => {
+    (loadTaskForEdit as jest.Mock).mockResolvedValue({ ok: false, error: "That task no longer exists" });
+    render(
+      <BoardClient
+        columns={columns}
+        tasks={[task({ id: T1, boardColumnId: COL_H_TODO })]}
+        memberIdByWorkspaceId={{ [WS_H]: M_H }}
+        workspaceIds={[WS_H]}
+        showWorkspace={false}
+        workspaces={testWorkspaces}
+        currentMemberIds={[M_H]}
+      />
+    );
+
+    fireEvent.click(screen.getByText("Call the plumber"));
+
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("That task no longer exists", "error"));
   });
 });

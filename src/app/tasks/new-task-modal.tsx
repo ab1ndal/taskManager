@@ -22,6 +22,8 @@ export function NewTaskModal({
   currentMemberIds,
   onTaskCreated,
   onTaskError,
+  initialWorkspaceId,
+  boardColumnId,
 }: {
   open: boolean;
   onClose: () => void;
@@ -29,8 +31,16 @@ export function NewTaskModal({
   currentMemberIds: string[];
   onTaskCreated?: (task: RawTask) => void;
   onTaskError?: (taskId: string) => void;
+  /** Preselects the workspace. The board opens this from a column, which belongs to one. */
+  initialWorkspaceId?: string;
+  /**
+   * The board column to create the task in. Sent only while the workspace picker still shows
+   * `initialWorkspaceId`: a column belongs to one workspace, so switching workspace mid-form makes
+   * it meaningless and the server would fall back to the leftmost column anyway.
+   */
+  boardColumnId?: string;
 }) {
-  const firstWorkspace = workspaces[0];
+  const firstWorkspace = workspaces.find((w) => w.id === initialWorkspaceId) ?? workspaces[0];
   const getInitialMembers = (wsId: string) =>
     workspaces.find((w) => w.id === wsId)?.members
       .filter((m) => currentMemberIds.includes(m.id))
@@ -120,6 +130,7 @@ export function NewTaskModal({
       recurrence: recurrence
         ? { ...recurrence, dueOffsetHours: recurrence.dueOffsetHours ?? undefined, isActive: true }
         : undefined,
+      boardColumnId: boardColumnId && workspaceId === initialWorkspaceId ? boardColumnId : undefined,
     });
 
     if (!parsed.success) {

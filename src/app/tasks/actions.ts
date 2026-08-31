@@ -155,6 +155,7 @@ export async function completeTask(rawTaskId: string): Promise<ActionResult> {
     }
 
     revalidatePath("/tasks");
+    revalidatePath("/board");
     return {};
   });
 }
@@ -257,6 +258,7 @@ export async function reopenTask(rawTaskId: string): Promise<ActionResult> {
     await reHomeOutOfTerminalColumn(admin, rootTaskId);
 
     revalidatePath("/tasks");
+    revalidatePath("/board");
     return {};
   });
 }
@@ -271,6 +273,7 @@ export async function deleteTask(rawTaskId: string): Promise<ActionResult> {
     assertNoError("delete task", await admin.from("tasks").delete().eq("id", taskId));
 
     revalidatePath("/tasks");
+    revalidatePath("/board");
     return {};
   });
 }
@@ -280,10 +283,8 @@ export async function createTaskWithSubtasks(
 ): Promise<ActionResult<{ subtaskErrors: number; recurrenceFailed: boolean }>> {
   return run("createTaskWithSubtasks", async () => {
     const { user } = await requireUser();
-    const { title, description, dueAt, workspaceId, memberIds, subtasks, recurrence } = parseInput(
-      createTaskWithSubtasksSchema,
-      input
-    );
+    const { title, description, dueAt, workspaceId, memberIds, subtasks, recurrence, boardColumnId: requestedColumnId } =
+      parseInput(createTaskWithSubtasksSchema, input);
     const uniqueMemberIds = [...new Set(memberIds)];
 
     await assertWorkspaceMember(workspaceId, user.id);
@@ -300,17 +301,26 @@ export async function createTaskWithSubtasks(
     // task, not a board-only concern. The leftmost non-terminal column is the "new work" column:
     // is_done is excluded explicitly rather than relying on position, because a workspace may have
     // reordered its terminal column to the front.
-    const { data: firstColumn, error: firstColumnError } = await admin
+    //
+    // A caller may name a column instead — the board's per-column "Add task" does. The request is
+    // checked rather than trusted: a column belonging to another workspace, or a terminal one,
+    // falls back to the default. Landing a brand-new task under Done would contradict the board's
+    // own rule that the terminal column holds completed work.
+    const { data: openColumns, error: openColumnsError } = await admin
       .from("board_columns")
       .select("id")
       .eq("workspace_id", workspaceId)
       .eq("is_done", false)
-      .order("position", { ascending: true })
-      .limit(1);
+      .order("position", { ascending: true });
 
-    assertNoError("load first board column", { error: firstColumnError });
+    assertNoError("load board columns", { error: openColumnsError });
 
-    const boardColumnId = firstColumn?.[0]?.id as string | undefined;
+    const openColumnIds = (openColumns ?? []).map((c) => c.id as string);
+    const boardColumnId =
+      requestedColumnId && openColumnIds.includes(requestedColumnId)
+        ? requestedColumnId
+        : openColumnIds[0];
+
     if (!boardColumnId) {
       throw new Error(`workspace ${workspaceId} has no non-terminal board column`);
     }
@@ -382,6 +392,7 @@ export async function createTaskWithSubtasks(
     }
 
     revalidatePath("/tasks");
+    revalidatePath("/board");
     return { subtaskErrors, recurrenceFailed };
   });
 }
@@ -446,6 +457,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<ActionResult> 
       if (moveError) throw new Error(`move task workspace: ${moveError.message}`);
 
       revalidatePath("/tasks");
+      revalidatePath("/board");
       return {};
     }
 
@@ -472,6 +484,7 @@ export async function updateTask(input: UpdateTaskInput): Promise<ActionResult> 
     }
 
     revalidatePath("/tasks");
+    revalidatePath("/board");
     return {};
   });
 }

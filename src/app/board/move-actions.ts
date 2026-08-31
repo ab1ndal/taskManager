@@ -7,7 +7,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { assertNoError, run } from "@/app/tasks/action-run";
 import { completeTask, reopenTask } from "@/app/tasks/actions";
-import { parseInput, ValidationError } from "@/app/tasks/schemas";
+import { toLocalInputValue } from "@/app/tasks/recurrence-time";
+import type { RawTask } from "@/app/tasks/bucket-tasks";
+import { parseInput, taskIdSchema, ValidationError } from "@/app/tasks/schemas";
 import { knownRpcFailure } from "./rpc-errors";
 import {
   loadOlderDoneSchema,
@@ -248,5 +250,100 @@ export async function loadOlderDone(
     }));
 
     return { tasks, hasMore };
+  });
+}
+
+
+/**
+ * The full task behind a card, fetched only when one is opened.
+ *
+ * The board's own query is deliberately thin — title, deadline, workspace, column — because it
+ * renders every assigned task at once. The edit modal needs description, members, subtasks and
+ * recurrence, which is four more joins per card for data that is read one card at a time. So the
+ * board keeps its narrow query and pays for the rest on demand, the same posture `loadOlderDone`
+ * takes for the done column's history.
+ *
+ * Runs on the user-scoped client: RLS decides what comes back, and `assertTaskAssignee` refuses a
+ * task the caller cannot see before any of it is read.
+ */
+export async function loadTaskForEdit(rawTaskId: string): Promise<ActionResult<{ task: RawTask }>> {
+  return run("loadTaskForEdit", async () => {
+    const { user } = await requireUser();
+    const taskId = parseInput(taskIdSchema, rawTaskId);
+    await assertTaskAssignee(taskId, user.id);
+
+    const admin = createAdminClient();
+
+    const { data: rows, error: taskError } = await admin
+      .from("tasks")
+      .select("id, title, description, due_at, completed_at, workspace_id")
+      .eq("id", taskId)
+      .limit(1);
+    assertNoError("load task", { error: taskError });
+
+    const row = rows?.[0];
+    if (!row) throw new ForbiddenError("That task no longer exists");
+
+    const workspaceId = row.workspace_id as string;
+
+    const [{ data: workspaceRows }, { data: assignmentRows }, { data: subtaskRows }, { data: ruleRows }] =
+      await Promise.all([
+        admin.from("workspaces").select("id, name, kind").eq("id", workspaceId).limit(1),
+        admin.from("task_assignments").select("member_id, member_sort_key").eq("task_id", taskId),
+        admin
+          .from("tasks")
+          .select("id, title, completed_at, description, due_at")
+          .eq("parent_task_id", taskId)
+          .order("created_at", { ascending: true }),
+        admin
+          .from("task_rules")
+          .select("frequency, interval_count, next_run_at, default_due_offset_hours, is_active")
+          .eq("task_id", taskId)
+          .limit(1),
+      ]);
+
+    const workspace = workspaceRows?.[0];
+    const ownMemberIds = await memberIdsForUser(user.id);
+    const assignments = assignmentRows ?? [];
+    const mine = assignments.find((a) => ownMemberIds.includes(a.member_id as string));
+
+    // A paused rule still has a row, and still has to reach the modal so re-enabling restores the
+    // schedule the user set rather than overwriting it with defaults. Same rule as /tasks: the row
+    // carries `recurrence`, `is_active` alone drives `recurring`.
+    const rule = ruleRows?.[0];
+
+    const task: RawTask = {
+      id: row.id as string,
+      title: row.title as string,
+      description: (row.description as string | null) ?? null,
+      due_at: (row.due_at as string | null) ?? null,
+      completed_at: (row.completed_at as string | null) ?? null,
+      workspace: {
+        id: workspaceId,
+        name: (workspace?.name as string | undefined) ?? "Unknown",
+        kind: (workspace?.kind as string | undefined) ?? "work",
+      },
+      member_sort_key: (mine?.member_sort_key as number | undefined) ?? 0,
+      assignee_count: assignments.length || 1,
+      member_ids: assignments.map((a) => a.member_id as string),
+      subtasks: (subtaskRows ?? []).map((sub) => ({
+        id: sub.id as string,
+        title: sub.title as string,
+        completed_at: (sub.completed_at as string | null) ?? null,
+        description: (sub.description as string | null) ?? null,
+        due_at: (sub.due_at as string | null) ?? null,
+      })),
+      recurrence: rule
+        ? {
+            frequency: rule.frequency as "daily" | "weekly" | "monthly",
+            intervalCount: rule.interval_count as number,
+            firstRunAt: toLocalInputValue(rule.next_run_at as string),
+            dueOffsetHours: (rule.default_due_offset_hours as number | null) ?? null,
+          }
+        : null,
+      recurring: Boolean(rule?.is_active),
+    };
+
+    return { task };
   });
 }
