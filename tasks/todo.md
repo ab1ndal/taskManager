@@ -71,10 +71,16 @@ all closed 2026-07-27. Full write-ups in `06.5-FOLLOWUPS.md`.
   column is unreachable from the keyboard once five columns are defined. `e2e/board.spec.ts` widens
   the viewport to keep its drag test about the drop. A fix is either auto-scrolling the strip on a
   cross-axis move or a keyboard "move to column…" affordance.
-- **The board's drop write is fire-and-forget.** Navigating away immediately after a drop aborts the
-  in-flight server action and the move is lost with no error — the card was only ever placed
-  optimistically. Reproduced in the e2e run (webkit, firefox and mobile Safari) before the test was
-  reordered to wait for the write.
+- **Optimistic writes are fire-and-forget.** Navigating away immediately after a drop aborts the
+  in-flight server action and the move is lost with no error — the card, or the column, was only ever
+  moved optimistically. Reproduced in the e2e run on webkit, firefox and mobile Safari for both the
+  card drag and the Settings column reorder; both tests now wait for the write before navigating. A
+  product fix would keep the request alive or surface a pending state, and is its own slice.
+
+- **`page.goto` occasionally times out during a long serial e2e run**, twice now on different
+  surfaces (webkit `/board`, iphone `/tasks` behind the edit-task dialog), each passing on a targeted
+  rerun. Suspect the single `next start` server under a 300-test serial run rather than any page. If
+  it recurs, instrument the server rather than raising the timeout.
 
 ## Still open from earlier phases
 
