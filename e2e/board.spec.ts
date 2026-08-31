@@ -49,6 +49,18 @@ async function columnIdByName(name: string): Promise<string> {
   return id;
 }
 
+/** The seeded workspace's column names in stored `position` order — what both readers sort by. */
+async function orderInDatabase(): Promise<string[]> {
+  const admin = adminClient();
+  const { data, error } = await admin
+    .from("board_columns")
+    .select("name")
+    .eq("workspace_id", await workspaceId())
+    .order("position", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((c) => c.name as string);
+}
+
 /**
  * Puts the seeded root tasks back in the leftmost non-terminal column, which is where `seed()` left
  * them, and removes any column this spec created. Idempotent, so it is safe both before a run
@@ -200,8 +212,13 @@ test("a column can be dragged to a new position, and the board follows", async (
   const moved = ["Not Started", "Blocked", "In Progress", "Follow-up", "Completed"];
   await expect.poll(names, { message: "the column did not move in the editor" }).toEqual(moved);
 
-  // The write, not just the optimistic row: reload the editor, then check the board renders the
-  // same order — position is what both read.
+  // The row moves optimistically, so wait for the write itself before reloading: a reload cancels
+  // the in-flight server action, which is how this passed on Chromium and failed everywhere else.
+  await expect
+    .poll(orderInDatabase, { message: "the reorder never reached the database" })
+    .toEqual(moved);
+
+  // Now prove both readers agree with the stored positions.
   await page.reload();
   expect(await names()).toEqual(moved);
 
