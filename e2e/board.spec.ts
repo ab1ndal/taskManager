@@ -78,6 +78,17 @@ async function restoreFixture(): Promise<void> {
     .not("completed_at", "is", null);
   if (reopenErr) throw reopenErr;
 
+  // A reorder test moves a column; positions are 1000-spaced by the seed trigger, so putting them
+  // back by name restores exactly what migration 015 seeds.
+  for (const [index, name] of ["Not Started", "In Progress", "Blocked", "Follow-up", "Completed"].entries()) {
+    const { error } = await admin
+      .from("board_columns")
+      .update({ position: (index + 1) * 1000 })
+      .eq("workspace_id", wsId)
+      .eq("name", name);
+    if (error) throw error;
+  }
+
   const { error: dropErr } = await admin
     .from("board_columns")
     .delete()
@@ -142,7 +153,7 @@ test("a column can be added, recoloured and renamed, and a rename leaves its car
   const nameInput = page
     .getByRole("region", { name: /columns$/ })
     .first()
-    .getByLabel("Column name")
+    .getByLabel("Column name", { exact: true })
     .nth(DEFAULT_COLUMNS.length);
   await expect(nameInput).toHaveValue(added);
   await nameInput.fill(renamed);
@@ -167,6 +178,37 @@ test("a name a sibling column already has is refused in the field, not the whole
   // Field-level: the message sits on the input and the typed name survives, so it can be corrected.
   await expect(page.getByText("That name is already used in this workspace")).toBeVisible();
   await expect(page.getByLabel(/^New column name/).first()).toHaveValue("blocked");
+});
+
+test("a column can be dragged to a new position, and the board follows", async ({ page }) => {
+  await page.goto("/settings?tab=board");
+  const list = page.getByRole("region", { name: /columns$/ }).first();
+  // Exact, or the add form's "New column name for …" input matches too.
+  const names = () => list.getByLabel("Column name", { exact: true }).evaluateAll((els) =>
+    els.map((el) => (el as HTMLInputElement).value)
+  );
+  expect(await names()).toEqual(DEFAULT_COLUMNS);
+
+  // Keyboard drag on the row handle, the same lift/move/drop sequence e2e/drag-reorder.spec.ts uses.
+  await page.getByRole("button", { name: 'Reorder "Blocked"' }).focus();
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("ArrowUp");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Space");
+
+  const moved = ["Not Started", "Blocked", "In Progress", "Follow-up", "Completed"];
+  await expect.poll(names, { message: "the column did not move in the editor" }).toEqual(moved);
+
+  // The write, not just the optimistic row: reload the editor, then check the board renders the
+  // same order — position is what both read.
+  await page.reload();
+  expect(await names()).toEqual(moved);
+
+  await page.goto("/board");
+  await expect(
+    page.getByRole("region", { name: /, \d+ tasks?$/ }).locator("h2")
+  ).toHaveText(moved);
 });
 
 test("dragging a card into Completed completes it in the list view", async ({ page }) => {

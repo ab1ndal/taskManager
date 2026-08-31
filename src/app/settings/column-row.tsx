@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { CheckCircle2, Trash2 } from "lucide-react";
+import { CheckCircle2, GripVertical, Trash2 } from "lucide-react";
+import type { DraggableProvidedDragHandleProps, DraggableProvidedDraggableProps } from "@hello-pangea/dnd";
 
 import { renameBoardColumn, setBoardColumnColor } from "@/app/board/actions";
 import type { BoardColumn } from "@/app/board/group-columns";
@@ -27,11 +28,19 @@ export function ColumnRow({
   siblings,
   nonTerminalSiblingCount,
   onDeleted,
+  innerRef,
+  draggableProps,
+  dragHandleProps,
 }: {
   column: BoardColumn;
   siblings: BoardColumn[];
   nonTerminalSiblingCount: number;
   onDeleted: () => void;
+  // Supplied by the editor's <Draggable>. Optional so this row still renders — and stays testable —
+  // outside a DragDropContext; without them it is simply a row that cannot be dragged.
+  innerRef?: (element: HTMLElement | null) => void;
+  draggableProps?: DraggableProvidedDraggableProps;
+  dragHandleProps?: DraggableProvidedDragHandleProps | null;
 }) {
   const [name, setName] = useState(column.name);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -90,7 +99,22 @@ export function ColumnRow({
   }
 
   return (
-    <li className="flex items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+    <li
+      ref={innerRef}
+      {...draggableProps}
+      className="flex items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2"
+    >
+      {dragHandleProps && (
+        <button
+          type="button"
+          aria-label={`Reorder "${column.name}"`}
+          className="flex min-h-11 min-w-11 shrink-0 cursor-grab items-center justify-center text-[var(--color-text-muted)] active:cursor-grabbing"
+          {...dragHandleProps}
+        >
+          <GripVertical size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </button>
+      )}
+
       <ColorPicker value={color} onChange={saveColor} label={`Colour for ${column.name}`} />
 
       <div className="flex min-w-0 flex-1 flex-col justify-center">

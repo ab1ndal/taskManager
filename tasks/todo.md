@@ -59,20 +59,13 @@ all closed 2026-07-27. Full write-ups in `06.5-FOLLOWUPS.md`.
   whether offline is in scope; if yes it is its own slice, not a config flag.
 - **F12** — icons are placeholder art. Needs real artwork at 192, 512, maskable 512 and 180.
 
-## Follow-up from Task 12 (Board settings tab — column editor)
-
-- **Column reordering in Settings** — `src/app/settings/board-columns-editor.tsx` renders each
-  workspace's columns in `position` order with no drag handle; `reorderBoardColumn`
-  (`src/app/board/actions.ts`) exists and is action-tested but nothing here calls it. New columns
-  land at the end via `createBoardColumn`'s own placement. Wiring a second `DragDropContext` (the
-  board already has one, for cards) is separable work, not built here per the task-12 brief.
-
 ## Follow-ups from the kanban board branch (`feat/kanban-board`, 2026-08-30)
 
-- **Column reordering is not wired up.** `position` is respected everywhere and `reorderBoardColumn`
-  (`src/app/board/actions.ts`) exists and is action-tested, but no drag handle calls it. New columns
-  land at the end of the list. Wiring it means a second `DragDropContext` in
-  `src/app/settings/board-columns-editor.tsx`; separable work, deliberately out of the board slice.
+- [x] **Column reordering** — done 2026-08-30. `src/app/settings/board-columns-editor.tsx` now has its
+  own `DragDropContext`; each row carries a `Reorder "<name>"` handle and the drop calls
+  `reorderBoardColumn` with the positions either side of it. The terminal column drags like any other
+  (decided 2026-08-30: the board renders whatever `position` gives, and nothing assumes Completed is
+  last). New columns still land at the end via `createBoardColumn`'s own placement.
 - **Keyboard drag cannot reach a column that is scrolled out of view.** `@hello-pangea/dnd`'s
   cross-axis keyboard move stops at the last visible column, so on a 1280px-wide window the terminal
   column is unreachable from the keyboard once five columns are defined. `e2e/board.spec.ts` widens
