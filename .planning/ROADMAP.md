@@ -21,6 +21,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 6.5: App-Wide UI/UX Polish** (INSERTED) - Task panel polish plus the whole-app design system: dark mode, semantic tokens, icon consolidation, reduced motion (absorbs the former Phase 8)
 - [x] **Phase 7: Recurring Tasks** - Rule-driven task generation (code-complete, verified on DEV
   2026-07-29; shipped to production 2026-07-30)
+- [ ] **Phase 8: Installable on iPhone** - Harden the existing PWA into a home-screen app; web push permission plumbing
+- [ ] **Phase 9: Daily Reminder Digest** - One message a day per user: overdue, due today, due soon, by email and web push
 
 **Task Detail & Editing** was the original Phase 3. It was largely built outside the planning loop
 (`edit-task-modal.tsx`, `updateTask`, assignee management), so it is not carried as a separate phase.
@@ -161,14 +163,49 @@ Plans:
 - [x] Task 10: dev re-verification, `07-VERIFICATION.md`, `07-FOLLOWUPS.md`, roadmap/state close-out
   (this task — production deploy explicitly deferred)
 
-### Phase 8: Design Polish — FOLDED INTO PHASE 6.5 (2026-07-26)
+### Phase 8: Installable on iPhone
+**Goal**: Both phones install Hearth from Safari's share sheet and it behaves like an app, not a
+bookmarked tab
+**Depends on**: Phase 7
+**Requirements**: raised 2026-08-31; design in
+`docs/superpowers/specs/2026-08-31-ios-pwa-and-reminders-design.md`
+**Success Criteria** (what must be TRUE):
+  1. Installed from the share sheet, the app cold-launches standalone and the session survives —
+     no silent logout between launches
+  2. The app shell loads with no network; task data falls back to the last successful response
+  3. Content clears the notch and home indicator, and no route is a dead end without a browser back
+     button
+  4. A home-screen install can be granted notification permission and its push subscription is
+     stored
+**Out of scope**: App Store, Capacitor, native code, Apple developer account, Android
+**Plans**: TBD
+
+### Phase 9: Daily Reminder Digest
+**Goal**: Each user gets one message a day listing what is overdue, due today, and due soon
+**Depends on**: Phase 8 (iOS grants web push only to a home-screen install)
+**Requirements**: raised 2026-08-31; design in
+`docs/superpowers/specs/2026-08-31-ios-pwa-and-reminders-design.md`
+**Success Criteria** (what must be TRUE):
+  1. At the user's chosen local time, one message arrives on the enabled channels with three
+     sections: overdue, due today, due soon
+  2. The digest names only incomplete, dated tasks assigned to that user via `task_assignments`
+  3. A user with nothing in all three sections receives no message
+  4. A repeated cron tick, or a retry after a partial failure, cannot send the same digest twice on
+     the same local day
+  5. Channels are configurable per user from Settings → Notifications
+**Out of scope**: WhatsApp, SMS, per-task reminder times, due-date offset fires, event
+notifications
+**Plans**: TBD
+
+### Former Phase 8: Design Polish — FOLDED INTO PHASE 6.5 (2026-07-26)
 Its goal (one coherent visual system across light and dark) and audit items U6, U8-U12 are now
-success criteria 2-4 of Phase 6.5. Kept here only so the renumbering is traceable.
+success criteria 2-4 of Phase 6.5. Kept here only so the renumbering is traceable. The number 8 was
+reused on 2026-08-31 for Installable on iPhone.
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7 → 8 → 9
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -180,7 +217,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 6.5 → 7
 | 6. Task Updates & Speech-to-Text | 8/8 | Code landed; manual verification checklist still open | - |
 | 6.5. App-Wide UI/UX Polish | 6/6 | Complete — visual pass done in both colour schemes | 2026-07-26 |
 | 7. Recurring Tasks | 10/10 | Complete — shipped, migrations 012-014 live on production | 2026-07-30 |
-| ~~8. Design Polish~~ | - | Folded into 6.5 (2026-07-26) | - |
+| 8. Installable on iPhone | 0/? | Not started | - |
+| 9. Daily Reminder Digest | 0/? | Not started | - |
+| ~~Former 8. Design Polish~~ | - | Folded into 6.5 (2026-07-26); the number was reused for Installable on iPhone 2026-08-31 | - |
 
 **Superseded:** the old "Phase 5: Task and workspace lifecycle" entry. Task deletion, editing, and
 completion all landed — deletion and completion were fixed properly in Phase 3, which also found
