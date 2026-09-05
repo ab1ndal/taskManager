@@ -1,7 +1,13 @@
 # iPhone Install & Daily Reminders — Design
 
 Date: 2026-08-31
-Status: approved, not yet implemented
+Status: original approved design; reminder implementation updated 2026-09-05.
+
+The current reminder implementation and setup are documented in [Daily reminders](../../reminders.md).
+User decisions supersede the email portions below: free Gmail SMTP, separate work/personal recipient
+addresses per user, and routing by workspace kind rather than name. Atomic leases replace the
+read-before-send check, and ambiguous SMTP attempts are not automatically retried.
+The push worker is included; the broader offline-shell phase remains separate.
 
 Two roadmap phases, designed together because they couple: iOS grants web push only to a PWA that
 has been installed to the home screen, so the reminder channel depends on the install phase.

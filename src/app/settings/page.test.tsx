@@ -25,6 +25,8 @@ jest.mock("@/lib/supabase/browser", () => ({
   }),
 }));
 
+jest.mock("./notifications-tab", () => ({ NotificationsTab: () => <div>Notifications tab content</div> }));
+
 jest.mock("./board-tab", () => ({ BoardTab: () => <div>Board tab content</div> }));
 
 let mockSearch = "";
@@ -38,11 +40,12 @@ async function renderPage(search: string) {
   return render(await SettingsPage({ searchParams: Promise.resolve(Object.fromEntries(new URLSearchParams(search))) }));
 }
 
-it("shows both tabs", async () => {
+it("shows all settings tabs", async () => {
   await renderPage("");
 
   expect(screen.getByRole("link", { name: "Profile" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Board" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Notifications" })).toBeInTheDocument();
 });
 
 it("defaults to the profile tab", async () => {
@@ -106,4 +109,10 @@ it("has no accessibility violations", async () => {
   await screen.findByRole("heading", { name: "Profile" });
 
   expect(await axe(container)).toHaveNoViolations();
+});
+
+it("shows notification settings when requested", async () => {
+  await renderPage("tab=notifications");
+  expect(screen.getByText("Notifications tab content")).toBeInTheDocument();
+  expect(mockRedirect).not.toHaveBeenCalled();
 });

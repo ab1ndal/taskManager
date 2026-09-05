@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { TabPill } from "@/app/tasks/tab-pill";
 import { BoardTab } from "./board-tab";
+import { NotificationsTab } from "./notifications-tab";
 import { ProfileTab } from "./profile-tab";
 
 type SearchParams = Promise<{ tab?: string }>;
@@ -19,11 +20,11 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
   // the same fact. Bare /settings (no tab at all) is left alone — that already renders Profile
   // with no pill lit, which is correct: the Profile pill only lights up once its own explicit
   // ?tab=profile link is followed.
-  if (tab !== undefined && tab !== "profile" && tab !== "board") {
+  if (tab !== undefined && tab !== "profile" && tab !== "board" && tab !== "notifications") {
     redirect("/settings?tab=profile");
   }
 
-  const active = tab === "board" ? "board" : "profile";
+  const active = tab ?? "profile";
 
   return (
     <main className="p-6">
@@ -32,9 +33,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
       <nav aria-label="Settings sections" className="mb-6 flex gap-1 overflow-x-auto border-b border-[var(--color-border)] pb-3">
         <TabPill href="/settings?tab=profile" label="Profile" matchKey="tab" matchValue="profile" />
         <TabPill href="/settings?tab=board" label="Board" matchKey="tab" matchValue="board" />
+        <TabPill href="/settings?tab=notifications" label="Notifications" matchKey="tab" matchValue="notifications" />
       </nav>
 
-      {active === "board" ? <BoardTab /> : <ProfileTab />}
+      {active === "board" ? <BoardTab /> : active === "notifications" ? <NotificationsTab /> : <ProfileTab />}
     </main>
   );
 }

@@ -179,3 +179,23 @@ task_assignments.member_id, task_assignments.member_sort_key
 task_rules.next_run_at (partial, where is_active)
 task_updates.task_id, task_updates.created_at
 workspace_members.workspace_id, workspace_members.auth_user_id
+
+
+## Daily reminders (migrations 022–025)
+
+`notification_prefs` is keyed by auth user and stores email/push opt-ins, work and personal email
+addresses, digest time, IANA timezone, and soon-window days. Owner-only RLS covers reads and writes.
+`digest_time` is constrained to a quarter hour (migration 025) because the dispatcher only ticks
+every 15 minutes. Workspace `kind` routes `work` tasks to work email and every other kind to
+personal email, independent of workspace names. Assignment membership still determines task visibility and priority.
+
+`push_subscriptions` stores each user's browser endpoint and encryption keys with owner-only RLS.
+`notification_log` is service-role-only, unique on `(user_id, period_key, channel)`. Channels are
+`email_work`, `email_personal`, and `push`; period keys are local dates. Rows hold a frozen payload,
+claim token/time, attempted/sent timestamps, and delivered push endpoints. `claim_notification` is a
+service-role-only invoker RPC that atomically inserts or reclaims an expired ten-minute lease.
+An ambiguous email attempt is not reclaimable, avoiding automatic duplicate SMTP delivery.
+
+`private.dispatch_daily_reminders` reads the URL and cron secret from Vault and uses `pg_net` to call
+the reminder route every fifteen minutes. Without both Vault values the scheduled function is inert.
+See [reminder setup](reminders.md) for deployment, recipient configuration and retry semantics.

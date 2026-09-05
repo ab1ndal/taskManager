@@ -2,6 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  // These endpoints authenticate independently or must be public for push registration.
+  if (request.nextUrl.pathname === "/api/cron/reminders" || request.nextUrl.pathname === "/sw.js") {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
