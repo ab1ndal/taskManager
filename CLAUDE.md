@@ -23,26 +23,6 @@ Read docs/db.md when working with database schema, RLS, or queries.
 
 Read docs/workflow.md for development workflow rules.
 
-## Context Management Rules
-
-1. Never scan the entire repository unless explicitly requested.
-2. Use search before opening files.
-3. Only open files necessary for the task.
-4. Implement one feature slice at a time.
-5. Prefer small diffs instead of rewriting entire files.
-6. Do not open lockfiles, node_modules, or build outputs.
-
-## Development Order
-
-Always follow this order when implementing features:
-
-1. Database schema and migrations
-2. Row Level Security policies
-3. API routes
-4. UI components
-5. Tests
-6. Polishing
-
 ## Core Product Rules
 
 Visibility
