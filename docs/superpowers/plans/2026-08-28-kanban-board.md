@@ -1,6 +1,26 @@
 # Kanban Board Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Implementation status (2026-09-05):** Tasks 1–15 are implemented on `main`. The saved execution
+ledger records their completion on August 30, and the current source and commit history confirm
+it. Column reordering, originally deferred in Task 12, landed in `11f9364`; card editing, deletion,
+creation and drag polish landed in `415f8c5`.
+
+This document is the historical implementation recipe, including superseded code snippets and
+intermediate migration numbers. Its step bullets are not an active checklist. Current verification,
+the additional keyboard move dialog and the unresolved original completed-column selector are
+tracked in [tasks/todo.md](../../../tasks/todo.md). The reconciled design records the later UI
+choices. Do not replay this plan's migrations or commits to close a stale checkbox.
+
+| Tasks | Delivered work | Status |
+|---|---|---|
+| 1–4 | Schema/RLS, RPCs, test fake, validation and color tokens | Implemented |
+| 5–7 | Column actions, task moves, completed history, task creation | Implemented |
+| 8–10 | Grouping, cards, board route and drag-and-drop | Implemented |
+| 11–13 | Settings, column editor and per-task delete destinations | Implemented |
+| 14–15 | Browser coverage and documentation | Implemented |
+
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Historical steps are preserved below; active tracking has moved to `tasks/todo.md`.
 
 **Goal:** Ship a kanban board at `/board` where tasks are dragged between shared, per-workspace columns, plus a `/settings` Board tab for defining those columns and their colors.
 
@@ -85,7 +105,7 @@ The direct host `db.<ref>.supabase.co` is IPv6-only and unreachable here, and th
 - Consumes: nothing.
 - Produces: table `public.board_columns (id uuid, workspace_id uuid, name text, color text, position numeric, is_done boolean, created_at timestamptz)`; column `public.tasks.board_column_id uuid`; trigger function `private.seed_board_columns()`; `TAB20_SLUGS: readonly string[]`, `type Tab20Slug`, `DEFAULT_BOARD_COLUMNS: { name: string; color: Tab20Slug; isDone: boolean }[]` from `src/app/board/colors.ts`.
 
-- [ ] **Step 1: Write the failing test for the color module**
+- **Step 1: Write the failing test for the color module**
 
 Create `src/app/board/colors.test.ts`:
 
@@ -130,12 +150,12 @@ describe("tab20 palette", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to confirm it fails**
+- **Step 2: Run it to confirm it fails**
 
 Run: `npx jest src/app/board/colors.test.ts`
 Expected: FAIL — `Cannot find module './colors'`.
 
-- [ ] **Step 3: Write the color module**
+- **Step 3: Write the color module**
 
 Create `src/app/board/colors.ts`:
 
@@ -191,12 +211,12 @@ export const DEFAULT_BOARD_COLUMNS: { name: string; color: Tab20Slug; isDone: bo
 ];
 ```
 
-- [ ] **Step 4: Run the test to confirm it passes**
+- **Step 4: Run the test to confirm it passes**
 
 Run: `npx jest src/app/board/colors.test.ts`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Write the migration**
+- **Step 5: Write the migration**
 
 Create `supabase/migrations/015_board_columns.sql`:
 
@@ -366,7 +386,7 @@ create trigger tasks_board_column_workspace_matches
   for each row execute function private.assert_board_column_workspace();
 ```
 
-- [ ] **Step 6: Dry-run the migration against dev**
+- **Step 6: Dry-run the migration against dev**
 
 No local Postgres exists here, so this runs against the dev project inside a transaction that is rolled back. Read the connection string from the environment, never paste it into a file:
 
@@ -388,7 +408,7 @@ SQL
 
 Expected: every workspace reports `columns = 5, done = 1`; both counts are `0`; the final line is `ROLLBACK`.
 
-- [ ] **Step 7: Verify the two guards actually reject**
+- **Step 7: Verify the two guards actually reject**
 
 ```bash
 psql "$DEV_DB" <<'SQL'
@@ -421,7 +441,7 @@ SQL
 
 Expected: `ERROR: board column ... belongs to workspace ..., not ...`.
 
-- [ ] **Step 8: Apply the migration to dev**
+- **Step 8: Apply the migration to dev**
 
 Through the CLI, so the migration history stays consistent (Global Constraints; `tasks/lessons.md` L9):
 
@@ -434,7 +454,7 @@ Expected: `db push` applies `015` and nothing else; `migration list --linked` th
 
 If `db push` reports a password problem, it needs `SUPABASE_DB_PASSWORD` from `.env.local` in the environment — the CLI's passwordless fallback fails on this project with "permission denied to alter role".
 
-- [ ] **Step 9: Commit**
+- **Step 9: Commit**
 
 ```bash
 git add supabase/migrations/015_board_columns.sql src/app/board/colors.ts src/app/board/colors.test.ts
@@ -466,7 +486,7 @@ without someone choosing where it goes."
 
 `p_member_id` is on the move function because the drop writes the caller's own `member_sort_key` row; the function verifies that member belongs to the calling user's workspace scope rather than trusting it.
 
-- [ ] **Step 1: Write the migration**
+- **Step 1: Write the migration**
 
 Create `supabase/migrations/018_board_column_rpcs.sql`:
 
@@ -676,7 +696,7 @@ revoke execute on function public.delete_board_column(uuid, jsonb) from authenti
 grant execute on function public.delete_board_column(uuid, jsonb) to service_role;
 ```
 
-- [ ] **Step 2: Dry-run and exercise both functions against dev**
+- **Step 2: Dry-run and exercise both functions against dev**
 
 ```bash
 psql "$DEV_DB" -v ON_ERROR_STOP=1 <<'SQL'
@@ -732,7 +752,7 @@ SQL
 
 Expected: two `NOTICE: refused as expected: ...` lines, then `ROLLBACK`. If dev has only one workspace the first case prints its skip notice instead — that path is covered by the unit tests in Task 4.
 
-- [ ] **Step 3: Apply to dev**
+- **Step 3: Apply to dev**
 
 ```bash
 supabase db push
@@ -741,7 +761,7 @@ supabase migration list --linked
 
 Expected: `db push` applies `016`; the listing then shows `016` on both sides.
 
-- [ ] **Step 3b: Write migration `019_recurrence_board_column_reset.sql`**
+- **Step 3b: Write migration `019_recurrence_board_column_reset.sql`**
 
 `public.run_due_recurrences` (migration 014, lines 62-67) reactivates a recurring task by clearing
 `completed_at`, and never touches `board_column_id`. If the task was completed by dragging it into the
@@ -789,7 +809,7 @@ Verify inside `BEGIN … ROLLBACK`: a recurring task parked in the terminal colu
 the past comes back open AND in a non-terminal column; one parked in a non-terminal column keeps
 exactly the column it had. Paste real output.
 
-- [ ] **Step 4: Commit**
+- **Step 4: Commit**
 
 ```bash
 git add supabase/migrations/018_board_column_rpcs.sql supabase/migrations/019_recurrence_board_column_reset.sql
@@ -818,7 +838,7 @@ a task nobody chose a destination for."
 - Consumes: the RPC signatures from Task 2.
 - Produces: `rpc("move_task_to_column", { p_task_id, p_column_id, p_member_id, p_prev_key, p_next_key })` and `rpc("delete_board_column", { p_column_id, p_moves })` answering from the in-memory `tables`, so every action test in Tasks 4–6 asserts on resulting state rather than on call order.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Append to `src/test/supabase-fake.test.ts`:
 
@@ -970,12 +990,12 @@ describe("delete_board_column", () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/test/supabase-fake.test.ts -t "move_task_to_column"`
 Expected: FAIL — `unknown rpc: move_task_to_column`.
 
-- [ ] **Step 3: Implement both handlers in the fake**
+- **Step 3: Implement both handlers in the fake**
 
 In `src/test/supabase-fake.ts`, insert before the `return { data: null, error: { message: \`unknown rpc: ${fnName}\` } };` line:
 
@@ -1093,12 +1113,12 @@ In `src/test/supabase-fake.ts`, insert before the `return { data: null, error: {
       }
 ```
 
-- [ ] **Step 4: Run the tests to confirm they pass**
+- **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/test/supabase-fake.test.ts`
 Expected: PASS, including the six new tests.
 
-- [ ] **Step 5: Typecheck and commit**
+- **Step 5: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -1123,7 +1143,7 @@ coverage check that makes a stale delete dialog fail."
 - Consumes: `TAB20_SLUGS`, `Tab20Slug` (Task 1); `ValidationError`, `parseInput` from `src/app/tasks/schemas.ts`.
 - Produces: `createBoardColumnSchema`, `renameBoardColumnSchema`, `setBoardColumnColorSchema`, `reorderBoardColumnSchema`, `deleteBoardColumnSchema`, `moveTaskToColumnSchema`, `listTasksInColumnSchema`, `loadOlderDoneSchema`, and the matching `z.input` types: `CreateBoardColumnInput`, `RenameBoardColumnInput`, `SetBoardColumnColorInput`, `ReorderBoardColumnInput`, `DeleteBoardColumnInput`, `MoveTaskToColumnInput`, `ListTasksInColumnInput`, `LoadOlderDoneInput`. CSS custom properties `--color-tab20-*` for all 20 slugs.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Create `src/app/board/schemas.test.ts`:
 
@@ -1245,12 +1265,12 @@ describe("deleteBoardColumnSchema", () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/board/schemas.test.ts`
 Expected: FAIL — `Cannot find module './schemas'`.
 
-- [ ] **Step 3: Write the schemas**
+- **Step 3: Write the schemas**
 
 Create `src/app/board/schemas.ts`:
 
@@ -1349,12 +1369,12 @@ export type LoadOlderDoneInput = z.input<typeof loadOlderDoneSchema>;
 export type DeleteBoardColumnInput = z.input<typeof deleteBoardColumnSchema>;
 ```
 
-- [ ] **Step 4: Run the tests to confirm they pass**
+- **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/app/board/schemas.test.ts`
 Expected: PASS, 11 tests.
 
-- [ ] **Step 5: Add the tab20 tokens to `globals.css`**
+- **Step 5: Add the tab20 tokens to `globals.css`**
 
 In the plain `:root` block, after the `--color-kind-*` tokens, add:
 
@@ -1416,7 +1436,7 @@ its light-theme value:
     --color-tab20-cyan-light: #a5dde3;
 ```
 
-- [ ] **Step 6: Verify every slug has a token in both themes**
+- **Step 6: Verify every slug has a token in both themes**
 
 The contract between the slug list and the CSS is easy to break silently, so assert it. Append to `src/app/board/colors.test.ts`:
 
@@ -1441,7 +1461,7 @@ describe("tab20 CSS tokens", () => {
 Run: `npx jest src/app/board/colors.test.ts`
 Expected: PASS, 45 tests. A missing token fails with the slug named.
 
-- [ ] **Step 7: Typecheck and commit**
+- **Step 7: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -1466,7 +1486,7 @@ cannot disagree and dark mode stays twenty lines."
 - Consumes: schemas (Task 4); `run`, `assertNoError` from `src/app/tasks/action-run.ts`; `requireUser`, `assertWorkspaceMember`, `ForbiddenError` from `src/lib/auth.ts`; `parseInput` from `src/app/tasks/schemas.ts`; `delete_board_column` RPC (Task 2).
 - Produces: `createBoardColumn(input): Promise<ActionResult<{ columnId: string }>>`, `renameBoardColumn(input): Promise<ActionResult>`, `setBoardColumnColor(input): Promise<ActionResult>`, `reorderBoardColumn(input): Promise<ActionResult>`, `deleteBoardColumn(input): Promise<ActionResult>`, `listTasksInColumn(input): Promise<ActionResult<{ tasks: ColumnTask[] }>>` where `ColumnTask = { id: string; title: string; completedAt: string | null }`, and the internal helper `assertColumnMember(columnId, authUserId): Promise<{ workspaceId: string }>`.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Create `src/app/board/actions.test.ts`:
 
@@ -1689,12 +1709,12 @@ it("refuses to delete a column in another workspace", async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/board/actions.test.ts`
 Expected: FAIL — `Cannot find module './actions'`.
 
-- [ ] **Step 3: Write the actions**
+- **Step 3: Write the actions**
 
 Create `src/app/board/actions.ts`:
 
@@ -1939,12 +1959,12 @@ export async function deleteBoardColumn(input: DeleteBoardColumnInput): Promise<
 }
 ```
 
-- [ ] **Step 4: Run the tests to confirm they pass**
+- **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/app/board/actions.test.ts`
 Expected: PASS, 14 tests.
 
-- [ ] **Step 5: Typecheck and commit**
+- **Step 5: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -1972,7 +1992,7 @@ member_sort_key so the dialog leads with their top priorities."
 - Consumes: `moveTaskToColumnSchema`, `loadOlderDoneSchema` (Task 4); `move_task_to_column` RPC (Task 2); `completeTask`, `reopenTask` from `src/app/tasks/actions.ts`; `assertTaskAssignee`, `memberIdsForUser`, `ForbiddenError` from `src/lib/auth.ts`.
 - Produces: `moveTaskToColumn(input): Promise<ActionResult>`, `loadOlderDone(input): Promise<ActionResult<{ tasks: DoneTask[]; hasMore: boolean }>>` where `DoneTask = { id: string; title: string; dueAt: string | null; completedAt: string; workspaceId: string; boardColumnId: string; memberSortKey: number }`.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Create `src/app/board/move-actions.test.ts`:
 
@@ -2206,12 +2226,12 @@ it("refuses a workspace the user does not belong to", async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/board/move-actions.test.ts`
 Expected: FAIL — `Cannot find module './move-actions'`.
 
-- [ ] **Step 3: Write the actions**
+- **Step 3: Write the actions**
 
 Create `src/app/board/move-actions.ts`:
 
@@ -2390,12 +2410,12 @@ If `.not("completed_at", "is", null)` or `.lt(...)` are unsupported by the fake,
 `lt` filter kind, both following the existing `matches()` shape — and cover them with a case in
 `src/test/supabase-fake.test.ts`. Do not weaken the query to fit the fake.
 
-- [ ] **Step 4: Run the tests to confirm they pass**
+- **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/app/board/move-actions.test.ts`
 Expected: PASS, 12 tests.
 
-- [ ] **Step 5: Typecheck and commit**
+- **Step 5: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -2427,7 +2447,7 @@ skip."
 Migration 015's check constraint makes a root task without a column impossible, so this is not a
 nicety — task creation breaks without it.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Add to `src/app/tasks/actions.test.ts` in the `createTaskWithSubtasks` section. The shared `seed()`
 fixture needs columns, so extend it there too:
@@ -2490,12 +2510,12 @@ it("fails clearly when the workspace has no usable column", async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/tasks/actions.test.ts -t "leftmost non-terminal"`
 Expected: FAIL — `expect(received).toBe(expected)`, received `undefined`.
 
-- [ ] **Step 3: Implement**
+- **Step 3: Implement**
 
 In `src/app/tasks/actions.ts`, inside `createTaskWithSubtasks`, after `const admin = createAdminClient();` and before the `tasks` insert:
 
@@ -2536,12 +2556,12 @@ Then add the field to the insert:
 `insertSubtask` is left alone: subtasks carry no workspace and no column, which the check constraint
 enforces.
 
-- [ ] **Step 4: Run the full tasks suite**
+- **Step 4: Run the full tasks suite**
 
 Run: `npx jest src/app/tasks/actions.test.ts`
 Expected: PASS. The whole file must pass, not only the new tests — the shared `seed()` changed.
 
-- [ ] **Step 5: Verify against dev that creation still works end to end**
+- **Step 5: Verify against dev that creation still works end to end**
 
 ```bash
 npm run dev
@@ -2555,7 +2575,7 @@ psql "$DEV_DB" -c "select t.title, bc.name from public.tasks t join public.board
 
 Expected: the new tasks appear against their workspace's leftmost non-terminal column.
 
-- [ ] **Step 6: Typecheck and commit**
+- **Step 6: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -2589,7 +2609,7 @@ have dragged its terminal column to the front."
   - `DONE_WINDOW_DAYS = 7`
   - From `src/app/tasks/bucket-tasks.ts`: `deadlineFor(dueAt: string | null, now: Date): { label: string | null; variant: "red" | "yellow" | "green" | null }`
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Create `src/app/board/group-columns.test.ts`:
 
@@ -2801,12 +2821,12 @@ describe("resolveDropTarget", () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/board/group-columns.test.ts`
 Expected: FAIL — `Cannot find module './group-columns'`.
 
-- [ ] **Step 3: Write the grouping module**
+- **Step 3: Write the grouping module**
 
 Create `src/app/board/group-columns.ts`:
 
@@ -2963,12 +2983,12 @@ export function groupTasks(
 }
 ```
 
-- [ ] **Step 4: Run the tests to confirm they pass**
+- **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/app/board/group-columns.test.ts`
 Expected: PASS, 15 tests.
 
-- [ ] **Step 5: Extract `deadlineFor` so the board reuses the deadline rules**
+- **Step 5: Extract `deadlineFor` so the board reuses the deadline rules**
 
 The board card needs the same red/yellow/green rules `/tasks` uses. Restating them would let the two
 views drift, so lift them out of `bucketTasks`. In `src/app/tasks/bucket-tasks.ts`, add above
@@ -3014,13 +3034,13 @@ Then rewrite the dated branch of `bucketTasks` to call it, keeping the bucket as
     else buckets.upcoming.push(t);
 ```
 
-- [ ] **Step 6: Confirm the existing bucket tests still pass unchanged**
+- **Step 6: Confirm the existing bucket tests still pass unchanged**
 
 Run: `npx jest src/app/tasks/bucket-tasks.test.ts`
 Expected: PASS with no edits to the test file. This is a refactor — if a test needed changing, the
 behaviour moved and the extraction is wrong.
 
-- [ ] **Step 7: Typecheck and commit**
+- **Step 7: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -3051,7 +3071,7 @@ board and the list view cannot drift about what counts as overdue."
 Before writing this component, invoke the `ui-ux-pro-max` skill for the visual pass — that is a
 standing preference for new UI, and the card sets the board's visual language.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Create `src/app/board/board-card.test.tsx`:
 
@@ -3144,12 +3164,12 @@ it("has no accessibility violations", async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/board/board-card.test.tsx`
 Expected: FAIL — `Cannot find module './board-card'`.
 
-- [ ] **Step 3: Write the card**
+- **Step 3: Write the card**
 
 Create `src/app/board/board-card.tsx`:
 
@@ -3246,12 +3266,12 @@ export function BoardCard({
 }
 ```
 
-- [ ] **Step 4: Run the tests to confirm they pass**
+- **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/app/board/board-card.test.tsx`
 Expected: PASS, 9 tests including the axe check.
 
-- [ ] **Step 5: Typecheck and commit**
+- **Step 5: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -3282,7 +3302,7 @@ view, so the two cannot disagree about what is overdue."
 - Consumes: `mergeColumns`, `groupTasks`, `resolveDropTarget`, `BoardColumn`, `BoardTask` (Task 8); `BoardCard` (Task 9); `moveTaskToColumn`, `loadOlderDone` (Task 6); `computeNeighborKeys` from `src/app/tasks/reorder-helpers.ts`; `toast` from `src/components/toaster.tsx`.
 - Produces: route `/board`; `<BoardClient columns={BoardColumn[]} tasks={BoardTask[]} memberIdByWorkspaceId={Record<string,string>} workspaceIds={string[]} showWorkspace={boolean} />`; exported `buildBoardDragEndHandler(...)` for direct testing, mirroring `buildDragEndHandler` in `src/app/tasks/tasks-page-client.tsx`.
 
-- [ ] **Step 1: Write the failing tests for the drop handler**
+- **Step 1: Write the failing tests for the drop handler**
 
 Create `src/app/board/board-client.test.tsx`:
 
@@ -3469,12 +3489,12 @@ it("has no accessibility violations", async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/board/board-client.test.tsx`
 Expected: FAIL — `Cannot find module './board-client'`.
 
-- [ ] **Step 3: Write the client component**
+- **Step 3: Write the client component**
 
 Create `src/app/board/board-client.tsx`. The drop handler is exported separately for the same reason
 `buildDragEndHandler` is in `tasks-page-client.tsx`: the library's sensors are not driveable from
@@ -3765,12 +3785,12 @@ export function BoardClient({
 }
 ```
 
-- [ ] **Step 4: Run the tests to confirm they pass**
+- **Step 4: Run the tests to confirm they pass**
 
 Run: `npx jest src/app/board/board-client.test.tsx`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Write the server component**
+- **Step 5: Write the server component**
 
 Create `src/app/board/page.tsx`. The fetch shape follows `src/app/tasks/page.tsx`: RLS decides what
 comes back, and the id filters shape the result rather than guard it.
@@ -3912,14 +3932,14 @@ export default async function BoardPage({ searchParams }: { searchParams: Search
 }
 ```
 
-- [ ] **Step 6: Add `loading.tsx` and `error.tsx`**
+- **Step 6: Add `loading.tsx` and `error.tsx`**
 
 Copy the shape of `src/app/tasks/loading.tsx` and `src/app/tasks/error.tsx`, substituting the board's
 layout: `loading.tsx` renders three 280px-wide skeleton columns with `aria-busy="true"` and an
 `sr-only` "Loading your board…"; `error.tsx` is the `/tasks` error component with its copy changed to
 "Could not load the board." and the same retry button wired to `reset()`.
 
-- [ ] **Step 7: Add the nav link**
+- **Step 7: Add the nav link**
 
 In `src/components/nav-links.tsx`, extend the `links` array:
 
@@ -3933,7 +3953,7 @@ const links = [
 
 `/settings` is reached from the user menu, not this bar — Task 11 covers it.
 
-- [ ] **Step 8: Verify the existing nav test still passes and see the board run**
+- **Step 8: Verify the existing nav test still passes and see the board run**
 
 Run: `npx jest src/components/__tests__ src/app/layout.test.tsx`
 Expected: PASS.
@@ -3946,7 +3966,7 @@ Open `http://localhost:3000/board`. Confirm: five columns per the seeded default
 title/deadline/workspace only, a card dragged between columns stays there after a reload, and
 dragging into Completed makes the task appear completed on `/tasks`.
 
-- [ ] **Step 9: Typecheck and commit**
+- **Step 9: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -3978,7 +3998,7 @@ visit."
 - Consumes: `TabPill` from `src/app/tasks/tab-pill.tsx`.
 - Produces: route `/settings` accepting `?tab=profile|board` (default `profile`); `<ProfileTab />`, the current `/profile` body verbatim; `/profile` permanently redirects to `/settings?tab=profile`.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Create `src/app/settings/page.test.tsx`:
 
@@ -4044,19 +4064,19 @@ it("has no accessibility violations", async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/settings/page.test.tsx`
 Expected: FAIL — `Cannot find module './page'`.
 
-- [ ] **Step 3: Move the profile body into a tab component**
+- **Step 3: Move the profile body into a tab component**
 
 Create `src/app/settings/profile-tab.tsx` containing the current body of `src/app/profile/page.tsx`
 verbatim — the same `"use client"`, the same imports, the same skeleton and form — renamed from
 `ProfilePage` to `ProfileTab` and with its outer `<main className="max-w-sm p-6">` changed to
 `<div className="max-w-sm">`, since the tab shell now owns the page element and its padding.
 
-- [ ] **Step 4: Write the settings shell**
+- **Step 4: Write the settings shell**
 
 Create `src/app/settings/page.tsx`:
 
@@ -4094,7 +4114,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
 `TabPill` treats a missing `tab` param as inactive for both pills, which is why the Profile link
 carries `?tab=profile` explicitly rather than pointing at bare `/settings`.
 
-- [ ] **Step 5: Turn `/profile` into a redirect**
+- **Step 5: Turn `/profile` into a redirect**
 
 Replace the whole of `src/app/profile/page.tsx` with:
 
@@ -4110,13 +4130,13 @@ export default function ProfilePage() {
 }
 ```
 
-- [ ] **Step 6: Point the user menu at settings**
+- **Step 6: Point the user menu at settings**
 
 In `src/components/nav-user.tsx`, change the profile link's `href` from `/profile` to
 `/settings?tab=profile` and its label from "Profile" to "Settings". Update the corresponding
 assertion in `src/components/__tests__` if one names that label.
 
-- [ ] **Step 7: Run the suite for the touched areas**
+- **Step 7: Run the suite for the touched areas**
 
 Run: `npx jest src/app/settings src/components/__tests__`
 Expected: PASS. `BoardTab` is mocked in this task's test; Task 12 implements it, so create a minimal
@@ -4129,7 +4149,7 @@ export function BoardTab() {
 }
 ```
 
-- [ ] **Step 8: Commit**
+- **Step 8: Commit**
 
 ```bash
 npm run typecheck
@@ -4156,7 +4176,7 @@ in bookmarks and the user menu pointed there."
 - Consumes: `TAB20_SLUGS`, `Tab20Slug` (Task 1); `createBoardColumn`, `renameBoardColumn`, `setBoardColumnColor`, `reorderBoardColumn` (Task 5); `BoardColumn` (Task 8); `DeleteColumnDialog` (Task 13).
 - Produces: `<BoardTab />` (server component: loads the user's workspaces and their columns, renders `<BoardColumnsEditor>` per workspace); `<ColumnRow column={BoardColumn} siblingCount={number} onDeleted={() => void} />`; `<ColorPicker value={Tab20Slug} onChange={(slug: Tab20Slug) => void} label={string} />`.
 
-- [ ] **Step 1: Write the failing tests for the colour picker**
+- **Step 1: Write the failing tests for the colour picker**
 
 Create `src/app/settings/color-picker.test.tsx`:
 
@@ -4216,7 +4236,7 @@ it("has no accessibility violations when open", async () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm failure, then write the picker**
+- **Step 2: Run to confirm failure, then write the picker**
 
 Run: `npx jest src/app/settings/color-picker.test.tsx`
 Expected: FAIL — `Cannot find module './color-picker'`.
@@ -4312,7 +4332,7 @@ export function ColorPicker({
 Run: `npx jest src/app/settings/color-picker.test.tsx`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 3: Write the failing tests for a column row**
+- **Step 3: Write the failing tests for a column row**
 
 Create `src/app/settings/column-row.test.tsx`:
 
@@ -4401,7 +4421,7 @@ it("disables delete when it is the workspace's only column", () => {
 });
 ```
 
-- [ ] **Step 4: Run to confirm failure, then write the row**
+- **Step 4: Run to confirm failure, then write the row**
 
 Run: `npx jest src/app/settings/column-row.test.tsx`
 Expected: FAIL — `Cannot find module './column-row'`.
@@ -4509,7 +4529,7 @@ Expected: PASS, 6 tests. `DeleteColumnDialog` arrives in Task 13; until then add
 `export function DeleteColumnDialog() { return null; }` in
 `src/app/settings/delete-column-dialog.tsx` so this compiles.
 
-- [ ] **Step 5: Write the tab shell**
+- **Step 5: Write the tab shell**
 
 Create `src/app/settings/board-tab.tsx`, replacing the placeholder. It is a server component that
 loads the user's workspaces and their columns, and delegates each workspace to a small client editor
@@ -4677,12 +4697,12 @@ Column reordering is deliberately not in this task: the editor renders columns i
 `reorderBoardColumn` already exists, but wiring a second `DragDropContext` here is separable work.
 Note it in `tasks/todo.md` as the follow-up rather than half-building it.
 
-- [ ] **Step 6: Run the settings tests**
+- **Step 6: Run the settings tests**
 
 Run: `npx jest src/app/settings`
 Expected: PASS.
 
-- [ ] **Step 7: Typecheck and commit**
+- **Step 7: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -4712,7 +4732,7 @@ in the workspace."
 `ColumnRow` (Task 12) must pass `siblings` — the workspace's other columns — so update its call site
 in the same commit.
 
-- [ ] **Step 1: Write the failing tests**
+- **Step 1: Write the failing tests**
 
 Create `src/app/settings/delete-column-dialog.test.tsx`:
 
@@ -4893,12 +4913,12 @@ it("has no accessibility violations", async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- **Step 2: Run them to confirm they fail**
 
 Run: `npx jest src/app/settings/delete-column-dialog.test.tsx`
 Expected: FAIL — the placeholder renders `null`, so `findByText("Call the plumber")` times out.
 
-- [ ] **Step 3: Write the dialog**
+- **Step 3: Write the dialog**
 
 Create `src/app/settings/delete-column-dialog.tsx`:
 
@@ -5097,19 +5117,19 @@ export function DeleteColumnDialog({
 }
 ```
 
-- [ ] **Step 4: Pass `siblings` from the column row**
+- **Step 4: Pass `siblings` from the column row**
 
 In `src/app/settings/column-row.tsx`, add a `siblings: BoardColumn[]` prop and forward it to
 `DeleteColumnDialog`; in `src/app/settings/board-columns-editor.tsx`, pass
 `siblings={columns.filter((c) => c.id !== column.id)}`. Update `column-row.test.tsx`'s renders to
 include `siblings={[]}`.
 
-- [ ] **Step 5: Run the settings suite**
+- **Step 5: Run the settings suite**
 
 Run: `npx jest src/app/settings`
 Expected: PASS, including the 10 dialog tests.
 
-- [ ] **Step 6: Typecheck and commit**
+- **Step 6: Typecheck and commit**
 
 ```bash
 npm run typecheck
@@ -5135,13 +5155,13 @@ would be deleting."
 **Interfaces:**
 - Consumes: the running app; `e2e/fixtures.ts` for the authenticated context, following the existing specs.
 
-- [ ] **Step 1: Read the existing fixtures and one spec**
+- **Step 1: Read the existing fixtures and one spec**
 
 Read `e2e/fixtures.ts` and `e2e/drag-reorder.spec.ts` before writing anything: they establish how a
 signed-in page is obtained and how this suite drives `@hello-pangea/dnd` (keyboard drags, because the
 library's pointer sensors are unreliable under automation). Follow both exactly.
 
-- [ ] **Step 2: Write the spec**
+- **Step 2: Write the spec**
 
 Create `e2e/board.spec.ts`:
 
@@ -5261,7 +5281,7 @@ test.describe("kanban board", () => {
 });
 ```
 
-- [ ] **Step 3: Seed enough data for the delete test, then run**
+- **Step 3: Seed enough data for the delete test, then run**
 
 The delete test needs at least two tasks in Blocked. Create them through the UI on `/tasks` and drag
 them across on `/board` first, or extend the e2e seed the same way `e2e/global-setup.ts` seeds the
@@ -5271,14 +5291,14 @@ Run: `npm run test:e2e -- board.spec.ts`
 Expected: PASS. A skipped delete test means the seed did not produce two tasks in Blocked — fix the
 seed rather than lowering the assertion.
 
-- [ ] **Step 4: Run the whole e2e suite, including screenshots**
+- **Step 4: Run the whole e2e suite, including screenshots**
 
 Run: `npm run test:e2e`
 Expected: PASS. If `screenshots.spec.ts` fails only because the nav now has a Board link, update the
 baselines deliberately (`npm run test:e2e -- --update-snapshots screenshots.spec.ts`) and review the
 diff before committing it. Do not update baselines to paper over an unexpected layout change.
 
-- [ ] **Step 5: Commit**
+- **Step 5: Commit**
 
 ```bash
 git add e2e/board.spec.ts e2e/screenshots.spec.ts-snapshots
@@ -5305,7 +5325,7 @@ the behaviour a single bulk destination would have hidden."
 - Consumes: everything above.
 - Produces: docs that match the shipped behaviour.
 
-- [ ] **Step 1: Document the table in `docs/db.md`**
+- **Step 1: Document the table in `docs/db.md`**
 
 Add a `### board_columns` section after `task_rules`, in the same prose style as its neighbours:
 columns and types, then a Notes block covering — columns are workspace-scoped and shared by that
@@ -5320,7 +5340,7 @@ column and a subtask never does.
 
 Add to `## Indexing`: `board_columns.(workspace_id, position)` and `tasks.board_column_id`.
 
-- [ ] **Step 2: Document the view in `docs/product.md`**
+- **Step 2: Document the view in `docs/product.md`**
 
 Add a `## Board View` section after `## Visibility and Views`:
 
@@ -5337,13 +5357,13 @@ Add a `## Board View` section after `## Visibility and Views`:
 - Deleting a column asks where each of its tasks should go. Renaming a column never moves a task.
 - Default columns for a new workspace: Not Started, In Progress, Blocked, Follow-up, Completed.
 
-- [ ] **Step 3: Record the deferred work in `tasks/todo.md`**
+- **Step 3: Record the deferred work in `tasks/todo.md`**
 
 Add, in whatever format that file already uses: column reordering is not wired up — `position` is
 respected everywhere and `reorderBoardColumn` exists and is tested, but no drag handle calls it yet.
 New columns land at the end of the list.
 
-- [ ] **Step 4: Full verification before the final commit**
+- **Step 4: Full verification before the final commit**
 
 ```bash
 npm run typecheck
@@ -5355,7 +5375,7 @@ npm run test:e2e
 Expected: all four clean. Report any failure as a failure with its output; do not describe the
 feature as done while one is red.
 
-- [ ] **Step 5: Commit**
+- **Step 5: Commit**
 
 ```bash
 git add docs/db.md docs/product.md tasks/todo.md tasks/lessons.md

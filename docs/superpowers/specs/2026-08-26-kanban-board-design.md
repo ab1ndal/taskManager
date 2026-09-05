@@ -1,7 +1,32 @@
 # Kanban Board View — Design
 
 Date: 2026-08-26 (revised 2026-08-27: shared per-workspace columns; 2026-08-28: per-task destinations on delete)
-Status: approved, not yet implemented
+Status: implemented on `main`; original completed-column selector remains an open scope decision.
+
+## Implementation reconciliation — 2026-09-05
+
+The implementation plan's Tasks 1–15 landed, followed on 2026-08-30 by settings column
+reordering and card interactions. The sections below preserve the original design; these later
+decisions take precedence where they differ:
+
+- Cards wrap their full title. Pressing an open card opens the existing task editor in place;
+  the menu offers edit, complete/reopen and delete. Each active column in a single-workspace
+  view offers task creation. Empty columns and drag targets have explicit feedback.
+- Column headers use a color dot and bottom border on a neutral surface; card colors continue
+  to express deadline urgency. Shared tasks use the existing count badge.
+- Settings shows an editor for each workspace, with drag handles, rename on blur, color on
+  selection and per-task destinations on delete. The seeded Completed column is labelled;
+  the original terminal-column radio was omitted from the later plan and has not been built.
+- The deletion dialog uses the shared `Dialog` component because `ConfirmDialog` wraps its body
+  in a paragraph, which cannot contain the required destination controls.
+- Migrations 015–021 contain the schema, RPCs and review fixes. Column deletion must preserve
+  at least one active column; deletes go through the RPC, not a direct client DELETE policy.
+- A card-menu “Move to column…” dialog now provides a keyboard/touch alternative to offscreen
+  dragging, preserving personal priority and using the same completion/reopening action.
+
+Current verification and unresolved decisions are tracked in [tasks/todo.md](../../../tasks/todo.md).
+The separate [iPhone install and daily reminders design](2026-08-31-ios-pwa-and-reminders-design.md)
+belongs to Phases 8 and 9, not the board implementation.
 
 ## Goal
 

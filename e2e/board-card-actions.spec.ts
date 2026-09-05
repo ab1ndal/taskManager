@@ -128,3 +128,36 @@ test("an empty column says what it is for rather than sitting blank", async ({ p
     column(page, "Blocked").getByText("Drop a task here, or add one below.")
   ).toBeVisible();
 });
+
+test("a keyboard user can move to an offscreen column and reopen from it", async ({ page }) => {
+  const title = `${E2E_TASK_PREFIX} keyboard move`;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/board");
+  await page.getByRole("button", { name: "Add a task to Not Started" }).click();
+  const create = page.getByRole("dialog");
+  await create.getByLabel("Title", { exact: true }).fill(title);
+  await create.getByRole("button", { name: /create|add task/i }).first().click();
+  await expect(create).toBeHidden();
+
+  const menu = page.getByRole("button", { name: `More actions for "${title}"` });
+  await menu.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem", { name: "Move to column…" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  const move = page.getByRole("dialog", { name: "Move task", exact: true });
+  await expect(move.getByLabel("Move to column")).toBeFocused();
+  await move.getByLabel("Move to column").selectOption({ label: "Completed" });
+  await expect(move.getByText(/completes the task and its subtasks/)).toBeVisible();
+  await move.getByRole("button", { name: "Move task" }).click();
+  await expect(move).toBeHidden();
+  await expect(column(page, "Completed").getByRole("heading", { name: title })).toBeAttached();
+
+  await menu.click();
+  await page.getByRole("menuitem", { name: "Move to column…" }).click();
+  await move.getByLabel("Move to column").selectOption({ label: "Follow-up" });
+  await expect(move.getByText(/This reopens the task/)).toBeVisible();
+  await move.getByRole("button", { name: "Move task" }).click();
+  await expect(move).toBeHidden();
+  await page.reload();
+  await expect(column(page, "Follow-up").getByRole("heading", { name: title })).toBeAttached();
+});

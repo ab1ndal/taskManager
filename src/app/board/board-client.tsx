@@ -12,6 +12,7 @@ import type { Workspace } from "@/app/tasks/task-fields";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { toast } from "@/components/toaster";
 import { BoardCard } from "./board-card";
+import { MoveTaskDialog } from "./move-task-dialog";
 import {
   DONE_WINDOW_DAYS,
   groupTasks,
@@ -168,6 +169,7 @@ export function BoardClient({
   currentMemberIds: string[];
 }) {
   const [localTasks, setLocalTasks] = useState(tasks);
+  const [movingTask, setMovingTask] = useState<BoardTask | null>(null);
 
   // Server data is the source of truth: moveTaskToColumn revalidates "/board", so a completed drop
   // arrives here as fresh `tasks` props, not just a resolved promise. Without this, the optimistic
@@ -363,6 +365,7 @@ export function BoardClient({
                           >
                             <BoardCard
                               task={task}
+                              onMove={() => setMovingTask(task)}
                               showWorkspace={showWorkspace}
                               isDragging={dragSnapshot.isDragging}
                               dragHandleProps={dragProvided.dragHandleProps ?? undefined}
@@ -459,6 +462,15 @@ export function BoardClient({
           currentMemberIds={currentMemberIds}
           initialWorkspaceId={addingIn.workspaceId}
           boardColumnId={addingIn.columnId}
+        />
+      )}
+
+      {movingTask && (
+        <MoveTaskDialog
+          task={movingTask}
+          columns={columns.filter((column) => column.workspaceId === movingTask.workspaceId)}
+          memberId={memberIdByWorkspaceId[movingTask.workspaceId]}
+          onClose={() => setMovingTask(null)}
         />
       )}
 

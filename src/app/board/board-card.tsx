@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CircleCheck, Pencil, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CircleCheck, Pencil, RotateCcw, Trash2 } from "lucide-react";
 
 import { deadlineFor } from "@/app/tasks/bucket-tasks";
 import { completeTask, deleteTask, reopenTask } from "@/app/tasks/actions";
@@ -39,12 +39,14 @@ export function BoardCard({
   task,
   showWorkspace,
   onOpen,
+  onMove,
   isDragging = false,
   dragHandleProps,
   now = new Date(),
 }: {
   task: BoardTask;
   showWorkspace: boolean;
+  onMove?: () => void;
   /** Absent on a completed card, which has nothing to edit until it is reopened. */
   onOpen?: () => void;
   /** Drives the lift. Comes from the Draggable's snapshot, not from local state. */
@@ -128,6 +130,11 @@ export function BoardCard({
           <RowMenu
             label={`More actions for "${task.title}"`}
             items={[
+              ...(onMove ? [{
+                label: "Move to column…",
+                onSelect: onMove,
+                icon: <ArrowRightLeft size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />,
+              }] : []),
               ...(onOpen
                 ? [
                     {

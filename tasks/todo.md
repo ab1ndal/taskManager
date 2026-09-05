@@ -1,4 +1,37 @@
-# Board interactions and drag polish
+# Kanban board completion
+
+Current audit: 2026-09-05. The original implementation plan's Tasks 1–15 and the August 30
+interaction polish are on `main`. The old resume note saying the board was unmerged was stale.
+
+## Completion pass
+
+- [x] Read project memory and the saved board implementation ledger; reconcile the later UI decisions.
+- [x] Replace the card-opening test's fixed completion date with the current time so its fixture
+      stays in the rolling seven-day window.
+- [x] Add a card-menu “Move to column…” dialog for keyboard and touch access to offscreen columns,
+      with completion/reopening explanations, inline errors and preserved personal priority.
+- [x] Update the design and product records to distinguish the delivered UI from the original draft.
+- [x] Verify the completion pass: 598 unit tests, typecheck and production build pass; lint has
+      zero errors and one existing unrelated warning. All 13 focused browser checks pass across
+      Chromium, WebKit, Firefox and iPhone emulation, including offscreen moves, reopening,
+      deletion and immediate navigation after a drop. Scoped dev fixtures were removed.
+- [ ] Resolve the original completed-column selector requirement: the design specifies a radio,
+      but the later implementation plan and delivered UI only label the seeded Completed column.
+      User preference requested during this audit; no change to completion-role behavior yet.
+
+The older ledger's claim that navigation loses a drop did not reproduce in any of the four browser
+projects; `e2e/board.spec.ts` now tests immediate navigation before waiting for the write. This
+verifies in-app navigation, not closing the browser during a request. A preliminary WebKit deletion
+test timed out while its save was pending; the focused rerun passed on all four projects. The
+completion pass did not rerun the entire application E2E/screenshot suite.
+
+## Other saved discussions
+
+The approved [iPhone install and daily reminders design](../docs/superpowers/specs/2026-08-31-ios-pwa-and-reminders-design.md)
+is separate work in Phases 8 and 9 and remains unimplemented. The board's live cross-user updates,
+subtasks on cards, WIP limits and Notion sync remain outside its agreed scope.
+
+## August 30 interaction polish
 
 Approved scope (2026-08-30): board cards open a modal in place, can be edited and deleted, columns
 can add a task, empty columns say so, and the drag gets real feedback.
@@ -35,7 +68,8 @@ wiring, not invention.
 
 ## Outcome
 
-All seven steps landed. 594 unit tests and the chromium e2e suite pass.
+All steps landed. The August 30 verification recorded 594 passing unit tests and the Chromium E2E
+suite. Current completion-pass results are listed above.
 
 Surprises worth keeping:
 
@@ -52,7 +86,8 @@ Surprises worth keeping:
 - Task mutations revalidated only `/tasks`, so a change made in the list view left the board stale
   until a hard reload. Fixed alongside, since the board now calls the same actions.
 
-## Resume
+## Environment record
 
-Migrations 015-021 are applied to production and recorded (head 021). CLI is linked to dev.
-`main` still has none of the 47 board commits.
+The August 30 notes report migrations 015–021 applied and recorded in production. This completion
+pass does not independently verify production's migration ledger or deployment. Browser tests run
+against the development Supabase project; they create and remove only the scoped E2E fixtures.

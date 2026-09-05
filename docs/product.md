@@ -48,7 +48,12 @@ Tasks not assigned to the current user must not be shown.
 A kanban view of the same tasks the list view shows, at /board.
 
 The board shows root tasks only, as cards carrying title, deadline and workspace. Subtasks,
-descriptions and updates stay in the list view — a card is a glance, not a detail page.
+descriptions and updates stay out of the card body. Pressing an open card opens the existing task
+editor in a modal. The card menu offers edit, complete/reopen, delete and “Move to column…”.
+The move dialog can reach columns outside the visible board and uses the same completion rules as
+dragging, while preserving personal priority. Titles wrap so they remain readable on a phone.
+
+In a single-workspace view, active columns offer “Add task” prefilled with that column and workspace.
 
 Columns are defined per workspace and shared by that workspace's members. Any member may add,
 rename, recolour or delete a column from Settings → Board, and the change applies to everyone in
@@ -57,7 +62,9 @@ that workspace. The all-workspaces board merges columns of the same name across 
 Moving a task between columns moves it for every assignee. Vertical order within a column stays per
 user — the same member_sort_key ordering the list view uses.
 
-One column per workspace may be marked as the completed column. Dragging a task there completes it,
+The seeded Completed column is the workspace's completed column. Settings can rename, recolor,
+reorder or delete it; changing which column has this role is not currently available.
+Dragging a task there completes it,
 with the existing subtask rules; dragging it out reopens it. A completed task always appears in that
 column, whichever column it was in before.
 

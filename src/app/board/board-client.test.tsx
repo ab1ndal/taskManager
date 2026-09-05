@@ -524,7 +524,8 @@ describe("opening a card", () => {
         columns={columnsWithDone}
         tasks={[
           task({ id: T1, boardColumnId: COL_H_TODO }),
-          task({ id: T2, boardColumnId: COL_H_DONE, completedAt: "2026-08-28T09:00:00.000Z" }),
+          // Keep this card inside the rolling seven-day window as the calendar advances.
+          task({ id: T2, boardColumnId: COL_H_DONE, completedAt: new Date().toISOString() }),
         ]}
         memberIdByWorkspaceId={{ [WS_H]: M_H }}
         workspaceIds={[WS_H]}

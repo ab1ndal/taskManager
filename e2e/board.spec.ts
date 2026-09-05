@@ -232,7 +232,8 @@ test("dragging a card into Completed completes it in the list view", async ({ pa
   // The five columns are 288px wide, so the terminal one is off-screen at a stock desktop width and
   // `@hello-pangea/dnd`'s keyboard cross-axis move will not jump to a droppable that is scrolled out
   // of view — the arrows stop at the last visible column. Widening the viewport keeps this test
-  // about the drop and its completion stamp. The limitation itself is recorded in tasks/todo.md.
+  // about the drop and its completion stamp. The card-menu move dialog covers offscreen targets
+  // separately in board-card-actions.spec.ts.
   await page.setViewportSize({ width: 1700, height: 900 });
   await page.goto("/board");
   // Guard the premise: the arrow-key count below is the distance across the default five columns.
@@ -291,6 +292,32 @@ test("the done column expands to older history", async ({ page }) => {
 
   await done.getByRole("button", { name: /Show older/ }).click();
   await expect(done.getByRole("button", { name: /Show more|No older tasks/ })).toBeVisible();
+});
+
+test("a drop persists when navigating to the task list immediately", async ({ page }) => {
+  await page.setViewportSize({ width: 1700, height: 900 });
+  await page.goto("/board");
+  const card = column(page, "Not Started").locator("article").first();
+  const title = (await card.getByRole("heading").innerText()).trim();
+  await handleIn(card).focus();
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Space");
+  // Do not wait for either the optimistic card or the write before navigating.
+  await page.getByRole("link", { name: "Tasks", exact: true }).click();
+  await expect(page).toHaveURL(/\/tasks/);
+  const wsId = await workspaceId();
+  const targetId = await columnIdByName("In Progress");
+  await expect.poll(async () => {
+    const { data, error } = await adminClient().from("tasks").select("board_column_id")
+      .eq("workspace_id", wsId).eq("title", title).single();
+    if (error) throw error;
+    return data.board_column_id;
+  }).toBe(targetId);
+  await page.goto("/board");
+  await expect(column(page, "In Progress").getByRole("heading", { name: title, exact: true })).toBeVisible();
 });
 
 test("deleting a column sends each task where it was told to go", async ({ page }) => {
