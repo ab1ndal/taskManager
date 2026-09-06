@@ -9,6 +9,7 @@ import { NavLinks } from "@/components/nav-links";
 import { NavUser } from "@/components/nav-user";
 import { Toaster } from "@/components/toaster";
 import { ResumeRefresh } from "@/components/resume-refresh";
+import { PushUpkeep } from "@/components/push-upkeep";
 
 export const metadata: Metadata = {
   title: "Hearth",
@@ -78,6 +79,7 @@ export default async function RootLayout({
         <Toaster />
         {/* Signed out there is no task data to refresh and /api/build-id is behind auth. */}
         {user && <ResumeRefresh />}
+        {user && <PushUpkeep />}
       </body>
     </html>
   );

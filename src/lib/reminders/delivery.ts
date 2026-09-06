@@ -10,7 +10,16 @@ import { subscriptionSchema } from './schemas';
 type PrefRow = Preferences & { user_id: string };
 // PostgREST returns at most this many rows; read it explicitly so truncation is detectable.
 const ASSIGNMENT_LIMIT = 1000;
-type PushPayload = { title: string; body: string; tag: string; url: string };
+/**
+ * Declarative Web Push (iOS/iPadOS 18.4+). The OS renders this shape itself and applies
+ * `app_badge` without waking a service worker, and because visibility is guaranteed these messages
+ * are exempt from the silent-push penalty that revokes a subscription. `public/sw.js` still
+ * receives the event on older iOS and reads the same fields from `notification`.
+ */
+type PushPayload = {
+  web_push: 8030;
+  notification: { title: string; body: string; tag: string; navigate: string; app_badge: number };
+};
 
 export async function runReminders(admin: SupabaseClient, now = new Date()) {
   const start = Date.now();
@@ -107,7 +116,21 @@ export async function runReminders(admin: SupabaseClient, now = new Date()) {
       // Keep the encrypted payload well below browser push size limits. The app shows the full list.
       const sections = ([['Overdue', digest.overdue], ['Due today', digest.today], ['Due soon', digest.soon]] as const)
         .filter(([, items]) => items.length).map(([label, items]) => `${label} (${items.length}): ${items.slice(0, 2).map(t => t.title.slice(0, 70)).join(', ')}${items.length > 2 ? ', …' : ''}`);
-      const payload: PushPayload = { title: 'Hearth · Daily reminders', body: sections.join('\n'), tag: `hearth-${pref.user_id}-${local.date}`, url: '/tasks' };
+      // The badge is what is late or due now, not the whole digest: a number that counts tasks
+      // due next week is lit permanently and stops meaning anything.
+      const appBadge = digest.overdue.length + digest.today.length;
+      const payload: PushPayload = {
+        web_push: 8030,
+        notification: {
+          title: 'Hearth · Daily reminders',
+          body: sections.join('\n'),
+          tag: `hearth-${pref.user_id}-${local.date}`,
+          // `navigate` must be absolute; REMINDER_APP_URL is the canonical origin the cron job
+          // already posts to.
+          navigate: new URL('/tasks', process.env.REMINDER_APP_URL ?? 'https://localhost').toString(),
+          app_badge: appBadge,
+        },
+      };
       const token = randomUUID();
       const { data: claims, error: claimError } = await admin.rpc('claim_notification', {
         p_user_id: pref.user_id, p_period_key: local.date, p_channel: 'push', p_payload: payload, p_token: token,

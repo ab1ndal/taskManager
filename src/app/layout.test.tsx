@@ -29,6 +29,10 @@ jest.mock("@/components/resume-refresh", () => ({
   ResumeRefresh: () => <div data-testid="resume-refresh" />,
 }));
 
+jest.mock("@/components/push-upkeep", () => ({
+  PushUpkeep: () => <div data-testid="push-upkeep" />,
+}));
+
 const mockGetUser = jest.fn();
 jest.mock("@/lib/supabase/server", () => ({
   createClient: jest.fn(() => ({

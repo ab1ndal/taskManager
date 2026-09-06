@@ -149,3 +149,16 @@ it('removes expired push subscriptions and records successful device delivery', 
   expect(db.tables.push_subscriptions.map(row => row.id)).toEqual(['live']);
   expect(db.tables.notification_log[0].delivered_endpoints).toEqual(['https://web.push.apple.com/live']);
 });
+it('sends a declarative payload whose badge counts overdue and due-today tasks only', async () => {
+  const db = database(); db.prefs[0].push_enabled = true; db.prefs[0].email_enabled = false;
+  db.tables.push_subscriptions = [{ id: 'phone', user_id: 'alice', endpoint: 'https://web.push.apple.com/phone', p256dh: 'a'.repeat(87), auth: 'a'.repeat(22) }];
+  // Seeded above: one overdue work task and one due-today home task, plus another user's task.
+  await runReminders(db.admin, now);
+
+  const [, body] = jest.mocked(webpush.sendNotification).mock.calls[0];
+  const payload = JSON.parse(body as string);
+  expect(payload.web_push).toBe(8030);
+  expect(payload.notification.app_badge).toBe(2);
+  expect(payload.notification.navigate).toMatch(/\/tasks$/);
+  expect(payload.notification.title).toBe('Hearth · Daily reminders');
+});
