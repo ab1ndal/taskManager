@@ -3,7 +3,8 @@ import webpush from 'web-push';
 import { emailConfigured, sendEmail } from './email';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { randomUUID } from 'node:crypto';
-import { buildDigest, digestCount, digestText, localParts, type DigestTask, type Preferences } from './digest';
+import { buildDigest, digestCount, localParts, type DigestTask, type Preferences } from './digest';
+import { digestHtml, digestText } from './render';
 import { subscriptionSchema } from './schemas';
 
 type PrefRow = Preferences & { user_id: string };
@@ -47,10 +48,15 @@ export async function runReminders(admin: SupabaseClient, now = new Date()) {
         if (Date.now() - start > 35000) break;
         try {
           if (!emailConfigured()) throw new Error('Email is not configured');
+          const links = {
+            app: new URL('/tasks', process.env.REMINDER_APP_URL!).href,
+            settings: new URL('/settings?tab=notifications', process.env.REMINDER_APP_URL!).href,
+          };
           const email = {
             from: process.env.GMAIL_USER!, to: [recipient],
             subject: `Hearth · ${kind === 'work' ? 'Work' : 'Personal'} reminders for ${local.date}`,
-            text: `${digestText(emailDigest, pref.timezone)}\n\nOpen Hearth: ${new URL('/tasks', process.env.REMINDER_APP_URL!).href}\nManage reminders: ${new URL('/settings?tab=notifications', process.env.REMINDER_APP_URL!).href}`,
+            text: digestText(emailDigest, pref.timezone, links, now),
+            html: digestHtml(emailDigest, pref.timezone, links, now),
           };
           const emailToken = randomUUID();
           const { data: emailClaims, error: emailClaimError } = await admin.rpc('claim_notification', {

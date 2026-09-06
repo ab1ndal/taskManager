@@ -45,6 +45,21 @@ Recipients preconfigured in migration 024:
 | Abhinav | bindal.abhinav@gmail.com | abindal@nyase.com |
 | Anushka | anushka.a.jindal@gmail.com | ajindal@nyase.com |
 
+## Email content
+
+Each digest is sent as both a plain-text and an HTML part; a client that refuses HTML still shows
+the text. Both parts are rendered in `src/lib/reminders/render.ts` from the same `Digest` object, so
+they cannot disagree about which tasks are listed. Sections are `Overdue`, `Due today` and
+`Due soon`, each headed with its own count and omitted entirely when empty. Due dates are relative
+near today (`yesterday`, `earlier today, 9:00 AM`, `Tue, 9:00 AM`) and absolute beyond a week, all
+counted from local calendar dates so a DST day cannot shift a label.
+
+The HTML uses nested tables with inline styles and states every colour explicitly. Outlook renders
+through Word, which ignores `<style>` blocks, flex and grid, and no client can be relied on to
+inherit a theme. There are no images or web fonts. Task titles are user input and are HTML-escaped;
+the plain-text part leaves them as typed. Both parts are stored in the frozen claim payload, so a
+retry resends the identical message.
+
 ## Delivery and retries
 
 `pg_cron` calls a private dispatcher every 15 minutes. It reads Vault and uses `pg_net` to POST

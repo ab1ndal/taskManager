@@ -4,7 +4,7 @@ import nodemailer from 'nodemailer';
 export function emailConfigured() {
   return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD && process.env.REMINDER_APP_URL);
 }
-export type EmailPayload = { from: string; to: string[]; subject: string; text: string };
+export type EmailPayload = { from: string; to: string[]; subject: string; text: string; html: string };
 export async function sendEmail(payload: EmailPayload, messageId: string) {
   const transport = nodemailer.createTransport({
     host: 'smtp.gmail.com', port: 465, secure: true,

@@ -42,9 +42,3 @@ export function buildDigest(tasks: DigestTask[], now: Date, timezone: string, wi
 export function digestCount(digest: Digest) {
   return digest.overdue.length + digest.today.length + digest.soon.length;
 }
-export function digestText(digest: Digest, timezone: string) {
-  return (['overdue', 'today', 'soon'] as const).map((key, index) => {
-    const heading = ['Overdue', 'Due today', 'Due soon'][index];
-    return `${heading}\n${digest[key].map(task => `• ${task.title} — ${new Intl.DateTimeFormat('en', { timeZone: timezone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(task.due_at!))}`).join('\n') || 'None'}`;
-  }).join('\n\n');
-}

@@ -79,6 +79,16 @@ it('routes by workspace kind, excluding unassigned tasks and keeping addresses i
   expect(emails[1].text).not.toContain('Private work task');
   expect(JSON.stringify(emails)).not.toContain('Someone else secret');
 });
+it('sends an html part whose task list matches the text part', async () => {
+  const db = database();
+  await runReminders(db.admin, now);
+  const [work] = jest.mocked(sendEmail).mock.calls.map(([payload]) => payload);
+  expect(work.html).toContain('<table');
+  expect(work.html).toContain('Private work task');
+  expect(work.html).not.toContain('Private home task');
+  // The frozen claim must carry both parts, or a retry would send a degraded message.
+  expect(db.tables.notification_log[0].payload).toMatchObject({ text: work.text, html: work.html });
+});
 it('does not send twice on concurrent cron ticks', async () => {
   const db = database();
   await Promise.all([runReminders(db.admin, now), runReminders(db.admin, now)]);
