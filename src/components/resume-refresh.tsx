@@ -74,18 +74,23 @@ export function ResumeRefresh() {
       }
     }
 
-    const onPageShow = () => void check();
-    document.addEventListener("visibilitychange", onPageShow);
+    const onVisible = () => void check();
+    // `pageshow` fires on ordinary loads too, where the data is already fresh and a refresh is
+    // pure churn. Only a restore from the back/forward cache — `persisted` — is a resume.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) void check();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pageshow", onPageShow);
     // Resumes alone leave a window: an app left open across a deploy keeps calling Server Actions
     // that fail, because their arguments are encrypted with a build-derived key. Skew Protection
     // would absorb that, but it needs a Pro plan. A slow poll shrinks the window instead — it
     // cannot close it, so an action in flight when a deploy lands still fails once.
-    const interval = setInterval(onPageShow, POLL_INTERVAL_MS);
+    const interval = setInterval(onVisible, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
-      document.removeEventListener("visibilitychange", onPageShow);
+      document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pageshow", onPageShow);
     };
   }, [router]);

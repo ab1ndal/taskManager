@@ -29,6 +29,12 @@ function resume() {
   document.dispatchEvent(new Event("visibilitychange"));
 }
 
+function pageShow(persisted: boolean) {
+  const event = new Event("pageshow") as PageTransitionEvent & { persisted: boolean };
+  Object.defineProperty(event, "persisted", { value: persisted });
+  window.dispatchEvent(event);
+}
+
 describe("isSafeToReload", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -140,4 +146,23 @@ it("keeps checking while the app is left open in the foreground", async () => {
   await waitFor(() => expect(refresh).toHaveBeenCalledTimes(2));
 
   jest.useRealTimers();
+});
+
+it("refreshes on a back/forward cache restore", async () => {
+  answerWith("development");
+  render(<ResumeRefresh />);
+
+  pageShow(true);
+
+  await waitFor(() => expect(refresh).toHaveBeenCalled());
+});
+
+it("ignores an ordinary page load, whose data is already fresh", async () => {
+  answerWith("development");
+  render(<ResumeRefresh />);
+
+  pageShow(false);
+
+  await new Promise(resolve => setTimeout(resolve, 20));
+  expect(refresh).not.toHaveBeenCalled();
 });
