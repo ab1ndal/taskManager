@@ -2,8 +2,15 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  // These endpoints authenticate independently or must be public for push registration.
-  if (request.nextUrl.pathname === "/api/cron/reminders" || request.nextUrl.pathname === "/sw.js") {
+  // These endpoints authenticate independently or must be public for push registration. The
+  // manifest belongs here because browsers request it with credentials omitted: behind auth it
+  // redirects to /login on every install, and the install silently falls back to defaults instead
+  // of `display: standalone` and `start_url`.
+  if (
+    request.nextUrl.pathname === "/api/cron/reminders" ||
+    request.nextUrl.pathname === "/sw.js" ||
+    request.nextUrl.pathname === "/manifest.webmanifest"
+  ) {
     return NextResponse.next();
   }
 
