@@ -54,9 +54,13 @@ export default defineConfig({
       use: { ...devices["iPhone 14 Pro"], storageState: "e2e/.auth/user.json" },
     },
     {
-      // The other phone it ships to, at 402px.
+      // The other phone it ships to, at 402px. Pixel baselines stay on the 393px project alone:
+      // at nine pixels apart the two sets would differ only in width and double the cost of every
+      // intentional visual change. This project is here for geometry — overflow, touch targets,
+      // overlap — which is what actually differs between the two.
       name: "iphone-16-pro",
       dependencies: ["setup"],
+      testIgnore: /screenshots\.spec\.ts/,
       use: { ...devices["iPhone 16 Pro"], storageState: "e2e/.auth/user.json" },
     },
   ],
