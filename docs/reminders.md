@@ -1,113 +1,120 @@
 # Daily reminders
 
-Daily email uses an existing Gmail account through SMTP. No domain purchase, Resend account,
-Apple developer membership, or paid scheduler is required. Use existing free hosting/database
-quotas. Gmail account sending limits still apply; two people receiving at most one work and one
-personal email each day is a very small volume.
+What the reminder code does. For environment variables, Vault keys, migration order and the manual
+post-deploy checks, see [reminder setup](reminders-setup.md).
 
-Each user's Notifications settings contain a work address, personal address, send time, IANA
-timezone, and a 1–30 calendar-day upcoming window. The send time is a quarter hour, because the
-dispatcher ticks every 15 minutes and a time such as 23:50 has no tick left in its own local day.
-Workspaces are routed by `workspaces.kind`: `work` → work email; every other kind, `household`
-included, → personal email. Workspace names never determine routing.
-A blank address skips that category; it never falls back to another address. Each category gets
-at most one daily email, even when it contains multiple workspaces. Push combines both categories.
-Only assigned, incomplete, dated tasks are included, including assigned subtasks. Past deadlines
-are overdue, even earlier today; the other sections are mutually exclusive. Priority is per assignee.
+| Concern | File |
+| --- | --- |
+| Cron entry point | `src/app/api/cron/reminders/route.ts` |
+| Run loop, routing, claims, retries | `src/lib/reminders/delivery.ts` |
+| Task classification | `src/lib/reminders/digest.ts` |
+| Email rendering | `src/lib/reminders/render.ts` |
+| SMTP transport | `src/lib/reminders/email.ts` |
+| Preference and subscription validation | `src/lib/reminders/schemas.ts` |
+| Tables, claim RPC, RLS | `supabase/migrations/022_notifications.sql` – `025_reminder_time_grid.sql` |
 
-## Deployment setup
+## Scheduling and authorization
 
-1. Apply migrations 022–025 through the normal `supabase db push` / migration deployment workflow.
-   Migration 024 fills the four approved recipient addresses by matching the two existing login
-   emails. Preferences remain disabled until saved with email/push enabled. The migration does not
-   change existing opt-in settings or overwrite schedules.
-2. Set Vercel server environment variables:
-   - `GMAIL_USER`: the Gmail account that will send messages. This is independent of recipient addresses.
-   - `GMAIL_APP_PASSWORD`: a Google app password, not the regular account password. Google requires
-     2-Step Verification; some managed accounts or Advanced Protection accounts cannot use app passwords.
-     Create it at https://myaccount.google.com/apppasswords and enter it directly in Vercel, never chat or git.
-   - `REMINDER_APP_URL`: the canonical HTTPS app origin (the free `*.vercel.app` address works).
-   - `CRON_SECRET`: a random value, e.g. generate locally with `openssl rand -hex 32`.
-3. Store `reminder_app_url` and `reminder_cron_secret` in **each appropriate Supabase project's Vault**.
-   Their values must match that environment's app URL and `CRON_SECRET`. Use the Vault dashboard;
-   no secrets belong in migrations. The 15-minute job does nothing until both values exist.
-4. Redeploy the app with those environment variables. Each person opens Settings → Notifications,
-   verifies their two addresses and timezone, chooses a time, and enables daily email reminders.
-5. Optional push: generate a VAPID key pair using `npx web-push generate-vapid-keys`. Set
-   `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` (e.g. `mailto:` plus the
-   sender address). Rebuild after setting the public key. On iPhone install Hearth to the Home Screen,
-   open it there, and use “Enable on this device”, then Save changes.
+`pg_cron` runs `private.dispatch_daily_reminders()` every 15 minutes. The function reads
+`reminder_app_url` and `reminder_cron_secret` from Vault, returns immediately if either is missing,
+and uses `pg_net` to POST `/api/cron/reminders` with an `x-cron-secret` header.
 
-Recipients preconfigured in migration 024:
+The route accepts POST only. It compares the header against `CRON_SECRET` with a length check and
+`timingSafeEqual`, answering `401` before it constructs anything, and only then creates the
+service-role client. Regular settings actions use authenticated clients under RLS; neither
+`notification_log` nor `claim_notification` is reachable by app users.
 
-| Person | Personal | Work |
-| --- | --- | --- |
-| Abhinav | bindal.abhinav@gmail.com | abindal@nyase.com |
-| Anushka | anushka.a.jindal@gmail.com | ajindal@nyase.com |
+## Choosing who is due
+
+`runReminders` loads every `notification_prefs` row with `email_enabled` or `push_enabled` set, and
+for each one compares the user's local `HH:MM` against `digest_time`. A user is due once local time
+has reached that value, so the digest goes out on the **first tick at or after** the send time, not
+only on an exact match. `digest_time` is constrained to quarter hours, because a time like 23:50
+would have no tick left in its own local day.
+
+Local dates and times come from `localParts`, which formats through `Intl` in the user's IANA
+timezone. Every day boundary in the system is a local calendar date, never a UTC offset or an
+elapsed-hours calculation, so a 23- or 25-hour DST day cannot shift a task into the wrong section or
+a digest into the wrong period.
+
+## Building the digest
+
+Tasks come from `task_assignments` joined to `tasks`, filtered to the caller's workspace memberships,
+incomplete, and dated. Assigned subtasks are included like any other task. Ordering is
+`member_sort_key`, so priority is per assignee and a shared task can sit at different positions for
+different people. The query is capped at 1000 assignment rows; hitting the cap logs an error rather
+than mailing a quietly short digest.
+
+`buildDigest` splits tasks into three mutually exclusive sections. Anything whose deadline has
+already passed is `overdue`, including earlier the same day. Remaining tasks due on the local
+current date are `today`. Tasks falling within the next `soon_window_days` calendar days
+(1–30) are `soon`. Undated, completed and duplicate rows are dropped.
+
+Email is then split by workspace: `workspaces.kind = 'work'` goes to the work address and every other
+kind, `household` included, goes to the personal address. Workspace names never affect routing. Each
+category is re-classified on its own subset, so counts and sections match that email's contents. A
+blank address skips its category without falling back to the other one, and a category with nothing
+in it is not sent. Push combines both categories into one notification.
 
 ## Email content
 
-Each digest is sent as both a plain-text and an HTML part; a client that refuses HTML still shows
-the text. Both parts are rendered in `src/lib/reminders/render.ts` from the same `Digest` object, so
-they cannot disagree about which tasks are listed. Sections are `Overdue`, `Due today` and
-`Due soon`, each headed with its own count and omitted entirely when empty. Due dates are relative
-near today (`yesterday`, `earlier today, 9:00 AM`, `Tue, 9:00 AM`) and absolute beyond a week, all
-counted from local calendar dates so a DST day cannot shift a label.
+Each digest is sent as both a plain-text and an HTML part; a client that refuses HTML still shows the
+text. Both come from the same `Digest` object, so they cannot disagree about which tasks are listed.
+Sections are `Overdue`, `Due today` and `Due soon`, each headed with its own count and omitted
+entirely when empty. Due dates read relatively near today (`yesterday`, `earlier today, 9:00 AM`,
+`Tue, 9:00 AM`) and absolutely beyond a week.
 
-The HTML uses nested tables with inline styles and states every colour explicitly. Outlook renders
-through Word, which ignores `<style>` blocks, flex and grid, and no client can be relied on to
-inherit a theme. There are no images or web fonts. Task titles are user input and are HTML-escaped;
-the plain-text part leaves them as typed. Both parts are stored in the frozen claim payload, so a
-retry resends the identical message.
+The HTML nests tables with inline styles and states every colour explicitly. Outlook renders through
+Word, which ignores `<style>` blocks, flex and grid, and no client can be relied on to inherit a
+theme. There are no images or web fonts. Task titles are user input and are HTML-escaped; the
+plain-text part leaves them as typed.
 
-## Delivery and retries
+The push payload is deliberately small, to stay under browser push size limits: per section, a count
+and the first two titles truncated to 70 characters. The app shows the full list.
 
-`pg_cron` calls a private dispatcher every 15 minutes. It reads Vault and uses `pg_net` to POST
-`/api/cron/reminders` with `x-cron-secret`. That exact route bypasses cookie-login middleware but
-checks its secret before creating a service-role database client. Regular user settings actions
-use authenticated clients and RLS. Neither logs nor the claim RPC are available to app users.
+## Claims and idempotency
 
-An atomic database upsert leases `(user, local date, channel)` for ten minutes; email channels are
-`email_work` and `email_personal`, while push is `push`. Sent rows cannot be reclaimed. Empty
-digests do not create rows. Claimed payloads are frozen across retries. Failures are independent
-between email categories and push, and one user's failure does not stop subsequent users.
+`claim_notification` leases `(user_id, period_key, channel)` in a single upsert, across HTTP requests
+and server instances. Email channels are `email_work` and `email_personal`; push is `push`. A row can
+only be re-claimed when it has no `sent_at`, when its `claimed_at` is more than ten minutes old, and
+— for email — when `attempted_at` is still null. The claimed payload is frozen and replayed on every
+retry, so a changed address or a changed task title after a failed attempt does not alter the message
+in flight; both appear in the next day's digest instead. Empty digests create no rows at all.
 
-SMTP cannot guarantee exactly-once delivery. We record `attempted_at` before sending. A transient
-4xx refusal, or an `EAUTH`/`EDNS` failure that never reached the mailbox, releases that marker so a
-later tick can retry. A 5xx rejection is permanent and keeps the marker, because retrying it would
-repeat a certain failure every tick until the local day rolls over. An ambiguous timeout or process
-crash after this marker prevents automatic re-send that day, favoring no duplicates over a possibly
-missed email. `attempted_at IS NOT NULL AND sent_at IS NULL` identifies these cases for inspection.
-A stable Message-ID aids tracing but is not treated as provider deduplication.
+## Retries and failure semantics
 
-For push, successful endpoints are recorded separately so a partially failed run skips them on
-retry. Expired (404/410) endpoints are removed. Any other status — a 403 from a rotated VAPID key
-included — is logged with its status code and retried rather than deleted, so one bad credential
-cannot silently unsubscribe every device. A process crash between provider acceptance and
-receipt persistence can still repeat a push; the stable notification tag replaces the visible
-notification where supported. Provider acceptance does not guarantee display on a device.
+SMTP has no idempotency API, so `attempted_at` is written *before* the send. A transient 4xx refusal,
+or an `EAUTH`/`EDNS` failure that never reached a mailbox, clears that marker so a later tick can
+retry. A 5xx rejection keeps it, because retrying a certain failure would repeat it every tick until
+the local day rolls over. An ambiguous timeout or a crash after the marker prevents an automatic
+re-send that day, preferring a possibly missed email over a duplicate.
+`attempted_at IS NOT NULL AND sent_at IS NULL` finds these rows. The stable Message-ID aids tracing
+and is not treated as provider deduplication.
 
-Changing an email address after a failed attempt does not redirect the frozen retry payload.
-Address and task-content changes appear in the next day's digest. Disabling email stops both
-email categories immediately for subsequent runs. Removing a device only removes that device.
+`sent_at` records that the SMTP server accepted the message. Delivery beyond that point is out of the
+system's hands; a receiving gateway may queue a message for minutes after `sent_at` is written.
 
-The route is bounded to 60 seconds and stops starting new work before that deadline. For this
-household's size, normal runs take a few seconds. Delivery is approximate, within the next scheduler
-tick; infrastructure outages can delay it. The worker is push-only and does not cache private pages.
+For push, each accepted endpoint is appended to `delivered_endpoints`, so a partially failed run
+skips what already arrived. Only 404 and 410 delete a subscription. Any other status — a 403 from a
+rotated VAPID key included — is logged and retried, because deleting on a configuration mistake
+would silently unsubscribe every device. A crash between provider acceptance and receipt persistence
+can still repeat a push; the stable notification tag replaces the visible one where supported.
+Provider acceptance does not guarantee display.
 
-## Verification
+Failures are independent: work email, personal email and push each succeed or fail on their own, and
+one user's failure does not stop the users after them. Missing VAPID keys count as a push failure and
+are logged. The run returns `{ sent, failed, skipped }`.
 
-`npm run typecheck`, `npm run lint`, and `npm test -- --runInBand` cover the app. Reminder-specific
-tests cover local-day/DST boundaries, visibility, routing by type, concurrent claims, independent
-failures, SMTP ambiguity, expired subscriptions, cron authorization, and settings editing.
-`supabase/tests/notifications.sql` checks database claims and RLS inside a caller-owned transaction.
-Run against a disposable/test database after 022 and roll back its fixtures. Migrations 022–025
-and these assertions were verified together inside a rolled-back transaction on the development
-project. `pg_net` availability was probed on both development and production.
+## Time budget
 
-After deployment and credential setup, verify an actual email for each category and an actual
-push on a Home Screen iPhone. Automated tests mock delivery providers and do not send messages.
+The route declares `maxDuration = 60`. Within it the loop stops starting new users at 40s, new emails
+at 35s, and new push endpoints at 45s, leaving room to finish work already in flight. Whatever is
+left waits for the next 15-minute tick, so delivery is approximate rather than exact.
 
-References: [Google app passwords](https://support.google.com/accounts/answer/185833),
-[Supabase pg_net](https://supabase.com/docs/guides/database/extensions/pg_net),
-[Apple web push](https://developer.apple.com/documentation/usernotifications/sending-web-push-notifications-in-web-apps-and-browsers).
+## Tests
+
+`src/lib/reminders/*.test.ts` covers DST and local-day boundaries, section classification, routing by
+workspace kind, relative date formatting, HTML escaping, concurrent claims, independent failures,
+SMTP ambiguity and expired subscriptions. `supabase/tests/notifications.sql` checks the claim RPC and
+RLS inside a caller-owned transaction. Provider calls are mocked throughout — no test sends a real
+message.

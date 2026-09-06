@@ -198,4 +198,5 @@ An ambiguous email attempt is not reclaimable, avoiding automatic duplicate SMTP
 
 `private.dispatch_daily_reminders` reads the URL and cron secret from Vault and uses `pg_net` to call
 the reminder route every fifteen minutes. Without both Vault values the scheduled function is inert.
-See [reminder setup](reminders.md) for deployment, recipient configuration and retry semantics.
+See [Daily reminders](reminders.md) for claim and retry semantics, and
+[reminder setup](reminders-setup.md) for deployment and recipient configuration.
