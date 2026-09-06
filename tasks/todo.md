@@ -66,10 +66,10 @@ iPhone 14 Pro (393px). Narrow-screen floor is 393px; 320/375-only defects are ou
 
 ## Blocked / needs the user
 
-- **VAPID keys are not set in production.** No `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
-  `VAPID_PRIVATE_KEY` or `VAPID_SUBJECT`. Step 5 can be written but not verified end to end.
-- Real-device pass: dialog bottom edge vs home indicator, keyboard in the edit modal, board drag
-  at phone width, workspaces header wrap.
+- VAPID keys configured in production and redeployed on 2026-09-06. Still needs notification
+  permission on each installed app, followed by push delivery and badge verification.
+- User confirmed the five device checks pass on 2026-09-06: launching with Safari closed,
+  refresh after backgrounding, task creation/editing with the keyboard, board dragging, and Settings.
 - Unverified anywhere in the docs: whether an app-switcher resume fires `pageshow{persisted:true}`
   on current iOS. Design listens to both events because of this. Confirm on device.
 
