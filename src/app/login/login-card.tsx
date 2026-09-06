@@ -143,7 +143,7 @@ export function LoginCard() {
   return (
     // No nav renders for a signed-out user, so this subtracts only the page's own `p-6` gutters —
     // using --nav-height here left the card sitting visibly above centre.
-    <div className="flex min-h-[calc(100dvh-3rem)] items-center justify-center relative overflow-hidden">
+    <div className="flex min-h-[calc(100dvh-3rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] items-center justify-center relative overflow-hidden">
       {/* Pastel blobs */}
       <div
         aria-hidden="true"

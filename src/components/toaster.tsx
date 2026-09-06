@@ -78,7 +78,9 @@ export function Toaster() {
   }, []);
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+    // A fixed element is positioned against the viewport, so the safe-area padding `body` carries
+    // does not reach it and the home indicator sits over the toast in standalone mode.
+    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-50 flex flex-col gap-2">
       <div role="status" aria-live="polite" aria-atomic="true" className="flex flex-col gap-2">
         {politeToasts.map((t) => (
           <div key={t.id} className={toastClasses(t.type)}>

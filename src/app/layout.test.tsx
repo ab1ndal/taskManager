@@ -24,6 +24,11 @@ jest.mock("@/components/toaster", () => ({
   Toaster: () => <div data-testid="toaster" />,
 }));
 
+// Its own suite covers the refresh behaviour; here it would only demand a mounted app router.
+jest.mock("@/components/resume-refresh", () => ({
+  ResumeRefresh: () => <div data-testid="resume-refresh" />,
+}));
+
 const mockGetUser = jest.fn();
 jest.mock("@/lib/supabase/server", () => ({
   createClient: jest.fn(() => ({
