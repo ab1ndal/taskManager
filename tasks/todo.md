@@ -24,20 +24,22 @@ iPhone 14 Pro (393px). Narrow-screen floor is 393px; 320/375-only defects are ou
 
 ## Steps
 
-- [ ] 1. Manifest reachable: exempt `/manifest.webmanifest` in `src/proxy.ts`. It 307s to /login
+- [x] 1. Manifest reachable: exempt `/manifest.webmanifest` in `src/proxy.ts`. It 307s to /login
       today because manifests are fetched with credentials omitted, so `display: standalone`,
       `start_url: /tasks`, name and icons have never applied.
-- [ ] 2. Build id endpoint `src/app/api/build-id/route.ts` returning the commit SHA.
-- [ ] 3. `<ResumeRefresh />` in the root layout: visibilitychange + pageshow, timestamp-guarded,
+- [x] 2. Build id endpoint `src/app/api/build-id/route.ts` returning the commit SHA.
+- [x] 3. `<ResumeRefresh />` in the root layout: visibilitychange + pageshow, timestamp-guarded,
       `router.refresh()` for data and a no-store build-id compare for code.
-- [ ] 4. Server Action failure path for a stale client (no skew protection on Hobby).
-- [ ] 5. Push badge: `app_badge` in the declarative payload from delivery.ts, `setAppBadge` in
+- [ ] 4. Server Action failure path for a stale client (no skew protection on Hobby). Still open:
+      the resume reload closes the window in which a stale client can call a new deployment, but a
+      client that is mid-action when a deploy lands still gets a raw failure.
+- [x] 5. Push badge: `app_badge` in the declarative payload from delivery.ts, `setAppBadge` in
       sw.js for pre-18.4, clear on task list load, re-upsert subscription on open.
-- [ ] 6. Layout fixes at 393px: nav wrap, toaster bottom inset, /login safe-top, /tasks bottom
+- [x] 6. Layout fixes at 393px: nav wrap, toaster bottom inset, /login safe-top, /tasks bottom
       inset, ~14 touch targets under 44px, four break-words, board skeleton shift.
-- [ ] 7. Tests: Playwright project at 402px, touch-target scan with dialogs open, unit tests for
+- [x] 7. Tests: Playwright project at 402px, touch-target scan with dialogs open, unit tests for
       the resume-refresh guards.
-- [ ] 8. Verify: typecheck, lint, jest, e2e.
+- [~] 8. Verify: typecheck, lint and jest green; full Playwright run in progress.
 
 ## Blocked / needs the user
 
@@ -47,3 +49,17 @@ iPhone 14 Pro (393px). Narrow-screen floor is 393px; 320/375-only defects are ou
   at phone width, workspaces header wrap.
 - Unverified anywhere in the docs: whether an app-switcher resume fires `pageshow{persisted:true}`
   on current iOS. Design listens to both events because of this. Confirm on device.
+
+## Found during execution, not in the plan
+
+- **Settings was unreachable on both phones.** It has no entry in `NavLinks`, and its only link was
+  the user's name at `nav-user.tsx:28`, hidden below `sm`. On a 393px iPhone there was no route to
+  it — including the Notifications tab that enables push. The avatar now carries the link.
+- **The manifest had never applied in production.** `/manifest.webmanifest` returned 307 to /login
+  because manifests are fetched with credentials omitted. The app launched standalone only because
+  `appleWebApp.capable` is set independently.
+- **The 44px scan was blind to dialogs.** Running it inside an open dialog immediately found the
+  task form's own text fields, date fields and selects, which the first fix pass had missed.
+- **WebKit ignores `min-height` on a menulist `<select>`.** `min-h-11` left it 25px tall on iOS;
+  only an explicit `h-11` works.
+- **Vercel plan is Hobby**, so Skew Protection is unavailable. Confirmed via the API, not assumed.

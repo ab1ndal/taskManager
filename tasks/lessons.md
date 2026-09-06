@@ -362,3 +362,38 @@ that it is reachable, sized or on top. Anything whose correctness is geometric �
 targets, scroll containment, sticky headers, truncation — needs a real engine. When a component's
 review findings are about sizes (44px targets, grid columns, popover placement), that is the signal
 to add or run the e2e case rather than to trust the unit test that just went green.
+
+## A test that only walks the happy path proves nothing about the paths it skips
+
+The 44px scan in `e2e/layout.spec.ts` passed for months while fourteen controls violated the rule.
+It walked `/tasks` with no dialog open, and every violation lived in a modal, on the login screen or
+on the workspaces screen. Widening the same assertion to run inside an open dialog found four more
+defects in the task form within a minute of first running.
+
+**Rule:** when a rule is meant to hold everywhere, the test must enumerate the surfaces, not one
+representative surface. Before trusting a green invariant test, ask which screens it never visits —
+and note that scan exemptions need thought too: a checkbox is 12px, but its label is the real target,
+so the rule needs the exemption rather than the checkbox needing a fix.
+
+## Breakpoint boundaries hide defects exactly at the shipping width
+
+The nav's intrinsic width was 387px against a 393px test device — passing by 6px, with "Sign out"
+already wrapping to two lines. Below 387px the whole page scrolled sideways. A single phone project
+at the widest target device is the same blind spot as testing one browser.
+
+**Rule:** test at the narrowest width that ships, not a representative one, and add a project per
+real target device. Measure intrinsic width when a flex row "just fits" — fitting and fitting well
+are different, and `flex-shrink-0` on every child means the last child absorbs everything.
+
+## Verify platform behaviour against the platform, not against memory
+
+Three things in this work would have been wrong if taken from memory: Skew Protection looked like
+the answer for propagating deploys (it needs Pro; this project is Hobby), the service worker looked
+like the natural update signal (`sw.js` is byte-identical across deploys, so `controllerchange` never
+fires), and `min-h-11` looked sufficient for every control (WebKit ignores `min-height` on a menulist
+`<select>`). The plan, dashboard settings and live response headers all came from the Vercel API and
+curl against production.
+
+**Rule:** check the account, the plan and the live deployment before designing around a platform
+feature. And when research says a claim is anecdote rather than spec — such as whether iOS keeps
+stale JS across an app-switcher resume — design for both branches instead of picking one.
