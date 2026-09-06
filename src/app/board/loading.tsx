@@ -4,10 +4,10 @@
  */
 export default function BoardLoading() {
   return (
-    <div className="p-6" aria-busy="true" aria-live="polite">
+    <div className="pt-6" aria-busy="true" aria-live="polite">
       <span className="sr-only">Loading your board…</span>
-      <div className="mb-6 h-5 w-24 animate-pulse rounded bg-[var(--color-border)]" />
-      <div className="flex gap-4 overflow-x-auto pb-6">
+      <div className="mx-4 mb-6 h-5 w-24 animate-pulse rounded bg-[var(--color-border)]" />
+      <div className="flex gap-4 overflow-x-auto px-4 pb-6">
         {[0, 1, 2].map((i) => (
           <div
             key={i}

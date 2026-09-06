@@ -95,7 +95,7 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
           <button
             onClick={() => setLeaveConfirmOpen(true)}
             disabled={isPending}
-            className="text-2xs font-semibold px-3 py-1 rounded-full transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none text-[var(--color-text-secondary)] hover:bg-[var(--color-danger-surface)] hover:text-[var(--color-danger-text)]"
+            className="inline-flex items-center min-h-11 text-2xs font-semibold px-3 py-1 rounded-full transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none text-[var(--color-text-secondary)] hover:bg-[var(--color-danger-surface)] hover:text-[var(--color-danger-text)]"
           >
             {isPending ? "Leaving…" : "Leave"}
           </button>
@@ -104,7 +104,7 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
         <button
           onClick={handleJoin}
           disabled={isPending}
-          className="shrink-0 text-2xs font-semibold px-3 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)] hover:bg-[var(--color-accent)] hover:text-[var(--color-text-on-accent)] disabled:opacity-50 disabled:pointer-events-none transition-opacity duration-100"
+          className="shrink-0 inline-flex items-center min-h-11 text-2xs font-semibold px-3 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)] hover:bg-[var(--color-accent)] hover:text-[var(--color-text-on-accent)] disabled:opacity-50 disabled:pointer-events-none transition-opacity duration-100"
         >
           {isPending ? "Joining…" : "Join"}
         </button>

@@ -58,8 +58,8 @@ export function DictationTextarea({
         // `block` matters: a textarea is inline by default, which leaves a few pixels of descender
         // space under it inside the wrapper — enough that a mic positioned from the wrapper's
         // bottom edge sits below the field's own border instead of inside it. `pr-10` keeps the
-        // text from running under the mic.
-        className={`${className} block ${dictation.isSupported ? "pr-10" : ""}`}
+        // text from running under the mic, which is a 44px target rather than the 32px it used to be.
+        className={`${className} block ${dictation.isSupported ? "pr-12" : ""}`}
         {...textareaProps}
       />
       {dictation.isSupported && (
@@ -72,7 +72,7 @@ export function DictationTextarea({
           aria-label={isDictating ? "Stop dictating" : dictateLabel}
           onClick={() => dictation.toggle(field, value, onChange)}
           disabled={textareaProps.disabled}
-          className={`absolute right-1.5 bottom-1.5 w-8 h-8 flex items-center justify-center rounded-full text-sm disabled:opacity-50 transition-colors ${
+          className={`absolute right-1.5 bottom-1.5 w-11 h-11 flex items-center justify-center rounded-full text-sm disabled:opacity-50 transition-colors ${
             isDictating
               ? "bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]"
               : "text-[var(--color-text-muted)] hover:bg-[var(--color-accent-subtle)] hover:text-[var(--color-accent-text)]"

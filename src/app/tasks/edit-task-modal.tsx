@@ -636,7 +636,7 @@ export function EditTaskModal({
                 </button>
                 <div className="flex-1 min-w-0">
                   <span
-                    className={`block text-sm ${
+                    className={`block text-sm break-words ${
                       s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""
                     }`}
                   >
@@ -774,7 +774,7 @@ export function EditTaskModal({
                 >
                   {formatUpdateTime(u.createdAt)}
                 </time>
-                <p>{u.updateText}</p>
+                <p className="break-words">{u.updateText}</p>
               </li>
             ))}
           </ul>

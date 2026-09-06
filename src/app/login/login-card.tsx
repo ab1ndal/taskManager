@@ -185,7 +185,7 @@ export function LoginCard() {
             <button
               type="button"
               onClick={() => { setMode("signin"); setError(""); setDuplicateEmail(false); }}
-              className={`flex-1 rounded-sm py-[7px] font-medium transition-colors text-sm ${
+              className={`flex-1 min-h-11 rounded-sm py-[7px] font-medium transition-colors text-sm ${
                 mode === "signin"
                   ? "bg-[var(--color-surface)] shadow-sm text-[var(--color-accent)]"
                   : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -196,7 +196,7 @@ export function LoginCard() {
             <button
               type="button"
               onClick={() => { setMode("signup"); setError(""); setDuplicateEmail(false); }}
-              className={`flex-1 rounded-sm py-[7px] font-medium transition-colors text-sm ${
+              className={`flex-1 min-h-11 rounded-sm py-[7px] font-medium transition-colors text-sm ${
                 mode === "signup"
                   ? "bg-[var(--color-surface)] shadow-sm text-[var(--color-accent)]"
                   : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -219,7 +219,7 @@ export function LoginCard() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
                 placeholder="Your name"
               />
             </div>
@@ -236,7 +236,7 @@ export function LoginCard() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
                 placeholder="you@example.com"
               />
             </div>
@@ -252,7 +252,7 @@ export function LoginCard() {
                   <button
                     type="button"
                     onClick={() => { setMode("forgot"); setError(""); }}
-                    className="text-xs text-[var(--color-accent)] hover:underline"
+                    className="inline-flex items-center min-h-11 text-xs text-[var(--color-accent)] hover:underline"
                   >
                     Forgot?
                   </button>
@@ -264,7 +264,7 @@ export function LoginCard() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -304,7 +304,7 @@ export function LoginCard() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="New password"
-                  className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                  className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -318,7 +318,7 @@ export function LoginCard() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm password"
-                  className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                  className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
                 />
               </div>
               <p className="text-xs text-[var(--color-text-muted)]">Minimum 6 characters</p>
@@ -340,14 +340,14 @@ export function LoginCard() {
                 <button
                   type="button"
                   onClick={() => { setMode("signin"); setDuplicateEmail(false); }}
-                  className="text-[var(--color-accent)] hover:underline"
+                  className="inline-flex items-center min-h-11 text-[var(--color-accent)] hover:underline"
                 >
                   Sign in
                 </button>
                 <button
                   type="button"
                   onClick={() => { setMode("forgot"); setPassword(""); setDuplicateEmail(false); }}
-                  className="text-[var(--color-accent)] hover:underline"
+                  className="inline-flex items-center min-h-11 text-[var(--color-accent)] hover:underline"
                 >
                   Reset your password
                 </button>
@@ -359,7 +359,7 @@ export function LoginCard() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-1 rounded-sm bg-[var(--color-accent)] px-4 py-[10px] text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 transition-colors"
+              className="mt-1 min-h-11 rounded-sm bg-[var(--color-accent)] px-4 py-[10px] text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 transition-colors"
             >
               {loading
                 ? mode === "forgot"
@@ -388,7 +388,7 @@ export function LoginCard() {
                 type="button"
                 onClick={handleGoogle}
                 disabled={loading}
-                className="flex items-center justify-center gap-2 rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-[10px] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-accent-subtle)] disabled:opacity-50 transition-colors"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-[10px] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-accent-subtle)] disabled:opacity-50 transition-colors"
               >
                 <svg aria-hidden="true" viewBox="0 0 18 18" className="h-[18px] w-[18px]">
                   <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62Z" />
@@ -405,7 +405,7 @@ export function LoginCard() {
             <button
               type="button"
               onClick={() => { setMode("signin"); setError(""); }}
-              className="mt-1 text-xs text-[var(--color-accent)] hover:underline text-center"
+              className="mt-1 inline-flex items-center justify-center min-h-11 text-xs text-[var(--color-accent)] hover:underline text-center"
             >
               ← Back to sign in
             </button>

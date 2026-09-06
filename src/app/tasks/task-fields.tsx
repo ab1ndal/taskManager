@@ -180,7 +180,7 @@ export function TaskFields({
         <legend className="block text-xs text-[var(--color-text-muted)] mb-1">Assign to</legend>
         <div className="flex flex-col gap-1.5">
           {currentWorkspace?.members.map((m) => (
-            <label key={m.id} className="flex items-center gap-2 text-sm cursor-pointer">
+            <label key={m.id} className="flex items-center gap-2 min-h-11 text-sm cursor-pointer">
               <input
                 type="checkbox"
                 checked={selectedMemberIds.includes(m.id)}
@@ -202,7 +202,7 @@ export function TaskFields({
         whether `recurrence` is non-null — a paused rule has stored values but must render OFF.
       */}
       <div>
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
+        <label className="flex items-center gap-2 min-h-11 text-sm cursor-pointer">
           <input
             type="checkbox"
             checked={recurrenceEnabled}

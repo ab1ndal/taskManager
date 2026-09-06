@@ -295,7 +295,7 @@ export function NewTaskModal({
                       onClick={() => removeSubtask(i)}
                       disabled={disabled}
                       aria-label={`Remove subtask ${i + 1}`}
-                      className="shrink-0 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                      className="shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
                     >
                       <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                     </button>
@@ -335,7 +335,7 @@ export function NewTaskModal({
               type="button"
               onClick={addSubtaskRow}
               disabled={disabled}
-              className="mt-1 text-sm text-[var(--color-accent)] hover:underline disabled:opacity-50"
+              className="mt-1 inline-flex items-center min-h-11 text-sm text-[var(--color-accent)] hover:underline disabled:opacity-50"
             >
               + Add subtask
             </button>
@@ -352,14 +352,14 @@ export function NewTaskModal({
               type="button"
               onClick={onClose}
               disabled={disabled}
-              className="px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
+              className="min-h-11 px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || selectedMemberIds.length === 0 || pending}
-              className="px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="min-h-11 px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {pending ? "Adding…" : "Add task"}
             </button>

@@ -48,7 +48,7 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
         </h2>
         <button
           onClick={() => setModalOpen(true)}
-          className="text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors duration-150"
+          className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors duration-150"
         >
           Create Workspace
         </button>
@@ -152,14 +152,14 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                 <button
                   type="button"
                   onClick={() => { setModalOpen(false); setFormError(null); }}
-                  className="text-sm font-semibold px-4 py-2 rounded-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
+                  className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending || !name.trim()}
-                  className="text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
+                  className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
                 >
                   {isPending ? "Creating…" : "Create"}
                 </button>

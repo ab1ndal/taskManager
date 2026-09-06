@@ -41,7 +41,7 @@ export function ConfirmDialog({
       ariaLabelledBy={id}
       className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto backdrop:bg-[var(--color-scrim)]"
     >
-      <h3 id={id} className="text-base font-semibold mb-2">
+      <h3 id={id} className="text-base font-semibold mb-2 break-words">
         {title}
       </h3>
       <p className="text-sm text-[var(--color-text-secondary)] mb-4">{body}</p>
