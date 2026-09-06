@@ -30,11 +30,13 @@ for (const path of PAGES) {
   });
 }
 
-test("every interactive control meets the 44px touch minimum", async ({ page }) => {
-  await page.goto("/tasks");
-  await expect(page.getByRole("heading", { name: /Hello,/ })).toBeVisible();
-
-  const undersized = await page.evaluate(() => {
+/**
+ * Scans what is on screen right now. Taking a root lets the same rule run inside an open dialog:
+ * the original scan only ever saw /tasks with every modal closed, which is why fourteen undersized
+ * controls lived in the modals and on the login and workspace screens without failing anything.
+ */
+async function undersizedControls(page: Page) {
+  return page.evaluate(() => {
     const MIN = 44;
     const out: string[] = [];
     const els = document.querySelectorAll<HTMLElement>(
@@ -47,14 +49,54 @@ test("every interactive control meets the 44px touch minimum", async ({ page }) 
       if (style.display === "none" || style.visibility === "hidden") continue;
       // Inline links inside a paragraph are text, not touch targets, and are exempt by WCAG 2.5.8.
       if (el.tagName === "A" && el.closest("p")) continue;
+      // A checkbox is a 12px box, but tapping its label toggles it — so the label is the real
+      // target and its height is the one that has to clear 44px.
+      const label = el.closest("label");
+      if (label && label.getBoundingClientRect().height >= MIN - 0.5) continue;
       if (r.height < MIN - 0.5) {
         out.push(`${el.tagName}[${el.getAttribute("aria-label") ?? el.textContent?.trim().slice(0, 30)}] h=${Math.round(r.height)}`);
       }
     }
     return out;
   });
+}
+
+test("every interactive control meets the 44px touch minimum", async ({ page }) => {
+  await page.goto("/tasks");
+  await expect(page.getByRole("heading", { name: /Hello,/ })).toBeVisible();
+
+  const undersized = await undersizedControls(page);
 
   expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
+});
+
+test("controls inside the new task dialog meet the 44px touch minimum", async ({ page }) => {
+  await page.goto("/tasks");
+  await page.getByRole("button", { name: "New task" }).first().click();
+  await expect(page.locator("dialog[open]")).toBeVisible();
+
+  const undersized = await undersizedControls(page);
+
+  expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
+});
+
+test("controls on the workspaces screen meet the 44px touch minimum", async ({ page }) => {
+  await page.goto("/workspaces");
+  await expect(page.getByRole("heading", { name: "All Workspaces" })).toBeVisible();
+
+  const undersized = await undersizedControls(page);
+
+  expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
+});
+
+test("settings is reachable from the nav on a phone", async ({ page }) => {
+  // Settings has no entry in NavLinks and its only other link is the user's name, which is hidden
+  // below the sm breakpoint — so on a phone there was no route to it, push settings included.
+  await page.goto("/tasks");
+
+  await page.getByRole("link", { name: "Settings" }).click();
+
+  await expect(page).toHaveURL(/\/settings/);
 });
 
 test("a long task title is fully readable, not clipped to an ellipsis", async ({ page }) => {

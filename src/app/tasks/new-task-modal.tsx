@@ -288,7 +288,7 @@ export function NewTaskModal({
                       onKeyDown={(e) => handleSubtaskKeyDown(e, row.title)}
                       disabled={disabled}
                       ref={i === subtaskRows.length - 1 ? lastSubtaskRef : undefined}
-                      className="flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                      className="min-h-11 flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
                     />
                     <button
                       type="button"
@@ -314,7 +314,7 @@ export function NewTaskModal({
                       disabled={disabled}
                       rows={2}
                       wrapperClassName="w-full sm:flex-1 min-w-0"
-                      className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+                      className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
                     />
                     <input
                       type="date"
@@ -325,7 +325,7 @@ export function NewTaskModal({
                       // Safari renders a date input without a picker glyph and sizes it to its own
                       // text: at `text-xs` it came out 96px, narrower than the value it holds. The
                       // explicit floor keeps it legible in every engine.
-                      className="w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+                      className="min-h-11 w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
                     />
                   </div>
                 </div>

@@ -113,7 +113,7 @@ export function TaskFields({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           disabled={disabled}
-          className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
+          className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
         />
       </div>
 
@@ -131,7 +131,7 @@ export function TaskFields({
           onChange={onDescriptionChange}
           disabled={disabled}
           rows={3}
-          className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
+          className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
         />
       </div>
 
@@ -145,7 +145,7 @@ export function TaskFields({
           value={dueAt}
           onChange={(e) => onDueAtChange(e.target.value)}
           disabled={disabled}
-          className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+          className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
         />
       </div>
 
@@ -163,7 +163,7 @@ export function TaskFields({
             value={workspaceId}
             onChange={(e) => onWorkspaceChange(e.target.value)}
             disabled={disabled}
-            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+            className="h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
           >
             {workspaces.map((w) => (
               <option key={w.id} value={w.id}>
@@ -237,7 +237,7 @@ export function TaskFields({
                     })
                   }
                   disabled={disabled}
-                  className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                  className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
                 />
               </div>
               <div className="flex-1">
@@ -257,7 +257,7 @@ export function TaskFields({
                     })
                   }
                   disabled={disabled}
-                  className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+                  className="h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
                 >
                   {/* No biweekly: it is weekly with an interval of 2, and migration 012 drops it. */}
                   <option value="daily">days</option>
@@ -285,7 +285,7 @@ export function TaskFields({
                 value={recurrence.firstRunAt}
                 onChange={(e) => onRecurrenceChange({ ...recurrence, firstRunAt: e.target.value })}
                 disabled={disabled}
-                className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+                className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
               />
             </div>
 
@@ -309,7 +309,7 @@ export function TaskFields({
                   })
                 }
                 disabled={disabled}
-                className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
               />
             </div>
           </div>

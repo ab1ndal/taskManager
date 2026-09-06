@@ -144,7 +144,7 @@ export function DeleteColumnDialog({
                   if (!target) return;
                   setTargetByTaskId(Object.fromEntries(tasks.map((task) => [task.id, target])));
                 }}
-                className="min-h-11 flex-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-sm"
+                className="h-11 flex-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-sm"
               >
                 <option value="">Choose a column…</option>
                 {siblings.map((sibling) => (
@@ -170,7 +170,7 @@ export function DeleteColumnDialog({
                     onChange={(event) =>
                       setTargetByTaskId((prev) => ({ ...prev, [task.id]: event.target.value }))
                     }
-                    className="min-h-11 w-40 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-sm"
+                    className="h-11 w-40 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-sm"
                   >
                     {siblings.map((sibling) => (
                       <option key={sibling.id} value={sibling.id}>

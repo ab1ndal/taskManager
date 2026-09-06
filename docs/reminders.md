@@ -72,6 +72,18 @@ plain-text part leaves them as typed.
 The push payload is deliberately small, to stay under browser push size limits: per section, a count
 and the first two titles truncated to 70 characters. The app shows the full list.
 
+It is sent in Declarative Web Push shape (`web_push: 8030` with the fields nested under
+`notification`). iOS and iPadOS 18.4+ render that themselves without waking a service worker, and
+apply `app_badge` to the Home Screen icon directly. Because the notification is guaranteed to be
+visible, declarative messages are exempt from the silent-push penalty that revokes a subscription.
+`public/sw.js` still receives the event on older systems, reads the same fields, and sets the badge
+through `WorkerNavigator.setAppBadge` — supported for Home Screen web apps since iOS 16.4. It falls
+back to the flat `{title, body, tag, url}` shape so a payload queued before the change still shows.
+
+`app_badge` counts overdue plus due-today tasks only. A badge that includes next week's work is lit
+permanently and stops carrying information. Nothing clears a badge automatically — not reading the
+notification, not opening the app — so `PushUpkeep` clears it whenever the app becomes visible.
+
 ## Claims and idempotency
 
 `claim_notification` leases `(user_id, period_key, channel)` in a single upsert, across HTTP requests

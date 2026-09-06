@@ -32,6 +32,11 @@ personal email each day is a very small volume.
    sender address). Rebuild after setting the public key. On iPhone, install Hearth to the Home
    Screen, open it there, use "Enable on this device", then Save changes.
 
+   As of 2026-09-05 none of the three VAPID variables is set on the production project, so push has
+   never been configured there; email digests are unaffected. Removing and re-adding Hearth to the
+   Home Screen discards notification permission and the push subscription, and both must be granted
+   again from the installed app.
+
 Recipients preconfigured in migration 024:
 
 | Person | Personal | Work |

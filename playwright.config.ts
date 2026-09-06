@@ -47,10 +47,17 @@ export default defineConfig({
     },
     {
       // Mobile Safari on a notched device: the deliverable ships as an iPhone app, so the phone
-      // layout is a first-class target rather than a narrow-viewport afterthought.
+      // layout is a first-class target rather than a narrow-viewport afterthought. 393px is the
+      // narrower of the two phones this ships to, and the width at which the nav used to wrap.
       name: "iphone",
       dependencies: ["setup"],
       use: { ...devices["iPhone 14 Pro"], storageState: "e2e/.auth/user.json" },
+    },
+    {
+      // The other phone it ships to, at 402px.
+      name: "iphone-16-pro",
+      dependencies: ["setup"],
+      use: { ...devices["iPhone 16 Pro"], storageState: "e2e/.auth/user.json" },
     },
   ],
   webServer: {

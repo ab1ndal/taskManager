@@ -23,6 +23,8 @@ Read docs/db.md when working with database schema, RLS, or queries.
 
 Read docs/workflow.md for development workflow rules.
 
+Read docs/ios.md when working on the installed iPhone app, standalone behaviour, or narrow-screen layout.
+
 ## Core Product Rules
 
 Visibility
