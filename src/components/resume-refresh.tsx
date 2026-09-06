@@ -8,6 +8,9 @@ import { reloadPage } from "@/lib/reload-page";
 /** Resumes closer together than this re-use the last check; app switching is bursty. */
 const MIN_INTERVAL_MS = 10_000;
 
+/** How often an app left open in the foreground re-checks for a deploy. */
+const POLL_INTERVAL_MS = 5 * 60_000;
+
 /**
  * Reloading mid-sentence loses work, so a pending deploy waits for a resume that finds the app
  * idle. There is always another resume: iOS foregrounds a standalone app every time it is opened.
@@ -74,8 +77,14 @@ export function ResumeRefresh() {
     const onPageShow = () => void check();
     document.addEventListener("visibilitychange", onPageShow);
     window.addEventListener("pageshow", onPageShow);
+    // Resumes alone leave a window: an app left open across a deploy keeps calling Server Actions
+    // that fail, because their arguments are encrypted with a build-derived key. Skew Protection
+    // would absorb that, but it needs a Pro plan. A slow poll shrinks the window instead — it
+    // cannot close it, so an action in flight when a deploy lands still fails once.
+    const interval = setInterval(onPageShow, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
+      clearInterval(interval);
       document.removeEventListener("visibilitychange", onPageShow);
       window.removeEventListener("pageshow", onPageShow);
     };

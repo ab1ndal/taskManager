@@ -126,3 +126,18 @@ describe("ResumeRefresh", () => {
     expect(reload).not.toHaveBeenCalled();
   });
 });
+
+it("keeps checking while the app is left open in the foreground", async () => {
+  jest.useFakeTimers();
+  answerWith("development");
+  render(<ResumeRefresh />);
+
+  resume();
+  await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+
+  // Past both the throttle and the poll interval.
+  jest.advanceTimersByTime(5 * 60_000 + 1);
+  await waitFor(() => expect(refresh).toHaveBeenCalledTimes(2));
+
+  jest.useRealTimers();
+});

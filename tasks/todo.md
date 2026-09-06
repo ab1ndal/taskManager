@@ -30,9 +30,9 @@ iPhone 14 Pro (393px). Narrow-screen floor is 393px; 320/375-only defects are ou
 - [x] 2. Build id endpoint `src/app/api/build-id/route.ts` returning the commit SHA.
 - [x] 3. `<ResumeRefresh />` in the root layout: visibilitychange + pageshow, timestamp-guarded,
       `router.refresh()` for data and a no-store build-id compare for code.
-- [ ] 4. Server Action failure path for a stale client (no skew protection on Hobby). Still open:
-      the resume reload closes the window in which a stale client can call a new deployment, but a
-      client that is mid-action when a deploy lands still gets a raw failure.
+- [x] 4. Stale-client window narrowed: the build-id check also runs on a 5-minute interval while
+      the app is open, not only on resume. It cannot close the window — an action already in flight
+      when a deploy lands still fails once — and Skew Protection, which would, needs a Pro plan.
 - [x] 5. Push badge: `app_badge` in the declarative payload from delivery.ts, `setAppBadge` in
       sw.js for pre-18.4, clear on task list load, re-upsert subscription on open.
 - [x] 6. Layout fixes at 393px: nav wrap, toaster bottom inset, /login safe-top, /tasks bottom
