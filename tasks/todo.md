@@ -39,7 +39,30 @@ iPhone 14 Pro (393px). Narrow-screen floor is 393px; 320/375-only defects are ou
       inset, ~14 touch targets under 44px, four break-words, board skeleton shift.
 - [x] 7. Tests: Playwright project at 402px, touch-target scan with dialogs open, unit tests for
       the resume-refresh guards.
-- [~] 8. Verify: typecheck, lint and jest green; full Playwright run in progress.
+- [x] 8. Verify: production build and typecheck pass; 672 Jest tests pass; lint has no errors
+      (one existing unused-variable warning). Both phone suites and desktop functional checks pass;
+      Chromium screenshots pass after updating the four reviewed stale baselines.
+
+## Verification follow-up — 2026-09-06
+
+- Resumed from Claude's final session on 2026-09-05, at `0f79ce6`.
+- Fresh production build tested on port 3110 against the development Supabase project. Runs use
+  one worker, and the harness removes its seeded rows and users afterwards.
+- Phone suite: 159 passed, six skipped. Found that `mobile.spec.ts` only selected the original
+  `iphone` project, silently skipping all six checks for `iphone-16-pro`.
+- Changed the mobile guard to use the project's `isMobile` setting. Also made the install test
+  clear cookies and reject redirects when fetching the manifest, reproducing a browser's
+  unauthenticated manifest request rather than hiding the original auth defect.
+- Reran `mobile.spec.ts` on both phones: 13 passed (12 checks plus authentication setup), no skips.
+- Updated `docs/ios.md` to describe persisted `pageshow` and foreground polling.
+- Desktop suite: 220 passed, 38 intentionally skipped, four Chromium dialog screenshot failures.
+  Inspected all four rendered dialogs: the differences match the intentional 44px form controls
+  and checkbox targets from `b030db3` / `ed7ade1`. The prior session updated phone baselines only.
+  Updated the four desktop baselines without changing the application or comparison thresholds.
+- Full Chromium screenshot rerun: 11 passed (10 screenshots plus authentication setup).
+  All five browser/device projects are covered across these runs, with no unresolved test failures.
+  Typecheck and lint of the changed test also pass. No deployment or production configuration
+  changes were made; the device and push checks below remain outstanding.
 
 ## Blocked / needs the user
 

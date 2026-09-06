@@ -6,11 +6,11 @@ import { test, expect } from "@playwright/test";
  * safe area with no browser chrome to absorb mistakes.
  */
 
-// The `iphone` project already supplies the device descriptor; running these under the desktop
+// Both phone projects supply a device descriptor; running these under the desktop
 // projects would just repeat the same assertions against the wrong viewport.
 test.describe("iPhone", () => {
-  test.beforeEach(async ({}, testInfo) => {
-    test.skip(testInfo.project.name !== "iphone", "iPhone project only");
+  test.beforeEach(async ({ isMobile }) => {
+    test.skip(!isMobile, "Phone projects only");
   });
 
   test("text inputs are at least 16px, so iOS does not zoom on focus", async ({ page }) => {
@@ -48,7 +48,10 @@ test.describe("iPhone", () => {
     const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
     expect(manifestHref, "no web app manifest — cannot install to the home screen").toBeTruthy();
 
-    const res = await page.request.get(manifestHref!);
+    // Browsers fetch the manifest without credentials. A signed-in request would hide an auth
+    // redirect and pass even though a real Home Screen install cannot read the manifest.
+    await page.context().clearCookies();
+    const res = await page.request.get(manifestHref!, { maxRedirects: 0 });
     expect(res.ok()).toBe(true);
     const manifest = await res.json();
     expect(manifest.display).toBe("standalone");

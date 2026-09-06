@@ -39,8 +39,11 @@ JavaScript context that has been parked for hours: its task list is whatever the
 and its code is whatever was deployed when it first loaded. Neither corrects itself without a
 navigation, and the app is a single screen the user rarely navigates away from.
 
-`ResumeRefresh` handles both on `visibilitychange` and `pageshow`, throttled to one check per ten
-seconds. `router.refresh()` covers the data. For code it fetches `/api/build-id` with `cache:
+`ResumeRefresh` handles both when the document becomes visible and on a persisted `pageshow`
+(a back/forward-cache restore), throttled to one check per ten seconds. Ordinary page loads are
+ignored because their data is already fresh. A five-minute interval also checks while the app stays
+visible, narrowing the stale-client window when a deployment lands during use.
+`router.refresh()` covers the data. For code it fetches `/api/build-id` with `cache:
 'no-store'` and compares the answer against the `NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA` baked into the
 bundle at build time; a difference means a deploy happened underneath us, and it reloads — but only
 when no dialog is open and no text field has focus, so a reload never eats what someone is typing.
