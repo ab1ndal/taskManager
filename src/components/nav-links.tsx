@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+/**
+ * Three destinations, deliberately.
+ *
+ * The bar's intrinsic width is ~355px on a 393px iPhone (see src/app/layout.tsx), and every link is
+ * flex-shrink-0, so a fourth entry pushes "Sign out" into a second line and makes the page scroll
+ * sideways — the defect tasks/lessons.md records. Groceries takes the slot rather than joining:
+ * it is a weekly-or-daily destination, while /workspaces is a rare setup screen still reachable
+ * from the /tasks sidebar and by URL.
+ */
 const links = [
   { href: "/tasks", label: "Tasks" },
   { href: "/board", label: "Board" },
-  { href: "/workspaces", label: "Workspaces" },
+  { href: "/groceries", label: "Groceries" },
 ];
 
 /**
