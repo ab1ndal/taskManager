@@ -1408,6 +1408,38 @@ describe("grocery actions", () => {
     expect(fake.tables.grocery_items).toHaveLength(0);
   });
 
+  // Regression: assertNoNameCollision takes `{ error }`, not a bare error. Passing the error
+  // directly destructured null on every success, throwing *after* the write had committed — so a
+  // successful add reported failure, skipped revalidation, and invited a retry that bumped
+  // times_added again.
+  it("reports success on a write that had no error", async () => {
+    const { addGroceryItem } = await import("./actions");
+    const result = await addGroceryItem({
+      workspaceId: WORKSPACE, name: "Paneer", category: "dairy", target: "stock",
+    });
+
+    expect(result).toEqual({ ok: true, itemId: expect.any(String) });
+  });
+
+  it("turns a duplicate name into a field error rather than a generic failure", async () => {
+    fake = createFakeSupabase({
+      tables: seed(),
+      failOn: (table, op) =>
+        table === "grocery_items" && op === "update"
+          ? { message: "duplicate key value violates unique constraint", code: "23505" }
+          : null,
+    });
+    const { editItem } = await import("./actions");
+    const result = await editItem({
+      itemId: ITEM, name: "Milk", category: "dairy", expiresOn: null, quantity: null,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      fieldErrors: { name: [expect.stringContaining("already have an item")] },
+    });
+  });
+
   it("rejects invalid input before touching the database", async () => {
     const { addGroceryItem } = await import("./actions");
     const result = await addGroceryItem({
@@ -1559,7 +1591,7 @@ export async function addGroceryItem(
       p_member: await memberInWorkspace(workspaceId, user.id),
     });
 
-    assertNoNameCollision("add grocery item", error);
+    assertNoNameCollision("add grocery item", { error });
     assertNoRpcError("add grocery item", { error });
 
     revalidatePath("/groceries");
@@ -1668,7 +1700,7 @@ export async function editItem(input: EditItemInput): Promise<ActionResult<{ ite
       })
       .eq("id", itemId);
 
-    assertNoNameCollision("edit grocery item", error);
+    assertNoNameCollision("edit grocery item", { error });
 
     revalidatePath("/groceries");
     return { itemId };
@@ -1720,6 +1752,16 @@ git commit -m "feat(groceries): add server actions over the transition RPCs"
 ```tsx
 // src/app/groceries/item-row.test.tsx
 import { render, screen } from "@testing-library/react";
+
+// Server actions are stubbed: these tests are about what the row renders, not what it writes.
+jest.mock("./actions", () => ({
+  setNeeded: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  markBought: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  finishItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  adjustQuantity: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  editItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  forgetItem: jest.fn(async () => ({ ok: true })),
+}));
 
 import { PantryRow, ShoppingRow } from "./item-row";
 
@@ -1790,7 +1832,20 @@ describe("ShoppingRow", () => {
 
 ```tsx
 // src/app/groceries/groceries-client.test.tsx
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+
+// The client tree reaches server actions through AddRow and the rows, and useForegroundRefresh
+// needs a router. Both are stubbed so these tests stay about rendering and filtering.
+jest.mock("next/navigation", () => ({ useRouter: () => ({ refresh: jest.fn() }) }));
+jest.mock("./actions", () => ({
+  addGroceryItem: jest.fn(async () => ({ ok: true, itemId: "g9" })),
+  setNeeded: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  markBought: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  finishItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  adjustQuantity: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  editItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  forgetItem: jest.fn(async () => ({ ok: true })),
+}));
 
 import { GroceriesClient } from "./groceries-client";
 
@@ -1834,6 +1889,33 @@ describe("GroceriesClient", () => {
   it("hides the category filter until a view gets long", () => {
     render(<GroceriesClient {...props} view="stock" />);
     expect(screen.queryByRole("group", { name: /filter/i })).not.toBeInTheDocument();
+  });
+
+  // Regression: the threshold used to read the already-filtered count, so picking a small category
+  // in a long list hid the whole bar — "All" included — while the filter stayed active, with no way
+  // back to the full list.
+  it("keeps the filter bar reachable after selecting a small category", () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      id: `m${i}`,
+      name: `Item ${String(i).padStart(2, "0")}`,
+      category: i < 3 ? "dairy" : "pantry",
+      inStock: true,
+      needed: false,
+      quantity: null,
+      expiresOn: null,
+      expiryIsEstimate: false,
+      timesAdded: 1,
+    }));
+
+    render(<GroceriesClient {...props} items={many} view="stock" />);
+    const filter = screen.getByRole("group", { name: /filter/i });
+
+    fireEvent.click(screen.getByRole("button", { name: /dairy/i }));
+
+    expect(filter).toBeInTheDocument();
+    const all = screen.getByRole("button", { name: "All" });
+    fireEvent.click(all);
+    expect(screen.getAllByText(/^Item /)).toHaveLength(20);
   });
 
   it("shows an empty state when a view has nothing", () => {
@@ -2104,20 +2186,34 @@ export function GroceriesClient({
   useForegroundRefresh();
 
   const visible = useMemo(() => {
-    // Archived rows — neither in stock nor needed — belong to autocomplete only, so both views
-    // filter them out. They are still loaded, which is what makes suggestions work with no
-    // extra round trip.
-    const inView = items.filter((item) => (view === "stock" ? item.inStock : item.needed));
     const filtered = category ? inView.filter((item) => item.category === category) : inView;
     const sortable = filtered.map((item) => ({ ...item, expiresOn: item.expiresOn }));
 
     return (view === "stock" ? sortPantry(sortable, sort) : sortShopping(sortable)) as GroceryItem[];
-  }, [items, view, category, sort]);
+  }, [inView, view, category, sort]);
 
-  const categories = useMemo(
-    () => [...new Set(items.filter((i) => (view === "stock" ? i.inStock : i.needed)).map((i) => i.category))],
+  // Archived rows — neither in stock nor needed — belong to autocomplete only, so both views
+  // filter them out. They are still loaded, which is what makes suggestions work with no extra
+  // round trip.
+  const inView = useMemo(
+    () => items.filter((item) => (view === "stock" ? item.inStock : item.needed)),
     [items, view],
   );
+
+  const categories = useMemo(
+    () => [...new Set(inView.map((item) => item.category))],
+    [inView],
+  );
+
+  /**
+   * The threshold reads the *unfiltered* count, and the bar stays up while a filter is active.
+   *
+   * Judging it by the filtered list traps the user: with twenty items, picking a category holding
+   * three drops the count below the threshold, the whole bar — including "All" — disappears, and
+   * the filter is still on with no way to clear it. A foreground refresh preserves that state, so
+   * the list stays stuck until a manual reload.
+   */
+  const showFilter = category !== null || inView.length > FILTER_THRESHOLD;
 
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -2148,7 +2244,7 @@ export function GroceriesClient({
         </div>
       )}
 
-      {visible.length + (category ? 1 : 0) > FILTER_THRESHOLD && (
+      {showFilter && (
         <div role="group" aria-label="Filter by category" className="flex gap-2 px-3 pb-2 overflow-x-auto">
           <button
             type="button"
@@ -2423,6 +2519,24 @@ it("does not submit an empty name", async () => {
   fireEvent.submit(screen.getByRole("textbox", { name: /add an item/i }).closest("form")!);
   expect(addGroceryItem).not.toHaveBeenCalled();
 });
+
+// Regression: picking a suggestion used to submit whatever the selector held, because
+// setCategory() does not change the binding the current render closed over. grocery_upsert
+// overwrites the category, so a Dairy item re-added this way silently became Pantry and lost its
+// shelf-life estimate for every later purchase.
+it("submits the suggestion's own category, not the selector's", async () => {
+  const { addGroceryItem } = await import("./actions");
+  render(<AddRow {...props} />);
+
+  fireEvent.change(screen.getByRole("textbox", { name: /add an item/i }), {
+    target: { value: "oat" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: /oat milk/i }));
+
+  expect(addGroceryItem).toHaveBeenCalledWith(
+    expect.objectContaining({ name: "Oat milk", category: "dairy" }),
+  );
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -2511,7 +2625,14 @@ export function AddRow({
 
   const suggestions = suggestNames(items, name);
 
-  function submit(value: string) {
+  /**
+   * `categoryOverride` is not a convenience: picking a suggestion has to submit *that item's*
+   * category, and `setCategory()` does not change the `category` binding this render already
+   * closed over. Reading state here would submit the previous category, and because
+   * grocery_upsert overwrites the column, a Dairy item re-added from a suggestion would silently
+   * become Pantry — losing its shelf-life estimate for every future purchase.
+   */
+  function submit(value: string, categoryOverride?: string) {
     const trimmed = value.trim();
     if (trimmed === "") return;
 
@@ -2519,7 +2640,7 @@ export function AddRow({
       const result = await addGroceryItem({
         workspaceId,
         name: trimmed,
-        category,
+        category: categoryOverride ?? category,
         target,
       });
 
@@ -2583,7 +2704,7 @@ export function AddRow({
                 type="button"
                 onClick={() => {
                   setCategory(item.category);
-                  submit(item.name);
+                  submit(item.name, item.category);
                 }}
                 className="shrink-0 inline-flex items-center min-h-11 px-3 rounded-full bg-[var(--color-surface-sunken)] text-xs"
               >
