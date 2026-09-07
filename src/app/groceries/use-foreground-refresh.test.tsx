@@ -34,6 +34,7 @@ describe("useForegroundRefresh", () => {
   it("stops while the page is hidden", () => {
     render(<Probe />);
     act(() => setVisibility("hidden"));
+    expect(jest.getTimerCount()).toBe(0);
     act(() => void jest.advanceTimersByTime(5000));
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -41,8 +42,10 @@ describe("useForegroundRefresh", () => {
   it("resumes when the page becomes visible again", () => {
     render(<Probe />);
     act(() => setVisibility("hidden"));
+    expect(jest.getTimerCount()).toBe(0);
     act(() => void jest.advanceTimersByTime(5000));
     act(() => setVisibility("visible"));
+    expect(jest.getTimerCount()).toBe(1);
     act(() => void jest.advanceTimersByTime(1100));
     expect(refresh).toHaveBeenCalledTimes(1);
   });
@@ -50,6 +53,7 @@ describe("useForegroundRefresh", () => {
   it("clears its timer on unmount", () => {
     const { unmount } = render(<Probe />);
     unmount();
+    expect(jest.getTimerCount()).toBe(0);
     act(() => void jest.advanceTimersByTime(5000));
     expect(refresh).not.toHaveBeenCalled();
   });
