@@ -305,6 +305,15 @@ export async function cleanupUiWrites(): Promise<void> {
     .in("workspace_id", workspaceIds)
     .like("title", `${E2E_TAG}%`);
   if (recurringTaskErr) throw recurringTaskErr;
+
+  // Same rule as the task cleanup: seeded workspace plus marker, never looser. Groceries are
+  // workspace-scoped rows, so both halves of that filter are available.
+  const { error: groceryErr } = await admin
+    .from("grocery_items")
+    .delete()
+    .in("workspace_id", workspaceIds)
+    .like("name", "E2E %");
+  if (groceryErr) throw groceryErr;
 }
 
 /**

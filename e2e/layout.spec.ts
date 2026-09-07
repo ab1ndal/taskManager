@@ -8,7 +8,15 @@ import { test, expect, type Page } from "@playwright/test";
 // `/profile` redirects to `/settings`, so naming it here exercised the settings page by accident.
 // Both settings tabs are named explicitly, and `/board` — the widest page in the app, and the one
 // that scrolls horizontally by design inside its own container — is on the list in its own right.
-const PAGES = ["/tasks", "/workspaces", "/board", "/settings?tab=profile", "/settings?tab=board"];
+const PAGES = [
+  "/tasks",
+  "/workspaces",
+  "/board",
+  "/groceries?view=buy",
+  "/groceries?view=stock",
+  "/settings?tab=profile",
+  "/settings?tab=board",
+];
 
 async function hasHorizontalOverflow(page: Page) {
   return page.evaluate(() => {

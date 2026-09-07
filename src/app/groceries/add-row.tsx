@@ -77,7 +77,7 @@ export function AddRow({
           placeholder={target === "list" ? "Add to the list" : "Add to the pantry"}
           autoComplete="off"
           enterKeyHint="done"
-          className="flex-1 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
+          className="flex-1 min-w-0 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
         />
         <select
           value={category}
@@ -87,7 +87,13 @@ export function AddRow({
           aria-label="Category"
           // WebKit ignores min-height on a menulist select, so the height is explicit. See
           // tasks/lessons.md.
-          className="h-11 px-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm"
+          // A native select renders at the width of its widest option ("Pantry & dry goods"),
+          // which alone overflows a 393px viewport once the input and Add button sit beside it.
+          // min-w-0 + shrink let it give up that intrinsic width; max-w-28 caps it at a size the
+          // 393px layout (the narrower of the two shipping phones) actually has room for, with the
+          // remainder going to the input. The selected label clips at that width — an accepted
+          // native-control limitation, not a bug.
+          className="h-11 min-w-0 shrink max-w-28 px-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm"
         >
           {GROCERY_CATEGORIES.map((c) => (
             <option key={c.slug} value={c.slug}>
