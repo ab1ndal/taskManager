@@ -278,17 +278,27 @@ section stating plainly that visibility here is workspace membership, not assign
 the `deploy-migrations` GitHub workflow on merge to `main`. Not MCP, not the SQL editor — lesson L9
 records that this repo has broken its migration history twice that way.
 
-## Accepted risk
+## Authorization model, and the accepted risk
 
+**Every member of a household workspace may read, add, edit and delete any grocery item in it.**
+That is the intended model, not a limitation: the list is shared property, and the two people
+sharing it are equally trusted with it. There is no per-item owner, no assignment row, and no
+soft-delete requiring approval. The owner confirmed this on 2026-09-06.
+
+The risk that follows is about *who counts as a member*.
 `007_rls_security_definer.sql:134` makes `workspaces_select` `using (true)`, and
 `workspace_members_insert_self` constrains only `auth_user_id`, not which workspace. Production has
-`disable_signup: false` with email and Google enabled. Any person who signs up can therefore join
-the Household workspace and read the grocery list. The owner accepted this on 2026-09-06 rather
-than delay the feature; `tasks/todo.md` records it, along with the one-toggle mitigation (disable
-new signups) and the proper fix (narrow `workspaces_select`, gate self-join behind an invite).
+`disable_signup: false` with email and Google enabled. So anyone who creates an account can join
+the Household workspace, and — because authorization here is membership — would get the same full
+read, write and permanent-delete access as a real member, `grocery_forget` included.
 
-Groceries is the first household *content* to sit behind membership alone. Tasks are not exposed by
-this, because they still require an assignment row.
+The owner accepted this on 2026-09-06, twice, on the grounds that the app is login-gated and only
+household members have accounts today. `tasks/todo.md` records the exposure, the one-toggle
+mitigation (disable new signups in the Supabase dashboard), and the proper fix if the app ever
+gains a third user (narrow `workspaces_select`, gate self-join behind an invite).
+
+Groceries is the first household *content* to sit behind membership alone. Tasks are unaffected,
+because they still require an assignment row.
 
 ## Out of scope
 

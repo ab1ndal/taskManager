@@ -9,7 +9,12 @@ protects. Production has `disable_signup: false` with email and Google enabled, 
 is open to anyone.
 
 Today that exposes workspace names and kinds plus member display names. The grocery feature will
-make it household content. The owner accepted this rather than delay the feature.
+make it household content, and because grocery authorization is membership, a self-joined outsider
+would get the same full read, write and permanent-delete access as a real member.
+
+The owner accepted this on 2026-09-06 after both the read and the write/delete scope were spelled
+out: the app is login-gated and only household members hold accounts. Members having full CRUD over
+the shared list is the intended design.
 
 - [ ] Cheapest mitigation, no code: disable new signups in the Supabase dashboard
       (Authentication -> Sign In / Providers). Both users already have accounts.
