@@ -32,6 +32,11 @@ export const CATEGORY_SLUGS: readonly CategorySlug[] = GROCERY_CATEGORIES.map((c
 
 const bySlug = new Map(GROCERY_CATEGORIES.map((c) => [c.slug as string, c]));
 
+/** Narrows a plain string (e.g. a `<select>`'s `event.target.value`) to `CategorySlug`. */
+export function isCategorySlug(slug: string): slug is CategorySlug {
+  return bySlug.has(slug);
+}
+
 export function categoryLabel(slug: string): string {
   return bySlug.get(slug)?.label ?? slug;
 }

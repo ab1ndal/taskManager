@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 
 import { toast } from "@/components/toaster";
 import { addGroceryItem } from "./actions";
-import { GROCERY_CATEGORIES, type CategorySlug } from "./categories";
+import { GROCERY_CATEGORIES, isCategorySlug, type CategorySlug } from "./categories";
 import type { GroceryItem } from "./types";
 import { suggestNames } from "./suggest";
 
@@ -81,7 +81,9 @@ export function AddRow({
         />
         <select
           value={category}
-          onChange={(event) => setCategory(event.target.value as CategorySlug)}
+          onChange={(event) => {
+            if (isCategorySlug(event.target.value)) setCategory(event.target.value);
+          }}
           aria-label="Category"
           // WebKit ignores min-height on a menulist select, so the height is explicit. See
           // tasks/lessons.md.
