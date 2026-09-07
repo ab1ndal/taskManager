@@ -4,6 +4,7 @@ import { createFakeSupabase } from "@/test/supabase-fake";
 const WORKSPACE = "11111111-1111-4111-8111-111111111111";
 const OTHER_WORKSPACE = "22222222-2222-4222-8222-222222222222";
 const ITEM = "33333333-3333-4333-8333-333333333333";
+const OTHER_ITEM = "44444444-4444-4444-8444-444444444444";
 
 let fake: ReturnType<typeof createFakeSupabase>;
 
@@ -91,14 +92,14 @@ describe("grocery actions", () => {
     fake = createFakeSupabase({
       tables: seed({
         grocery_items: [
-          { id: "44444444-4444-4444-8444-444444444444", workspace_id: OTHER_WORKSPACE, name: "Secret", category: "pantry",
+          { id: OTHER_ITEM, workspace_id: OTHER_WORKSPACE, name: "Secret", category: "pantry",
             in_stock: true, needed: false, quantity: null, expires_on: null,
             expiry_is_estimate: false, times_added: 1 },
         ],
       }),
     });
     const { setNeeded } = await import("./actions");
-    const result = await setNeeded({ itemId: "44444444-4444-4444-8444-444444444444", needed: true });
+    const result = await setNeeded({ itemId: OTHER_ITEM, needed: true });
 
     expect(result).toEqual({ ok: false, error: expect.stringContaining("Forbidden") });
     expect(fake.tables.grocery_items?.[0].needed).toBe(false);
@@ -193,5 +194,79 @@ describe("grocery actions", () => {
 
     expect(result.ok).toBe(false);
     expect(fake.tables.grocery_items).toHaveLength(1);
+  });
+
+  // Regression: migration 028 fixed grocery_upsert so a null incoming quantity/date on the
+  // conflict branch preserves what is already tracked instead of wiping it. The fake used to
+  // model 027's pre-fix behaviour (`?? null`), which would silently reintroduce the data-loss bug
+  // in every test written against it.
+  it("re-adding an in-stock item with no quantity or date preserves what was already tracked", async () => {
+    const { addGroceryItem } = await import("./actions");
+    await addGroceryItem({ workspaceId: WORKSPACE, name: "Bananas", category: "produce", target: "stock" });
+
+    const row = fake.tables.grocery_items?.find((r) => r.name === "Bananas");
+    expect(row).toMatchObject({ quantity: 3, expires_on: "2026-09-13", expiry_is_estimate: true });
+  });
+
+  // Regression: assertNoNameCollision used to rethrow any non-23505 error as a plain Error before
+  // assertNoRpcError ever ran, so an authored RPC message (migration 026's
+  // "member % is not in workspace %") collapsed to the generic message instead of reaching the
+  // caller. The fake's failOn hook is wired to the grocery RPC dispatcher to prove the fix.
+  it("surfaces an authored RPC failure instead of the generic message", async () => {
+    fake = createFakeSupabase({
+      tables: seed(),
+      failOn: (table, op) =>
+        table === "grocery_items" && op === "insert"
+          ? { message: "member m1 is not in workspace w1" }
+          : null,
+    });
+    const { addGroceryItem } = await import("./actions");
+    const result = await addGroceryItem({
+      workspaceId: WORKSPACE, name: "Paneer", category: "dairy", target: "stock",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "member m1 is not in workspace w1",
+      fieldErrors: {},
+    });
+  });
+
+  // forgetItem is the one destructive path with no recovery — a refactor that dropped its
+  // assertItemMember call would otherwise go green.
+  it("refuses to forget an item in another workspace, reading the workspace from the row", async () => {
+    fake = createFakeSupabase({
+      tables: seed({
+        grocery_items: [
+          { id: OTHER_ITEM, workspace_id: OTHER_WORKSPACE, name: "Secret", category: "pantry",
+            in_stock: true, needed: false, quantity: null, expires_on: null,
+            expiry_is_estimate: false, times_added: 1 },
+        ],
+      }),
+    });
+    const { forgetItem } = await import("./actions");
+    const result = await forgetItem({ itemId: OTHER_ITEM });
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("Forbidden") });
+    expect(fake.tables.grocery_items).toHaveLength(1);
+  });
+
+  it("refuses to edit an item in another workspace, reading the workspace from the row", async () => {
+    fake = createFakeSupabase({
+      tables: seed({
+        grocery_items: [
+          { id: OTHER_ITEM, workspace_id: OTHER_WORKSPACE, name: "Secret", category: "pantry",
+            in_stock: true, needed: false, quantity: null, expires_on: null,
+            expiry_is_estimate: false, times_added: 1 },
+        ],
+      }),
+    });
+    const { editItem } = await import("./actions");
+    const result = await editItem({
+      itemId: OTHER_ITEM, name: "Renamed", category: "pantry", expiresOn: null, quantity: null,
+    });
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("Forbidden") });
+    expect(fake.tables.grocery_items?.[0].name).toBe("Secret");
   });
 });

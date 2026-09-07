@@ -539,6 +539,12 @@ export function createFakeSupabase(options: FakeOptions = {}) {
       // Mirrors migration 027. These are the transitions the constraints in 026 would reject as
       // partial writes, so the fake applies the same whole-row effects the RPCs do.
       if (fnName.startsWith("grocery_")) {
+        // Lets a test inject an authored RPC failure (e.g. private.assert_grocery_member_workspace's
+        // "member % is not in workspace %") the same way failOn injects one on a plain table op —
+        // the RPC dispatcher has no Query to run it through, so it is consulted here instead.
+        const injected = options.failOn?.("grocery_items", "insert", null);
+        if (injected) return { data: null, error: injected };
+
         const rows = (tables.grocery_items ?? []) as Row[];
         tables.grocery_items = rows;
         const find = (id: unknown) => rows.find((r) => r.id === id);
@@ -557,10 +563,14 @@ export function createFakeSupabase(options: FakeOptions = {}) {
             existing.in_stock = Boolean(existing.in_stock) || stock;
             existing.needed = Boolean(existing.needed) || !stock;
             if (stock) {
-              existing.quantity = params.p_quantity ?? null;
-              existing.expires_on = params.p_expires_on ?? null;
-              existing.expiry_is_estimate =
-                params.p_expires_on != null && Boolean(params.p_estimate);
+              // Mirrors migration 028: a null incoming quantity/date must not clobber what is
+              // already tracked, and expires_on/expiry_is_estimate change together or not at all —
+              // otherwise a date can survive with a stale estimate flag, or vice versa.
+              existing.quantity = params.p_quantity ?? existing.quantity;
+              if (params.p_expires_on != null) {
+                existing.expires_on = params.p_expires_on;
+                existing.expiry_is_estimate = Boolean(params.p_estimate);
+              }
             }
             existing.times_added = Number(existing.times_added ?? 1) + 1;
             return { data: existing, error: null };

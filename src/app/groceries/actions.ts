@@ -52,10 +52,24 @@ async function assertItemMember(
   return { workspaceId, category: data.category as string };
 }
 
+/** Turns an RPC failure into a user-facing message when we authored it, or rethrows. */
+function assertNoRpcError(step: string, { error }: { error: { message: string } | null }): void {
+  if (!error) return;
+  const known = knownGroceryRpcFailure(error.message);
+  if (known) throw new ValidationError({}, known);
+  throw new Error(`${step}: ${error.message}`);
+}
+
 /**
  * A unique-violation on grocery_items_workspace_name_key means this workspace already has a row
  * for that product — possibly an archived one the user cannot see, which is why the message says
  * where to look rather than just "already used".
+ *
+ * The 23505 check has to run before anything else can rethrow the error, and the non-23505 branch
+ * must still route through assertNoRpcError rather than jumping straight to a generic rethrow — a
+ * caller (addGroceryItem) that checks both wants the RPC's own authored messages (e.g. migration
+ * 026's "member % is not in workspace %") to reach the user, not collapse to the generic message
+ * because this ran first and threw a plain Error.
  */
 function assertNoNameCollision(
   step: string,
@@ -68,15 +82,7 @@ function assertNoNameCollision(
       "You already have an item with that name — check the other list",
     );
   }
-  throw new Error(`${step}: ${error.message}`);
-}
-
-/** Turns an RPC failure into a user-facing message when we authored it, or rethrows. */
-function assertNoRpcError(step: string, { error }: { error: { message: string } | null }): void {
-  if (!error) return;
-  const known = knownGroceryRpcFailure(error.message);
-  if (known) throw new ValidationError({}, known);
-  throw new Error(`${step}: ${error.message}`);
+  assertNoRpcError(step, { error });
 }
 
 /** The member row this user holds in the given workspace, for `added_by_member_id`. */
@@ -129,7 +135,6 @@ export async function addGroceryItem(
     });
 
     assertNoNameCollision("add grocery item", { error });
-    assertNoRpcError("add grocery item", { error });
 
     revalidatePath("/groceries");
     return { itemId: (data as { id: string }).id };
