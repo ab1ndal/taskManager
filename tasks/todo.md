@@ -1,5 +1,21 @@
 # Open work
 
+## Known exposure: the public workspace directory (accepted 2026-09-06)
+
+`007_rls_security_definer.sql:134` makes `workspaces_select` `using (true)`, and
+`workspace_members_insert_self` constrains only `auth_user_id`, not which workspace. Any
+authenticated user can therefore join the Household workspace and read whatever membership alone
+protects. Production has `disable_signup: false` with email and Google enabled, so account creation
+is open to anyone.
+
+Today that exposes workspace names and kinds plus member display names. The grocery feature will
+make it household content. The owner accepted this rather than delay the feature.
+
+- [ ] Cheapest mitigation, no code: disable new signups in the Supabase dashboard
+      (Authentication -> Sign In / Providers). Both users already have accounts.
+- [ ] Proper fix, if the app ever gains a third user: narrow `workspaces_select` to
+      `private.is_workspace_member(id)` and gate self-join behind an invite.
+
 ## iOS standalone / mobile app — shipped 2026-09-06
 
 Branch `feat/ios-standalone`, merged; head `ed885e5`, working tree clean. All eight plan steps
