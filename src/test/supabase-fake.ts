@@ -536,6 +536,103 @@ export function createFakeSupabase(options: FakeOptions = {}) {
         return { data: null, error: null };
       }
 
+      // Mirrors migration 027. These are the transitions the constraints in 026 would reject as
+      // partial writes, so the fake applies the same whole-row effects the RPCs do.
+      if (fnName.startsWith("grocery_")) {
+        const rows = (tables.grocery_items ?? []) as Row[];
+        tables.grocery_items = rows;
+        const find = (id: unknown) => rows.find((r) => r.id === id);
+
+        if (fnName === "grocery_upsert") {
+          const wanted = String(params.p_name).trim().toLowerCase();
+          const stock = params.p_target === "stock";
+          const existing = rows.find(
+            (r) =>
+              r.workspace_id === params.p_workspace &&
+              String(r.name).trim().toLowerCase() === wanted,
+          );
+
+          if (existing) {
+            existing.category = params.p_category;
+            existing.in_stock = Boolean(existing.in_stock) || stock;
+            existing.needed = Boolean(existing.needed) || !stock;
+            if (stock) {
+              existing.quantity = params.p_quantity ?? null;
+              existing.expires_on = params.p_expires_on ?? null;
+              existing.expiry_is_estimate =
+                params.p_expires_on != null && Boolean(params.p_estimate);
+            }
+            existing.times_added = Number(existing.times_added ?? 1) + 1;
+            return { data: existing, error: null };
+          }
+
+          const row: Row = {
+            id: `grocery-${rows.length + 1}`,
+            workspace_id: params.p_workspace,
+            name: String(params.p_name).trim(),
+            category: params.p_category,
+            in_stock: stock,
+            needed: !stock,
+            quantity: stock ? (params.p_quantity ?? null) : null,
+            expires_on: stock ? (params.p_expires_on ?? null) : null,
+            expiry_is_estimate:
+              stock && params.p_expires_on != null && Boolean(params.p_estimate),
+            times_added: 1,
+            added_by_member_id: params.p_member ?? null,
+          };
+          rows.push(row);
+          return { data: row, error: null };
+        }
+
+        const row = find(params.p_id);
+        if (!row) {
+          return { data: null, error: { message: `grocery item ${params.p_id} not found` } };
+        }
+
+        if (fnName === "grocery_set_needed") {
+          row.needed = params.p_needed;
+          return { data: row, error: null };
+        }
+
+        if (fnName === "grocery_mark_bought") {
+          row.in_stock = true;
+          row.needed = false;
+          row.expires_on = params.p_expires_on ?? null;
+          row.expiry_is_estimate = params.p_expires_on != null && Boolean(params.p_estimate);
+          return { data: row, error: null };
+        }
+
+        if (fnName === "grocery_finish" || fnName === "grocery_adjust_quantity") {
+          // The zero crossing lives inside grocery_adjust_quantity, so the fake has to model it
+          // here too — a decrement to zero finishes the item rather than storing 0.
+          if (fnName === "grocery_adjust_quantity") {
+            if (row.quantity == null) {
+              return {
+                data: null,
+                error: { message: `grocery item ${params.p_id} has no quantity to adjust` },
+              };
+            }
+            const next = Number(row.quantity) + Number(params.p_delta);
+            if (next > 0) {
+              row.quantity = next;
+              return { data: row, error: null };
+            }
+          }
+
+          row.in_stock = false;
+          row.needed = fnName === "grocery_finish" ? Boolean(params.p_keep_on_list) : true;
+          row.quantity = null;
+          row.expires_on = null;
+          row.expiry_is_estimate = false;
+          return { data: row, error: null };
+        }
+
+        if (fnName === "grocery_forget") {
+          rows.splice(rows.indexOf(row), 1);
+          return { data: null, error: null };
+        }
+      }
+
       return { data: null, error: { message: `unknown rpc: ${fnName}` } };
     },
     auth: {
