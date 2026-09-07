@@ -6,10 +6,37 @@ import { Check, ListPlus, Minus, Plus, Trash2, X } from "lucide-react";
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { RowMenu } from "@/components/row-menu";
 import { toast } from "@/components/toaster";
+import { GENERIC_ERROR, type ActionResult } from "@/app/tasks/action-result";
 import { adjustQuantity, editItem, finishItem, forgetItem, markBought, setNeeded } from "./actions";
 import { addDays, categoryLabel, shelfLifeDays } from "./categories";
 import { isExpired } from "./sort";
 import type { GroceryItem } from "./types";
+
+/**
+ * Shared by PantryRow and ShoppingRow: both wrap every action call the same way, so `call` lives
+ * once here rather than being copy-pasted per row. It has to live inside a component because it
+ * closes over `startTransition`.
+ *
+ * A rejected `work()` (dropped connection, mid-flight navigation, a server crash) used to be
+ * unhandled — no toast, no state change, no log. The try/catch below gives it the same toast a
+ * returned `{ ok: false }` gets, and still logs the real error for diagnosis.
+ */
+function useActionCall() {
+  const [pending, startTransition] = useTransition();
+
+  const call = (work: () => Promise<ActionResult>) =>
+    startTransition(async () => {
+      try {
+        const result = await work();
+        if (!result.ok) toast(result.error, "error");
+      } catch (error) {
+        console.error("grocery action call rejected", error);
+        toast(GENERIC_ERROR, "error");
+      }
+    });
+
+  return { pending, call };
+}
 
 const CATEGORY_TAG =
   "text-2xs font-medium px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] " +
@@ -40,13 +67,7 @@ function ExpiryLine({ item, today }: { item: GroceryItem; today: string }) {
 }
 
 export function PantryRow({ item, today }: { item: GroceryItem; today: string }) {
-  const [pending, startTransition] = useTransition();
-
-  const call = (work: () => Promise<{ ok: boolean; error?: string }>) =>
-    startTransition(async () => {
-      const result = await work();
-      if (!result.ok && result.error) toast(result.error, "error");
-    });
+  const { pending, call } = useActionCall();
 
   return (
     <li className="flex items-center gap-3 min-h-11 px-3 py-2 border-b border-[var(--color-border)]">
@@ -150,13 +171,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
 }
 
 export function ShoppingRow({ item }: { item: GroceryItem }) {
-  const [pending, startTransition] = useTransition();
-
-  const call = (work: () => Promise<{ ok: boolean; error?: string }>) =>
-    startTransition(async () => {
-      const result = await work();
-      if (!result.ok && result.error) toast(result.error, "error");
-    });
+  const { pending, call } = useActionCall();
 
   return (
     <li className="border-b border-[var(--color-border)]">

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 
 import { toast } from "@/components/toaster";
+import { GENERIC_ERROR } from "@/app/tasks/action-result";
 import { addGroceryItem } from "./actions";
 import { GROCERY_CATEGORIES, isCategorySlug, type CategorySlug } from "./categories";
 import type { GroceryItem } from "./types";
@@ -43,20 +44,26 @@ export function AddRow({
     if (trimmed === "") return;
 
     startTransition(async () => {
-      const result = await addGroceryItem({
-        workspaceId,
-        name: trimmed,
-        category: categoryOverride ?? category,
-        target,
-      });
+      try {
+        const result = await addGroceryItem({
+          workspaceId,
+          name: trimmed,
+          category: categoryOverride ?? category,
+          target,
+        });
 
-      if (!result.ok) {
-        toast(result.error, "error");
-        return;
+        if (!result.ok) {
+          toast(result.error, "error");
+          return;
+        }
+
+        setName("");
+        inputRef.current?.focus();
+      } catch (error) {
+        // A rejected call (dropped connection, mid-flight navigation) used to vanish silently.
+        console.error("grocery action call rejected", error);
+        toast(GENERIC_ERROR, "error");
       }
-
-      setName("");
-      inputRef.current?.focus();
     });
   }
 

@@ -10,8 +10,13 @@ jest.mock("./actions", () => ({
   forgetItem: jest.fn(async () => ({ ok: true })),
 }));
 
+// Same pattern as new-task-modal.test.tsx / edit-task-modal.test.tsx: a bare jest.fn() spy, so a
+// toast call can be asserted without mounting the real Toaster.
+jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
+
 import { PantryRow, ShoppingRow } from "./item-row";
-import { editItem } from "./actions";
+import { editItem, markBought } from "./actions";
+import { toast } from "@/components/toaster";
 import type { GroceryItem } from "./types";
 
 const base: GroceryItem = {
@@ -81,6 +86,19 @@ describe("PantryRow", () => {
 });
 
 describe("ShoppingRow", () => {
+  // Regression: a rejected action promise (dropped connection, mid-flight navigation) used to
+  // vanish silently — no toast, no state change, no log. The user taps and nothing tells them why.
+  it("toasts when the action call rejects instead of failing silently", async () => {
+    jest.mocked(markBought).mockRejectedValueOnce(new Error("network dropped"));
+
+    render(<ShoppingRow item={{ ...base, needed: true, inStock: false }} />);
+    fireEvent.click(screen.getByRole("button", { name: /bought spinach/i }));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith("Something went wrong. Please try again.", "error"),
+    );
+  });
+
   it("shows how many we already have when it is also in the pantry", () => {
     render(<ShoppingRow item={{ ...base, needed: true, inStock: true, quantity: 6 }} />);
     expect(screen.getByText("have 6")).toBeInTheDocument();
