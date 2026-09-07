@@ -385,6 +385,25 @@ at the widest target device is the same blind spot as testing one browser.
 real target device. Measure intrinsic width when a flex row "just fits" — fitting and fitting well
 are different, and `flex-shrink-0` on every child means the last child absorbs everything.
 
+## Vercel's Sensitive env vars pull as empty strings, so production secrets are unreachable locally
+
+**Learned:** 2026-09-06, trying to send a one-off verification push.
+
+`vercel env pull --environment=production` writes `KEY=""` for every variable Vercel marks
+Sensitive — here `VAPID_PRIVATE_KEY`, `CRON_SECRET`, `SUPABASE_SECRET_KEY` and both `GMAIL_*`. It
+exits successfully and the file looks complete; only the value is missing. Sensitive values are
+write-only once created, so the dashboard cannot show them either. The plain variables
+(`NEXT_PUBLIC_*`, `VAPID_SUBJECT`, `REMINDER_APP_URL`) do come through.
+
+The failure this produces is misleading: the script read an empty `SUPABASE_SECRET_KEY` and
+PostgREST answered `401 {"message":"No API key found in request"}`, which reads like a wrong key or
+a header bug rather than an empty one.
+
+**Rule:** check value *lengths* in a pulled env file before debugging anything that uses it
+(`awk -F= '{print $1, length($0)-length($1)-1}'`). And any operation that needs a production secret
+has to run where the secret already is — the deployed app, a Vercel function, the cron endpoint —
+not from a laptop. Keep a copy outside Vercel only if the workflow genuinely needs local access.
+
 ## Verify platform behaviour against the platform, not against memory
 
 Three things in this work would have been wrong if taken from memory: Skew Protection looked like
