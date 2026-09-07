@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { CATEGORY_SLUGS } from "./categories";
+import { CATEGORY_SLUGS, type CategorySlug } from "./categories";
 
 /**
  * Input contracts for the grocery server actions.
@@ -18,7 +18,7 @@ const name = z
   .min(1, "Name is required")
   .max(100, "Name must be 100 characters or fewer");
 
-const category = z.enum(CATEGORY_SLUGS as unknown as [string, ...string[]], {
+const category = z.enum(CATEGORY_SLUGS as readonly [CategorySlug, ...CategorySlug[]], {
   message: "Pick one of the listed categories",
 });
 
