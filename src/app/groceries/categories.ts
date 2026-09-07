@@ -82,3 +82,8 @@ export function estimatedExpiry(slug: string, now: Date = new Date()): string | 
   const shelfLife = bySlug.get(slug)?.shelfLifeDays ?? null;
   return shelfLife === null ? null : addDays(localToday(now), shelfLife);
 }
+
+/** How many days a category's item is assumed to keep, or null when it does not meaningfully expire. */
+export function shelfLifeDays(slug: string): number | null {
+  return bySlug.get(slug)?.shelfLifeDays ?? null;
+}

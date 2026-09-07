@@ -4,6 +4,7 @@ import {
   categoryLabel,
   estimatedExpiry,
   localToday,
+  shelfLifeDays,
 } from "./categories";
 
 describe("categories", () => {
@@ -52,5 +53,15 @@ describe("estimatedExpiry", () => {
 
   it("bases the estimate on the Pacific date", () => {
     expect(estimatedExpiry("baked", new Date("2026-09-06T01:30:00Z"))).toBe("2026-09-09");
+  });
+});
+
+describe("shelfLifeDays", () => {
+  it("returns the shelf life for a category that expires", () => {
+    expect(shelfLifeDays("dairy")).toBe(10);
+  });
+
+  it("returns null for a category that does not expire", () => {
+    expect(shelfLifeDays("pantry")).toBeNull();
   });
 });
