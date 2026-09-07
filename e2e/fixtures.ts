@@ -308,11 +308,15 @@ export async function cleanupUiWrites(): Promise<void> {
 
   // Same rule as the task cleanup: seeded workspace plus marker, never looser. Groceries are
   // workspace-scoped rows, so both halves of that filter are available.
+  //
+  // ilike, not like: grocery.spec.ts's re-add case deliberately writes a lowercased variant of a
+  // seeded name (the unique index is on lower(btrim(name))), and a case-sensitive `like` against
+  // "E2E %" leaves that row behind permanently in the shared dev project.
   const { error: groceryErr } = await admin
     .from("grocery_items")
     .delete()
     .in("workspace_id", workspaceIds)
-    .like("name", "E2E %");
+    .ilike("name", "E2E %");
   if (groceryErr) throw groceryErr;
 }
 

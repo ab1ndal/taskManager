@@ -55,16 +55,31 @@ test.describe("grocery list", () => {
     await page.goto("/groceries?view=stock");
     const input = page.getByRole("textbox", { name: /add an item/i });
 
+    // Scoped to an <li> that carries a row's own Actions menu, so a plain `hasText` match can
+    // never be satisfied by the add row's suggestion chip — that chip is a <li> too, and it
+    // repeats the item's name with no menu of its own. Without this, the final assertion below
+    // was satisfied by the chip alone (rendered client-side from the input's uncommitted text)
+    // before the re-add's own POST had landed, so the test returned early and the still-in-flight
+    // write got cancelled by the next test's context teardown — inserting the lowercased name
+    // after this test's own cleanup had already run.
+    const row = (name: string) =>
+      page
+        .locator("li")
+        .filter({ has: page.getByRole("button", { name: /actions/i }) })
+        .filter({ hasText: new RegExp(name, "i") });
+
     await input.fill(ITEM);
     await input.press("Enter");
-    await page.locator("li", { hasText: ITEM }).getByRole("button", { name: /actions/i }).click();
+    await expect(row(ITEM)).toBeVisible();
+
+    await row(ITEM).getByRole("button", { name: /actions/i }).click();
     await page.getByRole("menuitem", { name: /finished — just remove/i }).click();
-    await expect(page.getByText(ITEM)).toBeHidden();
+    await expect(row(ITEM)).toBeHidden();
 
     // Different case and trailing space: the unique index is on lower(btrim(name)).
     await input.fill(`${ITEM.toLowerCase()} `);
     await input.press("Enter");
-    await expect(page.locator("li", { hasText: new RegExp(ITEM, "i") })).toHaveCount(1);
+    await expect(row(ITEM)).toHaveCount(1);
   });
 
   test("the sort control appears in the pantry only", async ({ page }) => {
