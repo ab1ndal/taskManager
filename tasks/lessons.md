@@ -416,3 +416,40 @@ curl against production.
 **Rule:** check the account, the plan and the live deployment before designing around a platform
 feature. And when research says a claim is anecdote rather than spec — such as whether iOS keeps
 stale JS across an app-switcher resume — design for both branches instead of picking one.
+
+## `locator("li", { hasText })` can match the add row's own suggestion chip, and the chip wins the race
+
+**Learned:** 2026-09-06/07, grocery list e2e re-add test (commit `9450b9e`).
+
+The re-add test's final assertion was `locator("li", { hasText: ITEM }).toHaveCount(1)`. The add
+row's history-backed autocomplete renders each suggestion as an `<li>` too, and that chip — drawn
+client-side straight from the input's uncommitted text — satisfied the locator before the test's own
+re-add POST had landed server-side. The test returned early on that false positive, and its
+still-in-flight write was then cancelled by the next test's context teardown, landing afterwards with
+a lowercased name (the unique index is on `lower(btrim(name))`). `cleanupUiWrites()`'s
+case-sensitive `.like("name", "E2E %")` never matched that lowercased name, so the row leaked
+permanently into the shared dev project and tripped Playwright's strict-mode error in whatever ran
+next, reading as an unrelated flake.
+
+**Rule:** scope a locator that means "the item row" to something the row has and a transient
+suggestion never does — here, an `<li>` filtered to one that carries the row's own Actions menu —
+so the assertion can only be satisfied once the real write has landed. And any teardown filter
+matching a seeded-data prefix needs `ilike`, not `like`: a case mismatch anywhere upstream (a bug
+like this one, or a legitimately lowercased name) otherwise leaks a row into the shared dev project
+permanently rather than failing loudly.
+
+## A hardcoded future date in a test rots the moment the calendar catches up to it
+
+**Learned:** 2026-09-07, `src/app/groceries/actions.test.ts` re-add case (commit `0b73b15`).
+
+A re-add test asserted `expires_on: "2026-09-13"` as a literal. `addGroceryItem` computes that date
+from produce's shelf life against the real clock (an explicit `expiresOn` is the only thing that
+skips the computation, and migration 028's null-preserving fix doesn't apply here since the input
+isn't null), so the literal was only ever right because "today" happened to still be far enough
+before it — it would have gone red with no code change once today's date closed the gap, reading as
+a regression rather than what it was.
+
+**Rule:** a test whose expected value is "N days from today" must freeze the clock
+(`jest.useFakeTimers()` / `setSystemTime`) rather than hardcode a date computed once from the real
+one. This is the same category of bug `localToday()` exists to prevent in the app itself — it
+applies to test code with the same force it applies to product code.
