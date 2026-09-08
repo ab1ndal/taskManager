@@ -158,6 +158,131 @@ describe("grocery actions", () => {
     });
   });
 
+  // Regression (Critical 1): grocery_upsert wrote `category = excluded.category` unconditionally,
+  // so re-adding an existing product by typing its name — with the add row's selector sitting on
+  // its untouched "pantry" default — silently rewrote the stored category. Category drives the
+  // shelf-life estimate on every later add and Bought, and the shopping list's aisle order, so the
+  // loss is permanent and invisible. "No category supplied" now means "keep what is stored".
+  it("re-adding an item without a category keeps the stored category", async () => {
+    fake = createFakeSupabase({
+      tables: seed({
+        grocery_items: [
+          { id: ITEM, workspace_id: WORKSPACE, name: "Paneer", category: "dairy",
+            in_stock: true, needed: false, quantity: 2, expires_on: "2026-09-16",
+            expiry_is_estimate: true, times_added: 1 },
+        ],
+      }),
+    });
+    const { addGroceryItem } = await import("./actions");
+    const result = await addGroceryItem({ workspaceId: WORKSPACE, name: "Paneer", target: "stock" });
+
+    expect(result.ok).toBe(true);
+    expect(fake.tables.grocery_items?.[0].category).toBe("dairy");
+  });
+
+  // The other half of the same rule: a caller that *does* name a category still changes it, which
+  // is what the suggestion chip and a deliberate selector change rely on.
+  it("re-adding an item with a category still changes it", async () => {
+    fake = createFakeSupabase({
+      tables: seed({
+        grocery_items: [
+          { id: ITEM, workspace_id: WORKSPACE, name: "Paneer", category: "dairy",
+            in_stock: true, needed: false, quantity: 2, expires_on: null,
+            expiry_is_estimate: false, times_added: 1 },
+        ],
+      }),
+    });
+    const { addGroceryItem } = await import("./actions");
+    await addGroceryItem({ workspaceId: WORKSPACE, name: "Paneer", category: "frozen", target: "stock" });
+
+    expect(fake.tables.grocery_items?.[0].category).toBe("frozen");
+  });
+
+  // A brand new item with no category named falls back to the column's own default rather than
+  // failing the NOT NULL — the same row the untouched selector used to produce.
+  it("adds a new item with no category as pantry", async () => {
+    const { addGroceryItem } = await import("./actions");
+    await addGroceryItem({ workspaceId: WORKSPACE, name: "Rice", target: "stock" });
+
+    expect((fake.tables.grocery_items ?? []).find((r) => r.name === "Rice")?.category).toBe("pantry");
+  });
+
+  // Regression (Critical 2): grocery_mark_bought executed `expires_on = p_expires_on`
+  // unconditionally, and markBought sends null for the five categories with no shelf life. So
+  // buying more of a low-stock spice erased the date the user had typed in the edit dialog. The
+  // action can tell "omitted, use the shelf life" from "explicitly null, no expiry"; the RPC now
+  // can too, via p_set_expiry.
+  it("marking bought keeps a user-entered expiry for a category with no shelf life", async () => {
+    fake = createFakeSupabase({
+      tables: seed({
+        grocery_items: [
+          { id: ITEM, workspace_id: WORKSPACE, name: "Garam masala", category: "spices",
+            in_stock: true, needed: true, quantity: 1, expires_on: "2027-01-01",
+            expiry_is_estimate: false, times_added: 1 },
+        ],
+      }),
+    });
+    const { markBought } = await import("./actions");
+    const result = await markBought({ itemId: ITEM });
+
+    expect(result.ok).toBe(true);
+    expect(fake.tables.grocery_items?.[0]).toMatchObject({
+      in_stock: true, needed: false, expires_on: "2027-01-01", expiry_is_estimate: false,
+    });
+  });
+
+  // "No expiry at all" is still a thing the caller can ask for, and it must still clear the date.
+  it("marking bought with an explicit null expiry clears the stored date", async () => {
+    fake = createFakeSupabase({
+      tables: seed({
+        grocery_items: [
+          { id: ITEM, workspace_id: WORKSPACE, name: "Garam masala", category: "spices",
+            in_stock: true, needed: true, quantity: 1, expires_on: "2027-01-01",
+            expiry_is_estimate: false, times_added: 1 },
+        ],
+      }),
+    });
+    const { markBought } = await import("./actions");
+    await markBought({ itemId: ITEM, expiresOn: null });
+
+    expect(fake.tables.grocery_items?.[0]).toMatchObject({
+      expires_on: null, expiry_is_estimate: false,
+    });
+  });
+
+  // Regression (Important 2): "Still good" used to restate name, category and quantity from props
+  // up to 20 seconds stale, reverting the other phone's concurrent edit — the lost-update pattern
+  // tasks/lessons.md L10 records. extendExpiry touches the two expiry columns and nothing else.
+  it("extending an expiry leaves a concurrently changed quantity alone", async () => {
+    const { adjustQuantity, extendExpiry } = await import("./actions");
+    await adjustQuantity({ itemId: ITEM, delta: 2 });
+
+    const result = await extendExpiry({ itemId: ITEM, expiresOn: "2026-10-01" });
+
+    expect(result.ok).toBe(true);
+    expect(fake.tables.grocery_items?.[0]).toMatchObject({
+      name: "Bananas", category: "produce", quantity: 5,
+      expires_on: "2026-10-01", expiry_is_estimate: true,
+    });
+  });
+
+  it("refuses to extend the expiry of an item in another workspace", async () => {
+    fake = createFakeSupabase({
+      tables: seed({
+        grocery_items: [
+          { id: OTHER_ITEM, workspace_id: OTHER_WORKSPACE, name: "Secret", category: "pantry",
+            in_stock: true, needed: false, quantity: null, expires_on: null,
+            expiry_is_estimate: false, times_added: 1 },
+        ],
+      }),
+    });
+    const { extendExpiry } = await import("./actions");
+    const result = await extendExpiry({ itemId: OTHER_ITEM, expiresOn: "2026-10-01" });
+
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("Forbidden") });
+    expect(fake.tables.grocery_items?.[0].expires_on).toBeNull();
+  });
+
   it("forgetting deletes the row", async () => {
     const { forgetItem } = await import("./actions");
     await forgetItem({ itemId: ITEM });

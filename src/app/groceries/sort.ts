@@ -23,7 +23,7 @@ const byName = (a: SortableItem, b: SortableItem) =>
  * so ascending order puts it on top for free. Undated items go last — no date means nothing is
  * urgent about them — and ties fall back to name so the order never shuffles between renders.
  */
-export function sortPantry(items: readonly SortableItem[], mode: SortMode): SortableItem[] {
+export function sortPantry<T extends SortableItem>(items: readonly T[], mode: SortMode): T[] {
   const sorted = [...items];
 
   if (mode === "name") return sorted.sort(byName);
@@ -44,7 +44,7 @@ export function sortPantry(items: readonly SortableItem[], mode: SortMode): Sort
  * pantry — so the pantry's sort control is deliberately not offered here. Category position
  * approximates walking a store aisle by aisle.
  */
-export function sortShopping(items: readonly SortableItem[]): SortableItem[] {
+export function sortShopping<T extends SortableItem>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => {
     const positions = categoryPosition(a.category) - categoryPosition(b.category);
     return positions !== 0 ? positions : byName(a, b);

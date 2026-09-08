@@ -96,7 +96,7 @@ Follow-up, Completed (the last is_done).
 
 ### grocery_items
 
-Migrations 026–028 define one shared product row per workspace and normalized name.
+Migrations 026–029 define one shared product row per workspace and normalized name.
 
 | Column | Type / meaning |
 | --- | --- |
@@ -133,6 +133,18 @@ State transitions use the service-role-only, security-definer RPCs in migration 
 Quantity adjustments lock the row so concurrent changes compose and the zero crossing is atomic.
 Constraints are a backstop, not a partial-update API. Descriptive edits use an authorized table update;
 unchanged estimated dates retain their flag, while user-entered dates are explicit.
+
+Migration 029 makes two of those writes conditional and adds a third RPC:
+
+- `grocery_upsert` takes a nullable category, and a null one keeps the stored value. Re-adding a
+  product by typing its name no longer rewrites the category behind its shelf-life estimate and its
+  place in the shopping list's aisle order. A new row with no category takes the column default.
+- `grocery_mark_bought` takes `p_set_expiry`; false leaves both expiry columns untouched. The five
+  categories with no shelf life produce a null estimated date, which previously erased a
+  user-entered expiry on every Bought.
+- `grocery_extend_expiry` writes only `expires_on` and `expiry_is_estimate`. The "Still good" nudge
+  used a full descriptive edit, which wrote a stale name, category and quantity back over a
+  concurrent change from the other device.
 
 Authenticated RLS policies gate reads and writes on workspace membership. Server actions use the
 admin client and independently verify membership using the item's stored workspace. Unlike tasks,

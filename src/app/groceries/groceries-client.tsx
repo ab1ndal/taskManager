@@ -10,11 +10,6 @@ import { sortPantry, sortShopping, type SortMode } from "./sort";
 import type { GroceryItem } from "./types";
 import { useForegroundRefresh } from "./use-foreground-refresh";
 
-// Re-exported so the plan's stated interface still holds: GroceryItem moved to ./types (Task 8)
-// because add-row.tsx and suggest.ts, both leaf modules this component depends on, needed it
-// before this task existed.
-export type { GroceryItem } from "./types";
-
 /** Below this many rows a filter row is chrome, not help. */
 const FILTER_THRESHOLD = 15;
 
@@ -45,7 +40,7 @@ export function GroceriesClient({
   const visible = useMemo(() => {
     const filtered = category ? inView.filter((item) => item.category === category) : inView;
 
-    return (view === "stock" ? sortPantry(filtered, sort) : sortShopping(filtered)) as GroceryItem[];
+    return view === "stock" ? sortPantry(filtered, sort) : sortShopping(filtered);
   }, [inView, view, category, sort]);
 
   const categories = useMemo(

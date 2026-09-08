@@ -26,7 +26,15 @@ export function AddRow({
   target: "stock" | "list";
 }) {
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<CategorySlug>("pantry");
+  /**
+   * `null` means the user has not touched the selector, which is a different thing from "pantry":
+   * addGroceryItem then sends no category at all, and grocery_upsert keeps whatever the product is
+   * already filed under. Typing an existing Dairy item's name used to file it under Pantry — the
+   * default the selector shows — destroying the shelf-life estimate behind every later add and
+   * Bought, and its place in the shopping list's aisle order. The selector still *displays*
+   * "pantry", because that is what a genuinely new item gets.
+   */
+  const [category, setCategory] = useState<CategorySlug | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,13 +50,16 @@ export function AddRow({
   function submit(value: string, categoryOverride?: CategorySlug) {
     const trimmed = value.trim();
     if (trimmed === "") return;
+    const chosen = categoryOverride ?? category;
 
     startTransition(async () => {
       try {
         const result = await addGroceryItem({
           workspaceId,
           name: trimmed,
-          category: categoryOverride ?? category,
+          // Spread rather than `category: chosen ?? undefined`: the key has to be absent, not
+          // present-and-undefined, so the action sends null and the stored category survives.
+          ...(chosen !== null ? { category: chosen } : {}),
           target,
         });
 
@@ -87,7 +98,7 @@ export function AddRow({
           className="flex-1 min-w-0 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
         />
         <select
-          value={category}
+          value={category ?? "pantry"}
           onChange={(event) => {
             if (isCategorySlug(event.target.value)) setCategory(event.target.value);
           }}

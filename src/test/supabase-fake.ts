@@ -536,8 +536,8 @@ export function createFakeSupabase(options: FakeOptions = {}) {
         return { data: null, error: null };
       }
 
-      // Mirrors migration 027. These are the transitions the constraints in 026 would reject as
-      // partial writes, so the fake applies the same whole-row effects the RPCs do.
+      // Mirrors migrations 027-029. These are the transitions the constraints in 026 would reject
+      // as partial writes, so the fake applies the same whole-row effects the RPCs do.
       if (fnName.startsWith("grocery_")) {
         // Lets a test inject an authored RPC failure (e.g. private.assert_grocery_member_workspace's
         // "member % is not in workspace %") the same way failOn injects one on a plain table op —
@@ -559,7 +559,10 @@ export function createFakeSupabase(options: FakeOptions = {}) {
           );
 
           if (existing) {
-            existing.category = params.p_category;
+            // Mirrors migration 029: a null category means "keep the stored one". The add row
+            // sends nothing when its selector is untouched, and rewriting the column here would
+            // reintroduce the silent category loss in every test written against the fake.
+            existing.category = params.p_category ?? existing.category;
             existing.in_stock = Boolean(existing.in_stock) || stock;
             existing.needed = Boolean(existing.needed) || !stock;
             if (stock) {
@@ -580,7 +583,8 @@ export function createFakeSupabase(options: FakeOptions = {}) {
             id: `grocery-${rows.length + 1}`,
             workspace_id: params.p_workspace,
             name: String(params.p_name).trim(),
-            category: params.p_category,
+            // A genuinely new row with no category lands on the column default (migration 026).
+            category: params.p_category ?? "pantry",
             in_stock: stock,
             needed: !stock,
             quantity: stock ? (params.p_quantity ?? null) : null,
@@ -607,6 +611,19 @@ export function createFakeSupabase(options: FakeOptions = {}) {
         if (fnName === "grocery_mark_bought") {
           row.in_stock = true;
           row.needed = false;
+          // Mirrors migration 029: p_set_expiry false leaves both expiry columns alone. Writing
+          // them unconditionally erased a user-entered date for the five categories with no shelf
+          // life, because markBought sends a null date for those.
+          if (params.p_set_expiry !== false) {
+            row.expires_on = params.p_expires_on ?? null;
+            row.expiry_is_estimate = params.p_expires_on != null && Boolean(params.p_estimate);
+          }
+          return { data: row, error: null };
+        }
+
+        // Migration 029. Two columns and nothing else, which is the whole point of it existing
+        // beside editItem.
+        if (fnName === "grocery_extend_expiry") {
           row.expires_on = params.p_expires_on ?? null;
           row.expiry_is_estimate = params.p_expires_on != null && Boolean(params.p_estimate);
           return { data: row, error: null };

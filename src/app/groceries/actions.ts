@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { assertWorkspaceMember, memberIdsForUser, requireUser } from "@/lib/auth";
+import { assertWorkspaceMember, requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { assertNoError, run } from "@/app/tasks/action-run";
@@ -13,6 +13,7 @@ import {
   addGroceryItemSchema,
   adjustQuantitySchema,
   editItemSchema,
+  extendExpirySchema,
   finishItemSchema,
   forgetItemSchema,
   markBoughtSchema,
@@ -20,6 +21,7 @@ import {
   type AddGroceryItemInput,
   type AdjustQuantityInput,
   type EditItemInput,
+  type ExtendExpiryInput,
   type FinishItemInput,
   type ForgetItemInput,
   type MarkBoughtInput,
@@ -91,9 +93,6 @@ async function memberInWorkspace(
   authUserId: string,
 ): Promise<string | null> {
   const admin = createAdminClient();
-  const memberIds = await memberIdsForUser(authUserId);
-  if (memberIds.length === 0) return null;
-
   const { data, error } = await admin
     .from("workspace_members")
     .select("id")
@@ -119,14 +118,23 @@ export async function addGroceryItem(
     // An item entering the pantry with no printed date gets the category's shelf life, flagged as
     // an estimate. Undated rows sort last, which is wrong for produce — the whole reason the
     // estimate exists. `expiresOn: null` means the caller explicitly wants no date.
+    //
+    // With no category named there is nothing to look a shelf life up under, and a new row lands on
+    // the column default — so 'pantry' is what the estimate would be computed from anyway, and
+    // 'pantry' has none. A re-add then sends a null date, which migration 028's conflict branch
+    // already reads as "keep the date this row is carrying".
     const estimate = target === "stock" && expiresOn === undefined;
-    const resolvedExpiry = estimate ? estimatedExpiry(category) : (expiresOn ?? null);
+    const resolvedExpiry = estimate
+      ? estimatedExpiry(category ?? "pantry")
+      : (expiresOn ?? null);
 
     const admin = createAdminClient();
     const { data, error } = await admin.rpc("grocery_upsert", {
       p_workspace: workspaceId,
       p_name: name,
-      p_category: category,
+      // Null, not "pantry": migration 029 reads a null category as "leave the stored one alone".
+      // Defaulting here would put back the silent rewrite the add row used to cause.
+      p_category: category ?? null,
       p_target: target,
       p_quantity: target === "stock" ? (quantity ?? null) : null,
       p_expires_on: resolvedExpiry,
@@ -169,11 +177,18 @@ export async function markBought(
     const estimate = expiresOn === undefined;
     const resolvedExpiry = estimate ? estimatedExpiry(category) : (expiresOn ?? null);
 
+    // "Omitted, so use the shelf life" and "explicitly null, so no expiry" both reduce to a null
+    // date, and the RPC used to write it either way — erasing a user-entered date for the five
+    // categories with no shelf life. p_set_expiry carries the distinction the action can see: only
+    // a caller who named a date, or a shelf life that actually produced one, may touch the column.
+    const setExpiry = !estimate || resolvedExpiry !== null;
+
     const admin = createAdminClient();
     const { error } = await admin.rpc("grocery_mark_bought", {
       p_id: itemId,
       p_expires_on: resolvedExpiry,
       p_estimate: estimate && resolvedExpiry !== null,
+      p_set_expiry: setExpiry,
     });
     assertNoRpcError("mark bought", { error });
 
@@ -216,6 +231,40 @@ export async function adjustQuantity(
     const admin = createAdminClient();
     const { error } = await admin.rpc("grocery_adjust_quantity", { p_id: itemId, p_delta: delta });
     assertNoRpcError("adjust quantity", { error });
+
+    revalidatePath("/groceries");
+    return { itemId };
+  });
+}
+
+/**
+ * The "Still good" nudge: push an expired date out and mark it an estimate.
+ *
+ * Separate from editItem on purpose. editItem's schema makes name, category and quantity required,
+ * so routing the nudge through it wrote all three back from props that may be a foreground-refresh
+ * interval stale — silently reverting a rename or a count change made on the other phone. That is
+ * the lost-update pattern tasks/lessons.md L10 records, and the one grocery_adjust_quantity's
+ * `for update` exists to prevent. Dropping quantity from the editItem call would not have worked:
+ * the schema types it required-nullable, so omitting it clears the count.
+ *
+ * The date is always an estimate here — it is computed from the category's shelf life, not asserted
+ * by a person — so the flag is not a caller's to choose.
+ */
+export async function extendExpiry(
+  input: ExtendExpiryInput,
+): Promise<ActionResult<{ itemId: string }>> {
+  return run("extendExpiry", async () => {
+    const { user } = await requireUser();
+    const { itemId, expiresOn } = parseInput(extendExpirySchema, input);
+    await assertItemMember(itemId, user.id);
+
+    const admin = createAdminClient();
+    const { error } = await admin.rpc("grocery_extend_expiry", {
+      p_id: itemId,
+      p_expires_on: expiresOn,
+      p_estimate: true,
+    });
+    assertNoRpcError("extend expiry", { error });
 
     revalidatePath("/groceries");
     return { itemId };

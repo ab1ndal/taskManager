@@ -95,3 +95,38 @@ it("submits the suggestion's own category, not the selector's", async () => {
     ),
   );
 });
+
+// Regression (Critical 1): the typed path — fill a name, press Enter, selector untouched — always
+// sent category "pantry". grocery_upsert overwrote the column on conflict, so re-adding an
+// existing Dairy item this way rewrote it to Pantry and destroyed its shelf-life estimate. Only
+// the suggestion-chip path was ever tested. The selector now speaks only when the user has moved
+// it; "no category" means "keep what is stored".
+it("omits the category on a typed add when the selector was untouched", async () => {
+  const { addGroceryItem } = await import("./actions");
+  render(<AddRow {...props} />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+
+  fireEvent.change(input, { target: { value: "Oat milk" } });
+  fireEvent.submit(input.closest("form")!);
+
+  await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
+  expect(jest.mocked(addGroceryItem).mock.calls[0][0]).not.toHaveProperty("category");
+});
+
+it("sends the category once the user actually picks one", async () => {
+  const { addGroceryItem } = await import("./actions");
+  render(<AddRow {...props} />);
+
+  fireEvent.change(screen.getByRole("combobox", { name: /category/i }), {
+    target: { value: "frozen" },
+  });
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: "Peas" } });
+  fireEvent.submit(input.closest("form")!);
+
+  await waitFor(() =>
+    expect(addGroceryItem).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Peas", category: "frozen" }),
+    ),
+  );
+});

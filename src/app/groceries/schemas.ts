@@ -37,7 +37,14 @@ const quantity = z
 export const addGroceryItemSchema = z.object({
   workspaceId: uuid,
   name,
-  category,
+  /**
+   * Optional, and its absence is meaningful: grocery_upsert reads "no category supplied" as "keep
+   * whatever this product is already filed under". The add row only names one when the user has
+   * moved the selector or picked a suggestion, so typing an existing item's name can no longer
+   * rewrite its category — and with it the shelf-life estimate and the shopping list's aisle
+   * order. A brand new row with no category lands on the column default, 'pantry'.
+   */
+  category: category.optional(),
   /** 'stock' puts it in the pantry, 'list' puts it on the shopping list. */
   target: z.enum(["stock", "list"]),
   quantity: quantity.nullish(),
@@ -51,6 +58,14 @@ export const markBoughtSchema = z.object({
   /** Omitted means "use the category's shelf life"; null means "no expiry at all". */
   expiresOn: expiresOn.nullish(),
 });
+
+/**
+ * The "Still good" nudge, and only it. Deliberately narrower than editItemSchema: that schema makes
+ * name, category and quantity required, so a button that used it wrote all three back from props
+ * that may be up to a foreground-refresh interval stale, reverting the other phone's concurrent
+ * edit (tasks/lessons.md L10).
+ */
+export const extendExpirySchema = z.object({ itemId: uuid, expiresOn });
 
 export const finishItemSchema = z.object({ itemId: uuid, keepOnList: z.boolean() });
 
@@ -77,6 +92,7 @@ export const forgetItemSchema = z.object({ itemId: uuid });
 export type AddGroceryItemInput = z.input<typeof addGroceryItemSchema>;
 export type SetNeededInput = z.input<typeof setNeededSchema>;
 export type MarkBoughtInput = z.input<typeof markBoughtSchema>;
+export type ExtendExpiryInput = z.input<typeof extendExpirySchema>;
 export type FinishItemInput = z.input<typeof finishItemSchema>;
 export type AdjustQuantityInput = z.input<typeof adjustQuantitySchema>;
 export type EditItemInput = z.input<typeof editItemSchema>;

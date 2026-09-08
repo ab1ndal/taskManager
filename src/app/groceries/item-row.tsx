@@ -7,7 +7,7 @@ import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { RowMenu } from "@/components/row-menu";
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR, type ActionResult } from "@/app/tasks/action-result";
-import { adjustQuantity, editItem, finishItem, forgetItem, markBought, setNeeded } from "./actions";
+import { adjustQuantity, extendExpiry, finishItem, forgetItem, markBought, setNeeded } from "./actions";
 import { addDays, categoryLabel, shelfLifeDays } from "./categories";
 import { isExpired } from "./sort";
 import { EditItemDialog } from "./edit-item-dialog";
@@ -88,17 +88,17 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
               disabled={pending}
               onClick={() =>
                 call(() =>
-                  editItem({
+                  // extendExpiry, not editItem: editItem's schema makes name, category and
+                  // quantity required, so this button used to write all three back from props up
+                  // to a foreground-refresh interval stale, reverting the other phone's concurrent
+                  // rename or count change (tasks/lessons.md L10).
+                  extendExpiry({
                     itemId: item.id,
-                    name: item.name,
-                    category: item.category,
                     // A flat week is wrong for most categories — frozen food pushed out by seven
                     // days would read as expired again next week — so the nudge uses the
                     // category's own shelf life, falling back to a week only when a category
                     // carries none.
                     expiresOn: addDays(today, shelfLifeDays(item.category) ?? 7),
-                    expiryIsEstimate: true,
-                    quantity: item.quantity,
                   }),
                 )
               }

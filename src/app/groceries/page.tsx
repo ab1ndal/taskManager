@@ -15,7 +15,7 @@ type SearchParams = Promise<{ view?: string; workspace?: string }>;
  * item from the page entirely.
  */
 function rowCategory(value: unknown): CategorySlug {
-  return isCategorySlug(value as string) ? (value as CategorySlug) : "pantry";
+  return typeof value === "string" && isCategorySlug(value) ? value : "pantry";
 }
 
 export default async function GroceriesPage({ searchParams }: { searchParams: SearchParams }) {
@@ -47,7 +47,13 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
     .map((m) => m.workspaces as unknown as { id: string; kind: string })
     .filter((w) => w.kind === "household");
 
-  const workspaceId = workspace ?? households[0]?.id ?? null;
+  // `?workspace=` reaches this from the URL, so it is checked against the households just loaded
+  // rather than passed through. Unvalidated, a malformed value threw the user to the error
+  // boundary, a foreign UUID rendered a working-looking page whose every add failed, and a *work*
+  // workspace the user does belong to rendered a full grocery list — which docs/product.md puts in
+  // households. /board validates the same parameter the same way.
+  const workspaceId =
+    households.find((w) => w.id === workspace)?.id ?? households[0]?.id ?? null;
 
   if (!workspaceId) {
     return (

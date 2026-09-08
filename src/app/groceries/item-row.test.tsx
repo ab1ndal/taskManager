@@ -7,6 +7,7 @@ jest.mock("./actions", () => ({
   finishItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   adjustQuantity: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   editItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  extendExpiry: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   forgetItem: jest.fn(async () => ({ ok: true })),
 }));
 
@@ -15,7 +16,7 @@ jest.mock("./actions", () => ({
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 import { PantryRow, ShoppingRow } from "./item-row";
-import { editItem, markBought } from "./actions";
+import { editItem, extendExpiry, markBought } from "./actions";
 import { toast } from "@/components/toaster";
 import type { GroceryItem } from "./types";
 
@@ -78,26 +79,30 @@ describe("PantryRow", () => {
     fireEvent.click(screen.getByRole("button", { name: /still good/i }));
 
     await waitFor(() => {
-      expect(editItem).toHaveBeenCalledWith(
+      expect(extendExpiry).toHaveBeenCalledWith(
         expect.objectContaining({ itemId: "g1", expiresOn: "2026-09-16" }),
       );
     });
   });
 
-  // Regression: editItem's default expiryIsEstimate is false, on the reasoning that the edit
-  // form is a person asserting a date. "Still good" computes the date from shelf life, not a
-  // person — omitting the flag would silently stamp a machine guess as an asserted date, and it
-  // would render without the "~" that marks an estimate.
-  it("still good marks the pushed-out date as an estimate", async () => {
-    render(<PantryRow item={{ ...base, expiresOn: "2026-09-01" }} today="2026-09-06" />);
+  // Regression (Important 2): the nudge used to go through editItem, whose schema makes name,
+  // category and quantity required — so it wrote all three back from props up to 20 seconds stale
+  // (use-foreground-refresh.ts), reverting the other phone's concurrent rename or count change.
+  // That is the lost-update pattern tasks/lessons.md L10 records, sitting next to the stepper the
+  // branch had just fixed. extendExpiry names only the two expiry columns.
+  it("still good writes only the expiry, never the stale name, category or quantity", async () => {
+    render(
+      <PantryRow item={{ ...base, expiresOn: "2026-09-01", quantity: 3 }} today="2026-09-06" />,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: /still good/i }));
 
-    await waitFor(() => {
-      expect(editItem).toHaveBeenCalledWith(
-        expect.objectContaining({ itemId: "g1", expiryIsEstimate: true }),
-      );
+    await waitFor(() => expect(extendExpiry).toHaveBeenCalled());
+    expect(jest.mocked(extendExpiry).mock.calls[0][0]).toEqual({
+      itemId: "g1",
+      expiresOn: "2026-09-13",
     });
+    expect(editItem).not.toHaveBeenCalled();
   });
 });
 
