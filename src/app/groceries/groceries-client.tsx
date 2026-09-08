@@ -66,8 +66,8 @@ export function GroceriesClient({
   return (
     <div className="mx-auto w-full max-w-2xl">
       <div className="flex gap-2 px-3 py-2 overflow-x-auto">
-        <TabPill href="/groceries?view=buy" label="Shopping list" matchKey="view" matchValue="buy" />
-        <TabPill href="/groceries?view=stock" label="Pantry" matchKey="view" matchValue="stock" />
+        <TabPill href={`/groceries?${new URLSearchParams({ view: "buy", workspace: workspaceId })}`} label="Shopping list" matchKey="view" matchValue="buy" />
+        <TabPill href={`/groceries?${new URLSearchParams({ view: "stock", workspace: workspaceId })}`} label="Pantry" matchKey="view" matchValue="stock" />
       </div>
 
       <AddRow workspaceId={workspaceId} items={items} target={view === "stock" ? "stock" : "list"} />

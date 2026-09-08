@@ -94,3 +94,10 @@ describe("GroceriesClient", () => {
     expect(screen.getByText(/list is empty/i)).toBeInTheDocument();
   });
 });
+
+it("retains the selected workspace in both view links", () => {
+  render(<GroceriesClient {...props} view="buy" />);
+  for (const [label, view] of [["Shopping list", "buy"], ["Pantry", "stock"]]) {
+    expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", `/groceries?view=${view}&workspace=${props.workspaceId}`);
+  }
+});

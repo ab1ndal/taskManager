@@ -1,7 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
-import { Check, ListPlus, Minus, Plus, Trash2, X } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Check, Pencil, ListPlus, Minus, Plus, Trash2, X } from "lucide-react";
 
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { RowMenu } from "@/components/row-menu";
@@ -10,6 +10,7 @@ import { GENERIC_ERROR, type ActionResult } from "@/app/tasks/action-result";
 import { adjustQuantity, editItem, finishItem, forgetItem, markBought, setNeeded } from "./actions";
 import { addDays, categoryLabel, shelfLifeDays } from "./categories";
 import { isExpired } from "./sort";
+import { EditItemDialog } from "./edit-item-dialog";
 import type { GroceryItem } from "./types";
 
 /**
@@ -68,6 +69,7 @@ function ExpiryLine({ item, today }: { item: GroceryItem; today: string }) {
 
 export function PantryRow({ item, today }: { item: GroceryItem; today: string }) {
   const { pending, call } = useActionCall();
+  const [editing, setEditing] = useState(false);
 
   return (
     <li className="flex items-center gap-3 min-h-11 px-3 py-2 border-b border-[var(--color-border)]">
@@ -148,6 +150,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
       <RowMenu
         label={`Actions for ${item.name}`}
         items={[
+          { label: "Edit item", onSelect: () => setEditing(true), icon: <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" /> },
           {
             label: "Finished — add to list",
             onSelect: () => call(() => finishItem({ itemId: item.id, keepOnList: true })),
@@ -166,12 +169,14 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
           },
         ]}
       />
+      {editing && <EditItemDialog item={item} onClose={() => setEditing(false)} />}
     </li>
   );
 }
 
 export function ShoppingRow({ item }: { item: GroceryItem }) {
   const { pending, call } = useActionCall();
+  const [editing, setEditing] = useState(false);
 
   return (
     <li className="border-b border-[var(--color-border)]">
@@ -206,6 +211,7 @@ export function ShoppingRow({ item }: { item: GroceryItem }) {
         <RowMenu
           label={`Actions for ${item.name}`}
           items={[
+          { label: "Edit item", onSelect: () => setEditing(true), icon: <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" /> },
             {
               label: "Remove from list",
               onSelect: () => call(() => setNeeded({ itemId: item.id, needed: false })),
@@ -220,6 +226,7 @@ export function ShoppingRow({ item }: { item: GroceryItem }) {
           ]}
         />
       </div>
+      {editing && <EditItemDialog item={item} onClose={() => setEditing(false)} />}
     </li>
   );
 }

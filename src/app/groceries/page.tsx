@@ -23,7 +23,11 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
 
   // One canonical view per URL, so the active tab pill is never ambiguous. Shopping is the default:
   // it is the view with a deadline attached, because someone is standing in a shop.
-  if (view !== "stock" && view !== "buy") redirect("/groceries?view=buy");
+  if (view !== "stock" && view !== "buy") {
+    const params = new URLSearchParams({ view: "buy" });
+    if (workspace) params.set("workspace", workspace);
+    redirect(`/groceries?${params}`);
+  }
 
   const supabase = await createClient();
   const {
@@ -31,12 +35,13 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
   } = await supabase.auth.getUser();
 
   // RLS decides what comes back; the filters below shape the result rather than protect it.
-  const { data: members } = user
+  const { data: members, error: membersError } = user
     ? await supabase
         .from("workspace_members")
         .select("workspace_id, workspaces!inner(id, name, kind)")
         .eq("auth_user_id", user.id)
-    : { data: [] };
+    : { data: [], error: null };
+  if (membersError) throw new Error("Could not load grocery workspaces", { cause: membersError });
 
   const households = (members ?? [])
     .map((m) => m.workspaces as unknown as { id: string; kind: string })
@@ -56,10 +61,11 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
 
   // Archived rows are loaded on purpose: they are the autocomplete history, and at a few hundred
   // rows for two people this is one query rather than a suggestions endpoint.
-  const { data: rows } = await supabase
+  const { data: rows, error: rowsError } = await supabase
     .from("grocery_items")
     .select("id, name, category, in_stock, needed, quantity, expires_on, expiry_is_estimate, times_added")
     .eq("workspace_id", workspaceId);
+  if (rowsError) throw new Error("Could not load grocery items", { cause: rowsError });
 
   const items: GroceryItem[] = (rows ?? []).map((row) => ({
     id: row.id as string,

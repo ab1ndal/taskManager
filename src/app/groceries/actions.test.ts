@@ -42,6 +42,16 @@ describe("grocery actions", () => {
     fake = createFakeSupabase({ tables: seed() });
   });
 
+  it("preserves an estimate on an edit and clears its flag with its date", async () => {
+    const { editItem } = await import("./actions");
+    const input = { itemId: ITEM, name: "Bananas", category: "produce" as const,
+      quantity: 3, expiresOn: "2026-09-13", expiryIsEstimate: true };
+    expect((await editItem(input)).ok).toBe(true);
+    expect(fake.tables.grocery_items?.[0].expiry_is_estimate).toBe(true);
+    expect((await editItem({ ...input, expiresOn: null })).ok).toBe(true);
+    expect(fake.tables.grocery_items?.[0]).toMatchObject({ expires_on: null, expiry_is_estimate: false });
+  });
+
   it("adds an item with the category shelf life when no expiry is given", async () => {
     const { addGroceryItem } = await import("./actions");
     const result = await addGroceryItem({

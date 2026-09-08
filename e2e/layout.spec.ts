@@ -28,13 +28,17 @@ async function hasHorizontalOverflow(page: Page) {
 for (const path of PAGES) {
   test(`${path} does not scroll horizontally`, async ({ page }) => {
     await page.goto(path);
-    await expect(page.locator("main")).toBeVisible();
+    if (path.startsWith("/groceries")) await expect(page.getByRole("textbox", { name: "Add an item" })).toBeVisible();
+    // Streaming can briefly keep a hidden page beside the loading fallback in the DOM.
+    // Count the exposed landmark rather than that hidden transport markup.
+    await expect(page.getByRole("main")).toBeVisible();
     expect(await hasHorizontalOverflow(page)).toBe(false);
   });
 
   test(`${path} has exactly one main landmark`, async ({ page }) => {
     await page.goto(path);
-    await expect(page.locator("main")).toHaveCount(1);
+    if (path.startsWith("/groceries")) await expect(page.getByRole("textbox", { name: "Add an item" })).toBeVisible();
+    await expect(page.getByRole("main")).toHaveCount(1);
   });
 }
 

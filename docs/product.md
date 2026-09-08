@@ -161,3 +161,24 @@ have deadlines
 have assignees
 have updates
 be reordered
+
+## Groceries
+
+`/groceries` opens the shopping list by default; Pantry is the other view of the same household
+workspace's items. View navigation retains the selected workspace. Grocery visibility is workspace
+membership, not task assignment: every member can read, add, edit, archive, and permanently forget
+any item. This is the deliberate exception to task assignment visibility.
+
+Need adds an item to the shopping list without removing it from the pantry (low stock). Bought
+returns it to the pantry and removes it from the list. Finished clears pantry details and either
+keeps the item on the list or archives it. Archived names remain available for autocomplete.
+
+The row menu opens an editor for name and category in both views. In-stock items also allow an
+optional integer quantity and expiry date; clearing either field stops tracking it. A quantity
+stepper reaching zero finishes the item and adds it to the shopping list.
+
+Perishable categories receive shelf-life estimates on pantry entry and purchase. Estimates use a
+muted `~` prefix, never task-deadline red. Expired items show an amber pill and a Still good action.
+Pantry sorts by expiry or name; shopping sorts by category then name. Category filters appear over
+15 items and remain available while filtering. Foreground polling refreshes shared data every 20
+seconds. Failed reads show a retryable error screen instead of a misleading empty list.

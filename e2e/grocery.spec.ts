@@ -95,3 +95,34 @@ test.describe("grocery list", () => {
     await expect(page).toHaveURL(/\/groceries\?view=buy/);
   });
 });
+
+test("edits pantry details and retains workspace between views", async ({ page }) => {
+  const name = "E2E Milk edit";
+  await page.goto("/groceries?view=stock");
+  await page.getByRole("textbox", { name: "Add an item" }).fill(name);
+  await page.getByRole("textbox", { name: "Add an item" }).press("Enter");
+  const row = page.locator("li").filter({ has: page.getByRole("button", { name: `Actions for ${name}` }) });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: /actions/i }).click();
+  await page.getByRole("menuitem", { name: "Edit item" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Category").selectOption("dairy");
+  await dialog.getByLabel("Quantity").fill("3");
+  await dialog.getByLabel("Expiry date").fill("2020-01-01");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(row.getByText("3", { exact: true })).toBeVisible();
+  await expect(row.getByText("expired", { exact: true })).toBeVisible();
+  await row.getByRole("button", { name: "Still good" }).click();
+  await expect(row.getByText("expired", { exact: true })).toBeHidden();
+  await row.getByRole("button", { name: "Need", exact: true }).click();
+  await expect(row.getByRole("button", { name: "Need", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("link", { name: "Shopping list", exact: true }).click();
+  await expect(page).toHaveURL(/view=buy&workspace=/);
+  const workspace = new URL(page.url()).searchParams.get("workspace");
+  expect(workspace).toBeTruthy();
+  await expect(page.getByText("have 3", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Pantry", exact: true }).click();
+  await expect(page).toHaveURL(/view=stock&workspace=/);
+  expect(new URL(page.url()).searchParams.get("workspace")).toBe(workspace);
+});

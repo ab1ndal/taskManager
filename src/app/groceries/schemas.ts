@@ -23,7 +23,10 @@ const category = z.enum(CATEGORY_SLUGS as readonly [CategorySlug, ...CategorySlu
 });
 
 /** Bare calendar dates only. `date` columns hold no clock time and neither does an estimate. */
-const expiresOn = z.iso.date("Expiry must be in YYYY-MM-DD format");
+const expiresOn = z.iso.date("Expiry must be in YYYY-MM-DD format").refine(
+  (value) => value >= "2020-01-01" && value <= "2100-01-01",
+  "Expiry must be between 2020-01-01 and 2100-01-01",
+);
 
 const quantity = z
   .number()
@@ -66,6 +69,7 @@ export const editItemSchema = z.object({
   category,
   expiresOn: expiresOn.nullable(),
   quantity: quantity.nullable(),
+  expiryIsEstimate: z.boolean().optional().default(false),
 });
 
 export const forgetItemSchema = z.object({ itemId: uuid });

@@ -225,7 +225,7 @@ export async function adjustQuantity(
 export async function editItem(input: EditItemInput): Promise<ActionResult<{ itemId: string }>> {
   return run("editItem", async () => {
     const { user } = await requireUser();
-    const { itemId, name, category, expiresOn, quantity } = parseInput(editItemSchema, input);
+    const { itemId, name, category, expiresOn, quantity, expiryIsEstimate } = parseInput(editItemSchema, input);
     await assertItemMember(itemId, user.id);
 
     // Editing the descriptive columns is a plain update: none of them are part of a transition, so
@@ -237,7 +237,7 @@ export async function editItem(input: EditItemInput): Promise<ActionResult<{ ite
         name,
         category,
         expires_on: expiresOn,
-        expiry_is_estimate: false,
+        expiry_is_estimate: expiresOn !== null && expiryIsEstimate,
         quantity,
       })
       .eq("id", itemId);
