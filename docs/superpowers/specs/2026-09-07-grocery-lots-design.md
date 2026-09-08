@@ -78,6 +78,11 @@ create unique index grocery_lots_item_expiry_key
 create index grocery_lots_item_id_idx on public.grocery_lots (item_id);
 ```
 
+`nulls not distinct` is Postgres 15+. Both projects are well past that, but the plan verifies it
+against dev (`show server_version`) before the migration is written rather than assuming it — the
+whole undated-lot design rests on that one clause. The fallback if it were ever unavailable is a
+unique index on `coalesce(expires_on, date '1970-01-01')`, which is uglier and equivalent.
+
 `quantity int null` carries the same meaning it has on `grocery_items` today: null is "some, not
 counted", not zero.
 
@@ -101,6 +106,11 @@ create or replace function private.sync_grocery_stock() returns trigger ...
 -- after insert or delete on grocery_lots:
 --   update grocery_items set in_stock = exists (select 1 from grocery_lots where item_id = ...)
 ```
+
+The column default flips from `true` to `false` in the same migration, which is what lets the
+trigger be the only writer of `true`: an item created straight onto the shopping list
+(`p_target = 'list'`) inserts no lot, and under today's default it would land in the pantry. The
+insert path therefore names no `in_stock` at all and the lot insert is what promotes the item.
 
 Deriving `in_stock` from a join at every read was the alternative and was rejected: the four-state
 model in the 2026-09-06 spec is what the whole page, both sorts and the shopping view are written
@@ -130,7 +140,7 @@ write is a `security definer` function in `public`, granted to `service_role` on
 
 | Function | Change |
 |---|---|
-| `grocery_upsert(p_workspace, p_name, p_category, p_target, p_quantity, p_expires_on, p_estimate, p_member)` | Signature unchanged. Item half keeps today's behaviour — category coalesce from 029, `needed = g.needed or excluded.needed`, `times_added + 1`. When `p_target = 'stock'` it then merges a lot. `in_stock` is no longer written here; the trigger owns it. |
+| `grocery_upsert(p_workspace, p_name, p_category, p_target, p_quantity, p_expires_on, p_estimate, p_member)` | Signature unchanged. Item half keeps today's behaviour — category coalesce from 029, `needed = g.needed or excluded.needed`, `times_added + 1`. When `p_target = 'stock'` it then merges a lot, and that lot insert is what makes the item in stock. `in_stock` is never written by this function — see the default change below. |
 | `grocery_mark_bought(p_id, p_expires_on, p_estimate, p_quantity)` | Merges a lot and sets `needed = false`. **`p_set_expiry` is dropped**: it existed only to stop a null date clobbering the single expiry column, and there is nothing left to clobber. Migration 029's defect class disappears with it. |
 | `grocery_set_needed(p_id, p_needed)` | Unchanged. |
 | `grocery_finish(p_id, p_keep_on_list)` | Deletes every lot for the item; `needed = p_keep_on_list`. `in_stock` follows from the trigger. Same user-facing meaning as today: we are out of this. |
