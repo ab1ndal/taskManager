@@ -1,46 +1,53 @@
 # Open work
 
-## Grocery list — implementation and verification complete (2026-09-07)
+## Grocery list — complete and merge-ready, not merged (2026-09-07)
 
-Branch `feat/grocery-list`. All twelve plan tasks (categories and timezone-safe date arithmetic,
-per-user sort orders, migrations 026–028, zod schemas, seven server actions, the add row with
-history-backed autocomplete, foreground-refresh polling, the page with pantry/shopping views, item
-rows, the edit-item dialog, the nav entry, the e2e suite, and this docs/verification pass) are done.
-The prior handover here was stale; historical reviews remain in
-`.superpowers/sdd/2026-09-06-grocery-list/progress.md`.
+Branch `feat/grocery-list`, head `25efbc2`, based on `aacf10d`. **Nothing is merged and nothing is
+pushed.** All twelve plan tasks are complete and individually reviewed, and the whole-branch review
+found two Criticals that the per-task reviews structurally could not see; both are fixed at the
+server boundary and the fixes were re-reviewed clean.
 
-`docs/db.md`'s `grocery_items` section and `docs/product.md`'s `Groceries` section were checked
-against the Task 12 brief's two checklists item by item; both already covered every item (column
-list, four-state table, archived-rows-as-autocomplete-history, `grocery_forget` as the only real
-delete, the `categories.ts`/check-constraint slug duplication, the two triggers, RPCs as the only
-transition path with constraints as backstop; workspace-membership visibility as the departure from
-assignment-based visibility, full member CRUD, the two views, low-stock, the `~` estimate
-convention, shopping list as default) — nothing was added or rewritten.
+What the whole-branch review caught, worth remembering because both were silent data loss on the
+ordinary path:
 
-**Full verification, run 2026-09-07:**
-- `npm run typecheck` — clean.
-- `npm test` — **61 suites / 764 tests passed.** (Regression baseline going forward — supersedes the
-  earlier `53 suites / 717 tests` baseline, which this run's counts replace; a future session below
-  these numbers has regressed.)
-- `npm run lint` — 0 errors, 1 pre-existing warning in `src/app/tasks/schemas.recurrence.test.ts`
-  (unrelated to groceries, not touched).
-- `npm run build` — succeeds.
-- `npx playwright test` — the full five-project matrix would not stay resident in memory on this
-  machine (one run was killed by the operator investigating a stalled wait, a second was killed by
-  the OS under memory pressure at 349/471 tests, both green up to the kill). Verified instead
-  **project by project, single worker, in config order** (chromium, webkit, firefox, iphone,
-  iphone-16-pro), each a clean process: chromium 91 passed/6 skipped/0 failed; webkit 80 passed/16
-  skipped/**1 failed** (`task-flow.spec.ts:53`, an update posted in the edit modal persists across a
-  reload — `page.goto` timeout during context teardown); firefox 81 passed/16 skipped/0 failed;
-  iphone 96 passed/**1 failed** (`screenshots.spec.ts:85`, edit-task dialog — light — `page.goto`
-  timeout); iphone-16-pro 87 passed/0 failed. No grocery spec failed in any run, chunked or full.
-  Both failures are pre-existing, unrelated specs (task-flow, screenshots) failing on navigation
-  timeouts, not on assertions — consistent with memory pressure on this run's machine rather than a
-  code defect; not fixed or weakened per the task's no-source-changes constraint. Left as a real,
-  reported gap: **not a clean green five-for-five.**
+- Re-adding an item by **typing its name** rewrote its stored category to `pantry`, because the
+  upsert's conflict branch overwrote `category` unconditionally and the add row's selector defaults.
+  The column drives shelf-life estimates and list ordering, so the loss was permanent and invisible.
+- **Bought erased a user-entered expiry** for the five categories with no shelf life, because the
+  RPC could not distinguish "no date supplied" from "explicitly no expiry".
 
-Nothing from this task is merged or pushed. Migrations 026–028 are applied to **dev only**;
-production gets them through the `deploy-migrations` workflow on merge, not from this branch.
+Migration `029_grocery_expiry_and_category.sql` fixes both server-side, adds `grocery_extend_expiry`
+so the "Still good" nudge stops writing back stale columns, and re-issues its own grants.
+**Migrations 026-029 are applied to dev only** (`mcdpiuiayfljzvnhtqto`). Production
+(`xamdgvxziobpptcfymug`) has none of them and gets them through the `deploy-migrations` workflow on
+merge.
+
+### Verification baseline
+
+`npm test` is **61 suites / 775 tests**. Anything lower is a regression, not a new baseline.
+typecheck clean, lint 0 errors (1 pre-existing warning), build succeeds. Playwright per project:
+chromium 93, webkit 83, iphone 99, iphone-16-pro 87 — run **per project with `--workers=1`**, since
+the full five-project matrix does not fit in memory on this machine.
+
+Before any e2e run here: kill any stale `next start` on port 3100. `reuseExistingServer: true` will
+otherwise hand the suite a server whose `.next` was rebuilt underneath it, and every server action
+404s — it faked four grocery failures once already.
+
+### Follow-ups, none blocking merge
+
+- [ ] `board.spec.ts:297` fails on `iphone-16-pro` on this machine and is **not** one of the two
+      previously known pre-existing failures. Unrelated to this branch; confirm on a machine that is
+      not under memory pressure.
+- [ ] `029_grocery_expiry_and_category.sql:26-28` — the comment claims more than shipped. A
+      perishable's user-asserted date is still replaced by a fresh estimate on every Bought, which is
+      defensible behaviour; the comment should say so.
+- [ ] `e2e/layout.spec.ts:115` leaks its seeded row if the test fails before reaching cleanup. The
+      `E2E ` prefix and workspace scoping bound the damage.
+- [ ] The canonicalizing redirect carries an invalid `?workspace=` through one pass before the
+      validation rejects it. Cosmetic.
+
+Deferred minors judged shippable by the final review are recorded in the branch's commits and
+reviews; the execution lessons live in `tasks/lessons.md`.
 
 ## Known exposure: the public workspace directory (accepted 2026-09-06)
 
