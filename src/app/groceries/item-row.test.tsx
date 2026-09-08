@@ -83,6 +83,22 @@ describe("PantryRow", () => {
       );
     });
   });
+
+  // Regression: editItem's default expiryIsEstimate is false, on the reasoning that the edit
+  // form is a person asserting a date. "Still good" computes the date from shelf life, not a
+  // person — omitting the flag would silently stamp a machine guess as an asserted date, and it
+  // would render without the "~" that marks an estimate.
+  it("still good marks the pushed-out date as an estimate", async () => {
+    render(<PantryRow item={{ ...base, expiresOn: "2026-09-01" }} today="2026-09-06" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /still good/i }));
+
+    await waitFor(() => {
+      expect(editItem).toHaveBeenCalledWith(
+        expect.objectContaining({ itemId: "g1", expiryIsEstimate: true }),
+      );
+    });
+  });
 });
 
 describe("ShoppingRow", () => {

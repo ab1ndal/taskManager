@@ -97,6 +97,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
                     // category's own shelf life, falling back to a week only when a category
                     // carries none.
                     expiresOn: addDays(today, shelfLifeDays(item.category) ?? 7),
+                    expiryIsEstimate: true,
                     quantity: item.quantity,
                   }),
                 )
@@ -211,7 +212,7 @@ export function ShoppingRow({ item }: { item: GroceryItem }) {
         <RowMenu
           label={`Actions for ${item.name}`}
           items={[
-          { label: "Edit item", onSelect: () => setEditing(true), icon: <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" /> },
+            { label: "Edit item", onSelect: () => setEditing(true), icon: <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" /> },
             {
               label: "Remove from list",
               onSelect: () => call(() => setNeeded({ itemId: item.id, needed: false })),

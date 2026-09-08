@@ -38,7 +38,7 @@ for (const path of PAGES) {
   test(`${path} has exactly one main landmark`, async ({ page }) => {
     await page.goto(path);
     if (path.startsWith("/groceries")) await expect(page.getByRole("textbox", { name: "Add an item" })).toBeVisible();
-    await expect(page.getByRole("main")).toHaveCount(1);
+    await expect(page.locator("main")).toHaveCount(1);
   });
 }
 

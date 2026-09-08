@@ -57,7 +57,7 @@ export function EditItemDialog({ item, onClose }: { item: GroceryItem; onClose: 
             <p className="text-xs text-[var(--color-text-secondary)]">Leave quantity or expiry blank to stop tracking it.</p>
           </>}
         </fieldset>
-        {error && <p role="alert" className="text-sm text-[var(--color-danger-text)]">{error}</p>}
+        {error && <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={pending} className="min-h-11 px-4">Cancel</button>
           <button type="submit" disabled={pending} className="min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)]">{pending ? "Saving…" : "Save"}</button>

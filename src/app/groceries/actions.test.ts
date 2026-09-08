@@ -210,12 +210,23 @@ describe("grocery actions", () => {
   // conflict branch preserves what is already tracked instead of wiping it. The fake used to
   // model 027's pre-fix behaviour (`?? null`), which would silently reintroduce the data-loss bug
   // in every test written against it.
+  //
+  // Quantity is preserved because addGroceryItem sends it as null when the caller omits it, but
+  // the re-add still carries a *freshly computed* expiry — the category's shelf life applied
+  // against today — so that half of the assertion has to be pinned to a frozen clock rather than
+  // a literal, or it rots the moment today's date moves on.
   it("re-adding an in-stock item with no quantity or date preserves what was already tracked", async () => {
-    const { addGroceryItem } = await import("./actions");
-    await addGroceryItem({ workspaceId: WORKSPACE, name: "Bananas", category: "produce", target: "stock" });
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-09-06T18:00:00Z"));
+    try {
+      const { addGroceryItem } = await import("./actions");
+      await addGroceryItem({ workspaceId: WORKSPACE, name: "Bananas", category: "produce", target: "stock" });
 
-    const row = fake.tables.grocery_items?.find((r) => r.name === "Bananas");
-    expect(row).toMatchObject({ quantity: 3, expires_on: "2026-09-13", expiry_is_estimate: true });
+      const row = fake.tables.grocery_items?.find((r) => r.name === "Bananas");
+      expect(row).toMatchObject({ quantity: 3, expires_on: "2026-09-13", expiry_is_estimate: true });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   // Regression: assertNoNameCollision used to rethrow any non-23505 error as a plain Error before
