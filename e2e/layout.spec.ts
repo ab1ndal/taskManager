@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { cleanupUiWrites } from "./fixtures";
 
 /**
  * Layout facts that only exist once a real engine has done layout: overflow, landmark count,
@@ -8,7 +9,15 @@ import { test, expect, type Page } from "@playwright/test";
 // `/profile` redirects to `/settings`, so naming it here exercised the settings page by accident.
 // Both settings tabs are named explicitly, and `/board` — the widest page in the app, and the one
 // that scrolls horizontally by design inside its own container — is on the list in its own right.
-const PAGES = ["/tasks", "/workspaces", "/board", "/settings?tab=profile", "/settings?tab=board"];
+const PAGES = [
+  "/tasks",
+  "/workspaces",
+  "/board",
+  "/groceries?view=buy",
+  "/groceries?view=stock",
+  "/settings?tab=profile",
+  "/settings?tab=board",
+];
 
 async function hasHorizontalOverflow(page: Page) {
   return page.evaluate(() => {
@@ -20,12 +29,16 @@ async function hasHorizontalOverflow(page: Page) {
 for (const path of PAGES) {
   test(`${path} does not scroll horizontally`, async ({ page }) => {
     await page.goto(path);
-    await expect(page.locator("main")).toBeVisible();
+    if (path.startsWith("/groceries")) await expect(page.getByRole("textbox", { name: "Add an item" })).toBeVisible();
+    // Streaming can briefly keep a hidden page beside the loading fallback in the DOM.
+    // Count the exposed landmark rather than that hidden transport markup.
+    await expect(page.getByRole("main")).toBeVisible();
     expect(await hasHorizontalOverflow(page)).toBe(false);
   });
 
   test(`${path} has exactly one main landmark`, async ({ page }) => {
     await page.goto(path);
+    if (path.startsWith("/groceries")) await expect(page.getByRole("textbox", { name: "Add an item" })).toBeVisible();
     await expect(page.locator("main")).toHaveCount(1);
   });
 }
@@ -85,6 +98,44 @@ test("controls on the workspaces screen meet the 44px touch minimum", async ({ p
   await expect(page.getByRole("heading", { name: "All Workspaces" })).toBeVisible();
 
   const undersized = await undersizedControls(page);
+
+  expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
+});
+
+// The sweep used to run against /tasks and two task dialogs only, so the grocery screens — a
+// spec-binding 44px constraint like every other screen — were never covered. The add row's
+// selector is the control most at risk: WebKit ignores min-height on a menulist select, which is
+// why its height is set explicitly rather than by a min.
+test("controls on the grocery pantry meet the 44px touch minimum", async ({ page }) => {
+  await page.goto("/groceries?view=stock");
+  await expect(page.getByRole("textbox", { name: "Add an item" })).toBeVisible();
+
+  const undersized = await undersizedControls(page);
+
+  expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
+});
+
+test("controls inside the grocery edit dialog meet the 44px touch minimum", async ({ page }) => {
+  // The dialog only exists over a real row, so this seeds one. The `E2E ` prefix is what the
+  // scoped teardown collects (tasks/lessons.md L14): the dev project is shared with everyday
+  // local work, so nothing here may delete by anything broader.
+  const name = "E2E Layout scan item";
+  await page.goto("/groceries?view=stock");
+  const input = page.getByRole("textbox", { name: "Add an item" });
+  await input.fill(name);
+  await input.press("Enter");
+
+  const row = page
+    .locator("li")
+    .filter({ has: page.getByRole("button", { name: `Actions for ${name}` }) });
+  await expect(row).toBeVisible();
+  await row.getByRole("button", { name: /actions/i }).click();
+  await page.getByRole("menuitem", { name: "Edit item" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+
+  const undersized = await undersizedControls(page);
+
+  await cleanupUiWrites();
 
   expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
 });

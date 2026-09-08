@@ -67,7 +67,7 @@ describe("RootLayout — nav visibility", () => {
     expect(screen.getByRole("navigation")).toBeInTheDocument();
     expect(screen.getByText("Tasks")).toBeInTheDocument();
     expect(screen.getByText("Board")).toBeInTheDocument();
-    expect(screen.getByText("Workspaces")).toBeInTheDocument();
+    expect(screen.getByText("Groceries")).toBeInTheDocument();
     expect(screen.getByTestId("nav-user")).toBeInTheDocument();
   });
 });
