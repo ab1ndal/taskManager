@@ -173,12 +173,21 @@ Need adds an item to the shopping list without removing it from the pantry (low 
 returns it to the pantry and removes it from the list. Finished clears pantry details and either
 keeps the item on the list or archives it. Archived names remain available for autocomplete.
 
-The row menu opens an editor for name and category in both views. In-stock items also allow an
-optional integer quantity and expiry date; clearing either field stops tracking it. A quantity
-stepper reaching zero finishes the item and adds it to the shopping list.
+Each purchase creates a separate batch with optional quantity and expiry, including repeat purchases
+with the same date or no date. Pantry shows the earliest expiry and sums quantities only when every
+batch is counted. The batch disclosure provides editing even for a single batch. Finishing a batch
+leaves other purchases intact; finishing the product removes all its stock.
 
-Perishable categories receive shelf-life estimates on pantry entry and purchase. Estimates use a
-muted `~` prefix, never task-deadline red. Expired items show an amber pill and a Still good action.
-Pantry sorts by expiry or name; shopping sorts by category then name. Category filters appear over
-15 items and remain available while filtering. Foreground polling refreshes shared data every 20
-seconds. Failed reads show a retryable error screen instead of a misleading empty list.
+Bought opens purchase entry with optional quantity, a printed date, no expiry (default), or an
+explicit category-based estimate. Save and add another batch handles multiple expiry dates in one
+trip. The pantry menu offers Record purchase for subsequent trips. A counted item's decrement uses
+the earliest expiry first; reaching zero adds it to the shopping list. Unknown totals have no stepper.
+
+Product editing changes name/category in the pantry and name only in shopping. Shopping has no
+category controls, tags, filters or category ordering; it sorts alphabetically. Pantry retains
+category filtering above 15 items and expiry/name sorting. Expired batches appear in a cleanup
+section with Still good and Gone; removing one never removes fresh stock. Estimates use a muted `~`
+and expired stock uses amber, never task-deadline red.
+
+Foreground polling refreshes shared data every 20 seconds. Failed reads show a retryable error
+screen instead of a misleading empty list.

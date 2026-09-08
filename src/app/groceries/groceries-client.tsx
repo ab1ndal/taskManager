@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 
 import { TabPill } from "@/app/tasks/tab-pill";
+import { ExpiredSweep } from "./expired-sweep";
+import { LotDialog } from "./lot-dialog";
 import { AddRow } from "./add-row";
 import { categoryLabel } from "./categories";
 import { PantryRow, ShoppingRow } from "./item-row";
@@ -24,6 +26,7 @@ export function GroceriesClient({
   view: "stock" | "buy";
   today: string;
 }) {
+  const [purchase, setPurchase] = useState<GroceryItem | null>(null);
   const [sort, setSort] = useState<SortMode>("expiry");
   const [category, setCategory] = useState<string | null>(null);
 
@@ -38,7 +41,7 @@ export function GroceriesClient({
   );
 
   const visible = useMemo(() => {
-    const filtered = category ? inView.filter((item) => item.category === category) : inView;
+    const filtered = view === "stock" && category ? inView.filter((item) => item.category === category) : inView;
 
     return view === "stock" ? sortPantry(filtered, sort) : sortShopping(filtered);
   }, [inView, view, category, sort]);
@@ -87,7 +90,7 @@ export function GroceriesClient({
         </div>
       )}
 
-      {showFilter && (
+      {view === "stock" && showFilter && (
         <div role="group" aria-label="Filter by category" className="flex gap-2 px-3 pb-2 overflow-x-auto">
           <button
             type="button"
@@ -111,6 +114,9 @@ export function GroceriesClient({
         </div>
       )}
 
+      {view === "stock" && <ExpiredSweep items={items} today={today} />}
+      {purchase && <LotDialog item={purchase} onClose={() => setPurchase(null)} />}
+
       {visible.length === 0 ? (
         <p className="px-3 py-8 text-sm text-[var(--color-text-secondary)]">
           {view === "stock"
@@ -123,7 +129,7 @@ export function GroceriesClient({
             view === "stock" ? (
               <PantryRow key={item.id} item={item} today={today} />
             ) : (
-              <ShoppingRow key={item.id} item={item} />
+              <ShoppingRow key={item.id} item={item} onPurchase={setPurchase} />
             ),
           )}
         </ul>

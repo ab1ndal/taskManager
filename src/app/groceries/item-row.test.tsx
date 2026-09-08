@@ -7,7 +7,7 @@ jest.mock("./actions", () => ({
   finishItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   adjustQuantity: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   editItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
-  extendExpiry: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  extendLot: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   forgetItem: jest.fn(async () => ({ ok: true })),
 }));
 
@@ -16,8 +16,7 @@ jest.mock("./actions", () => ({
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 import { PantryRow, ShoppingRow } from "./item-row";
-import { editItem, extendExpiry, markBought } from "./actions";
-import { toast } from "@/components/toaster";
+import { editItem, extendLot } from "./actions";
 import type { GroceryItem } from "./types";
 
 const base: GroceryItem = {
@@ -29,10 +28,13 @@ const base: GroceryItem = {
   quantity: null,
   expiresOn: "2026-09-13",
   expiryIsEstimate: true,
-  timesAdded: 1,
+  timesAdded: 1, lots: [],
 };
 
 beforeEach(() => jest.clearAllMocks());
+const expiredLot = { id: "l1", itemId: "g1", quantity: 3, expiresOn: "2026-09-01", expiryIsEstimate: false, createdAt: "2026-09-01T12:00:00Z" };
+function expand() { fireEvent.click(screen.getByText(/batch.*View and edit/)); screen.getByText(/batch.*View and edit/).closest("details")!.open = true; }
+
 
 describe("PantryRow", () => {
   it("marks an estimated expiry with a tilde", () => {
@@ -46,8 +48,9 @@ describe("PantryRow", () => {
   });
 
   it("labels an expired item and offers Still good", () => {
-    render(<PantryRow item={{ ...base, expiresOn: "2026-09-01" }} today="2026-09-06" />);
-    expect(screen.getByText("expired")).toBeInTheDocument();
+    render(<PantryRow item={{ ...base, expiresOn: "2026-09-01", lots: [expiredLot] }} today="2026-09-06" />);
+    expect(screen.getAllByText("expired")[0]).toBeInTheDocument();
+    expand();
     expect(screen.getByRole("button", { name: /still good/i })).toBeInTheDocument();
   });
 
@@ -73,14 +76,15 @@ describe("PantryRow", () => {
   // life. produce's shelf life is also 7, so it can't tell the two behaviours apart — this uses
   // dairy (10) instead.
   it("still good pushes the expiry out by the category's shelf life, not a flat week", async () => {
-    const dairyItem: GroceryItem = { ...base, category: "dairy", expiresOn: "2026-09-01" };
+    const dairyItem: GroceryItem = { ...base, category: "dairy", expiresOn: "2026-09-01", lots: [expiredLot] };
     render(<PantryRow item={dairyItem} today="2026-09-06" />);
 
+    expand();
     fireEvent.click(screen.getByRole("button", { name: /still good/i }));
 
     await waitFor(() => {
-      expect(extendExpiry).toHaveBeenCalledWith(
-        expect.objectContaining({ itemId: "g1", expiresOn: "2026-09-16" }),
+      expect(extendLot).toHaveBeenCalledWith(
+        expect.objectContaining({ lotId: "l1", expiresOn: "2026-09-16" }),
       );
     });
   });
@@ -89,17 +93,18 @@ describe("PantryRow", () => {
   // category and quantity required — so it wrote all three back from props up to 20 seconds stale
   // (use-foreground-refresh.ts), reverting the other phone's concurrent rename or count change.
   // That is the lost-update pattern tasks/lessons.md L10 records, sitting next to the stepper the
-  // branch had just fixed. extendExpiry names only the two expiry columns.
+  // branch had just fixed. extendLot names only the two expiry columns.
   it("still good writes only the expiry, never the stale name, category or quantity", async () => {
     render(
-      <PantryRow item={{ ...base, expiresOn: "2026-09-01", quantity: 3 }} today="2026-09-06" />,
+      <PantryRow item={{ ...base, expiresOn: "2026-09-01", lots: [expiredLot], quantity: 3 }} today="2026-09-06" />,
     );
 
+    expand();
     fireEvent.click(screen.getByRole("button", { name: /still good/i }));
 
-    await waitFor(() => expect(extendExpiry).toHaveBeenCalled());
-    expect(jest.mocked(extendExpiry).mock.calls[0][0]).toEqual({
-      itemId: "g1",
+    await waitFor(() => expect(extendLot).toHaveBeenCalled());
+    expect(jest.mocked(extendLot).mock.calls[0][0]).toEqual({
+      lotId: "l1",
       expiresOn: "2026-09-13",
     });
     expect(editItem).not.toHaveBeenCalled();
@@ -107,31 +112,26 @@ describe("PantryRow", () => {
 });
 
 describe("ShoppingRow", () => {
-  // Regression: a rejected action promise (dropped connection, mid-flight navigation) used to
-  // vanish silently — no toast, no state change, no log. The user taps and nothing tells them why.
-  it("toasts when the action call rejects instead of failing silently", async () => {
-    jest.mocked(markBought).mockRejectedValueOnce(new Error("network dropped"));
-
-    render(<ShoppingRow item={{ ...base, needed: true, inStock: false }} />);
+  it("opens purchase entry without showing a category", () => {
+    const purchase = jest.fn();
+    render(<ShoppingRow item={base} onPurchase={purchase} />);
     fireEvent.click(screen.getByRole("button", { name: /bought spinach/i }));
-
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith("Something went wrong. Please try again.", "error"),
-    );
+    expect(purchase).toHaveBeenCalledWith(base);
+    expect(screen.queryByText("Produce")).not.toBeInTheDocument();
   });
 
   it("shows how many we already have when it is also in the pantry", () => {
-    render(<ShoppingRow item={{ ...base, needed: true, inStock: true, quantity: 6 }} />);
+    render(<ShoppingRow onPurchase={jest.fn()} item={{ ...base, needed: true, inStock: true, quantity: 6 }} />);
     expect(screen.getByText("have 6")).toBeInTheDocument();
   });
 
   it("shows no quantity line when we have none", () => {
-    render(<ShoppingRow item={{ ...base, needed: true, inStock: false, quantity: null }} />);
+    render(<ShoppingRow onPurchase={jest.fn()} item={{ ...base, needed: true, inStock: false, quantity: null }} />);
     expect(screen.queryByText(/^have /)).not.toBeInTheDocument();
   });
 
   it("names the bought control after the item", () => {
-    render(<ShoppingRow item={{ ...base, needed: true, inStock: false }} />);
+    render(<ShoppingRow onPurchase={jest.fn()} item={{ ...base, needed: true, inStock: false }} />);
     expect(screen.getByRole("button", { name: /bought spinach/i })).toBeInTheDocument();
   });
 });

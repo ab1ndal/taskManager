@@ -44,14 +44,14 @@ describe("sortPantry by name", () => {
 });
 
 describe("sortShopping", () => {
-  it("orders by category position then name", () => {
+  it("orders alphabetically regardless of category", () => {
     const sorted = sortShopping([
       item("Soap", "household"),
       item("Bread", "baked"),
       item("Spinach", "produce"),
       item("Apples", "produce"),
     ]);
-    expect(sorted.map((i) => i.name)).toEqual(["Apples", "Spinach", "Bread", "Soap"]);
+    expect(sorted.map((i) => i.name)).toEqual(["Apples", "Bread", "Soap", "Spinach"]);
   });
 });
 

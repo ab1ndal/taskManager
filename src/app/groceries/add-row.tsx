@@ -4,18 +4,13 @@ import { useRef, useState, useTransition } from "react";
 
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR } from "@/app/tasks/action-result";
+import { StockFields, type ExpiryMode } from "./stock-fields";
 import { addGroceryItem } from "./actions";
 import { GROCERY_CATEGORIES, isCategorySlug, type CategorySlug } from "./categories";
 import type { GroceryItem } from "./types";
 import { suggestNames } from "./suggest";
 
-/**
- * One field, Enter commits, focus stays.
- *
- * Adding five things in a shop should cost five names and nothing else, so category is a separate
- * optional control defaulting to Pantry and everything else is editable from the row afterwards.
- * A modal per item is the friction that makes someone text their partner instead.
- */
+/** Rapid name entry, with optional purchase details in the pantry only. */
 export function AddRow({
   workspaceId,
   items,
@@ -25,31 +20,21 @@ export function AddRow({
   items: GroceryItem[];
   target: "stock" | "list";
 }) {
+  const [quantity, setQuantity] = useState("");
+  const [date, setDate] = useState("");
+  const [mode, setMode] = useState<ExpiryMode>("none");
   const [name, setName] = useState("");
-  /**
-   * `null` means the user has not touched the selector, which is a different thing from "pantry":
-   * addGroceryItem then sends no category at all, and grocery_upsert keeps whatever the product is
-   * already filed under. Typing an existing Dairy item's name used to file it under Pantry — the
-   * default the selector shows — destroying the shelf-life estimate behind every later add and
-   * Bought, and its place in the shopping list's aisle order. The selector still *displays*
-   * "pantry", because that is what a genuinely new item gets.
-   */
+  // An untouched category preserves the stored product classification.
   const [category, setCategory] = useState<CategorySlug | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const suggestions = suggestNames(items, name);
 
-  /**
-   * `categoryOverride` is not a convenience: picking a suggestion has to submit *that item's*
-   * category, and `setCategory()` does not change the `category` binding this render already
-   * closed over. Reading state here would submit the previous category, and because
-   * grocery_upsert overwrites the column, a Dairy item re-added from a suggestion would silently
-   * become Pantry — losing its shelf-life estimate for every future purchase.
-   */
+  // Pass suggestion category directly; a React state update is not synchronous.
   function submit(value: string, categoryOverride?: CategorySlug) {
     const trimmed = value.trim();
-    if (trimmed === "") return;
+    if (pending || trimmed === "") return;
     const chosen = categoryOverride ?? category;
 
     startTransition(async () => {
@@ -59,7 +44,9 @@ export function AddRow({
           name: trimmed,
           // Spread rather than `category: chosen ?? undefined`: the key has to be absent, not
           // present-and-undefined, so the action sends null and the stored category survives.
-          ...(chosen !== null ? { category: chosen } : {}),
+          ...(target === "stock" && chosen !== null ? { category: chosen } : {}),
+          ...(target === "stock" ? { quantity: quantity === "" ? null : Number(quantity),
+            expiresOn: mode === "date" ? date : mode === "none" ? null : undefined } : {}),
           target,
         });
 
@@ -69,6 +56,7 @@ export function AddRow({
         }
 
         setName("");
+        setQuantity(""); setDate(""); setMode("none");
         inputRef.current?.focus();
       } catch (error) {
         // A rejected call (dropped connection, mid-flight navigation) used to vanish silently.
@@ -85,8 +73,9 @@ export function AddRow({
           event.preventDefault();
           submit(name);
         }}
-        className="flex items-center gap-2"
+        className="space-y-2"
       >
+        <div className="flex items-center gap-2">
         <input
           ref={inputRef}
           value={name}
@@ -97,7 +86,7 @@ export function AddRow({
           enterKeyHint="done"
           className="flex-1 min-w-0 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
         />
-        <select
+        {target === "stock" && <select
           value={category ?? "pantry"}
           onChange={(event) => {
             if (isCategorySlug(event.target.value)) setCategory(event.target.value);
@@ -118,7 +107,7 @@ export function AddRow({
               {c.label}
             </option>
           ))}
-        </select>
+        </select>}
         <button
           type="submit"
           disabled={pending || name.trim() === ""}
@@ -126,6 +115,11 @@ export function AddRow({
         >
           Add
         </button>
+        </div>
+        {target === "stock" && <details>
+          <summary className="min-h-11 flex items-center text-xs cursor-pointer">Purchase quantity and expiry</summary>
+          <StockFields quantity={quantity} setQuantity={setQuantity} date={date} setDate={setDate} mode={mode} setMode={setMode} />
+        </details>}
       </form>
 
       {suggestions.length > 0 && (

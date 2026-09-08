@@ -96,59 +96,46 @@ Follow-up, Completed (the last is_done).
 
 ### grocery_items
 
-Migrations 026–029 define one shared product row per workspace and normalized name.
-
-| Column | Type / meaning |
-| --- | --- |
-| id | uuid primary key |
-| workspace_id | uuid, references workspaces, cascading delete |
-| name | text, trimmed length 1–100 |
-| category | text, one of nine fixed category slugs |
-| in_stock, needed | boolean, independent pantry and shopping flags |
-| quantity | nullable positive integer, pantry only |
-| expires_on | nullable date, 2020-01-01 through 2100-01-01, pantry only |
-| expiry_is_estimate | boolean; true requires an expiry date |
-| times_added | integer, incremented on re-add for suggestion ranking |
-| added_by_member_id | nullable uuid, references workspace_members, set null on deletion |
-| created_at, state_changed_at | timestamptz |
+Migrations 026–030 define one product per workspace and normalized name. Products own `name`,
+`category`, `needed`, `times_added`, membership attribution and timestamps. The unique name index is
+`(workspace_id, lower(btrim(name)))`. `in_stock` defaults false and a lot insert/delete trigger keeps
+it synchronized with batch existence. The existing state-change trigger maintains `state_changed_at`.
 
 | in_stock | needed | State |
 | --- | --- | --- |
 | true | false | Pantry |
-| true | true | Low stock: pantry and shopping list |
+| true | true | Low stock: pantry and shopping |
 | false | true | Out, shopping list |
-| false | false | Archived, autocomplete history only |
+| false | false | Archived, autocomplete only |
 
-The unique index is `(workspace_id, lower(btrim(name)))`. Re-adding resurrects the same row;
-`grocery_forget` is the only product deletion operation. Finishing clears quantity and expiry.
-The category slug list is duplicated in `src/app/groceries/categories.ts` and the SQL check
-constraint; both must change together.
+### grocery_lots
 
-A trigger updates `state_changed_at` only when the stock/needed pair changes: its insertion default
-alone would not track transitions. A second trigger rejects an added-by member from another workspace.
+Migration 030 moves quantity and expiry off products into purchase batches:
 
-State transitions use the service-role-only, security-definer RPCs in migration 027:
-`grocery_upsert`, `grocery_set_needed`, `grocery_mark_bought`, `grocery_finish`,
-`grocery_adjust_quantity`, and `grocery_forget`. Migration 028 repairs upsert null handling.
-Quantity adjustments lock the row so concurrent changes compose and the zero crossing is atomic.
-Constraints are a backstop, not a partial-update API. Descriptive edits use an authorized table update;
-unchanged estimated dates retain their flag, while user-entered dates are explicit.
+| Column | Meaning |
+| --- | --- |
+| id | uuid primary key |
+| item_id | product FK, cascade on delete; indexed |
+| quantity | nullable positive integer; null means uncounted |
+| expires_on | nullable date between 2020-01-01 and 2100-01-01 |
+| expiry_is_estimate | true requires a date |
+| created_at | timestamp when recorded; backfill inherits product creation time |
 
-Migration 029 makes two of those writes conditional and adds a third RPC:
+Every purchase creates a new batch, including matching/absent expiry dates. Backfill creates one
+batch per previously in-stock product. Batch dates remain independently editable. Total quantity
+is unknown if any batch is uncounted. Earliest dated expiry drives the pantry summary.
 
-- `grocery_upsert` takes a nullable category, and a null one keeps the stored value. Re-adding a
-  product by typing its name no longer rewrites the category behind its shelf-life estimate and its
-  place in the shopping list's aisle order. A new row with no category takes the column default.
-- `grocery_mark_bought` takes `p_set_expiry`; false leaves both expiry columns untouched. The five
-  categories with no shelf life produce a null estimated date, which previously erased a
-  user-entered expiry on every Bought.
-- `grocery_extend_expiry` writes only `expires_on` and `expiry_is_estimate`. The "Still good" nudge
-  used a full descriptive edit, which wrote a stale name, category and quantity back over a
-  concurrent change from the other device.
+Stock RPCs lock the parent before accessing batches, serializing purchases, consumption and cleanup.
+`grocery_adjust_quantity` consumes earliest expiry first, undated last; increments correct the latest
+purchase. The final decrement sets needed. `grocery_lot_extend` touches only date/estimate;
+`grocery_lot_edit` changes one batch's quantity/date; `grocery_lot_discard` removes one batch.
+`grocery_finish` deletes all batches; `grocery_forget` deletes the product and cascades.
 
-Authenticated RLS policies gate reads and writes on workspace membership. Server actions use the
-admin client and independently verify membership using the item's stored workspace. Unlike tasks,
-groceries do not require assignment rows. See the accepted membership exposure in `tasks/todo.md`.
+Authenticated clients can read products and batches under workspace-membership RLS. Direct table
+writes are revoked; authenticated callers cannot execute the stock RPCs. Server actions independently
+authorize the stored workspace, then call service-role-only RPCs with empty search paths.
+Product name/category edits use an authorized admin table update. Shopping name edits omit category.
+Category slugs remain duplicated in `categories.ts` and the SQL check constraint.
 
 ### tasks
 

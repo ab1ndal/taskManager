@@ -25,7 +25,7 @@ const items: GroceryItem[] = [
     quantity: null,
     expiresOn: null,
     expiryIsEstimate: false,
-    timesAdded: 12,
+    timesAdded: 12, lots: [],
   },
 ];
 
@@ -82,7 +82,7 @@ it("does not submit an empty name", async () => {
 // shelf-life estimate for every later purchase.
 it("submits the suggestion's own category, not the selector's", async () => {
   const { addGroceryItem } = await import("./actions");
-  render(<AddRow {...props} />);
+  render(<AddRow {...props} target="stock" />);
 
   fireEvent.change(screen.getByRole("textbox", { name: /add an item/i }), {
     target: { value: "oat" },
@@ -115,7 +115,7 @@ it("omits the category on a typed add when the selector was untouched", async ()
 
 it("sends the category once the user actually picks one", async () => {
   const { addGroceryItem } = await import("./actions");
-  render(<AddRow {...props} />);
+  render(<AddRow {...props} target="stock" />);
 
   fireEvent.change(screen.getByRole("combobox", { name: /category/i }), {
     target: { value: "frozen" },
@@ -129,4 +129,14 @@ it("sends the category once the user actually picks one", async () => {
       expect.objectContaining({ name: "Peas", category: "frozen" }),
     ),
   );
+});
+
+it("has no shopping category selector and suggestions do not send a category", async () => {
+  const { addGroceryItem } = await import("./actions");
+  render(<AddRow {...props} />);
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByRole("textbox", { name: /add an item/i }), { target: { value: "oat" } });
+  fireEvent.click(screen.getByRole("button", { name: /oat milk/i }));
+  await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
+  expect(jest.mocked(addGroceryItem).mock.calls[0][0]).not.toHaveProperty("category");
 });

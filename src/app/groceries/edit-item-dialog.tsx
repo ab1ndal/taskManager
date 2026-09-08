@@ -8,12 +8,10 @@ import { GROCERY_CATEGORIES } from "./categories";
 import { editItemSchema } from "./schemas";
 import type { GroceryItem } from "./types";
 
-export function EditItemDialog({ item, onClose }: { item: GroceryItem; onClose: () => void }) {
+export function EditItemDialog({ item, onClose, shopping = false }: { item: GroceryItem; onClose: () => void; shopping?: boolean }) {
   const titleId = useId();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState<string>(item.category);
-  const [quantity, setQuantity] = useState(item.quantity?.toString() ?? "");
-  const [expiresOn, setExpiresOn] = useState(item.expiresOn ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const control = "block w-full min-w-0 h-11 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base";
@@ -25,10 +23,7 @@ export function EditItemDialog({ item, onClose }: { item: GroceryItem; onClose: 
         event.preventDefault();
         if (pending) return;
         const parsed = editItemSchema.safeParse({
-          itemId: item.id, name, category,
-          quantity: item.inStock && quantity !== "" ? Number(quantity) : null,
-          expiresOn: item.inStock ? expiresOn || null : null,
-          expiryIsEstimate: item.expiryIsEstimate && expiresOn === item.expiresOn,
+          itemId: item.id, name, ...(shopping ? {} : { category }),
         });
         if (!parsed.success) {
           setError(parsed.error.issues[0].message);
@@ -48,14 +43,10 @@ export function EditItemDialog({ item, onClose }: { item: GroceryItem; onClose: 
       }}>
         <fieldset disabled={pending} className="space-y-4 min-w-0">
           <label className="block text-sm">Name<input className={control} value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} /></label>
-          <label className="block text-sm">Category<select className={control} value={category} onChange={(e) => setCategory(e.target.value)}>
+          {!shopping && <label className="block text-sm">Category<select className={control} value={category} onChange={(e) => setCategory(e.target.value)}>
             {GROCERY_CATEGORIES.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
-          </select></label>
-          {item.inStock && <>
-            <label className="block text-sm">Quantity<input className={control} type="number" inputMode="numeric" min={1} max={999} step={1} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></label>
-            <label className="block text-sm">Expiry date<input className={control} type="date" min="2020-01-01" max="2100-01-01" value={expiresOn} onChange={(e) => setExpiresOn(e.target.value)} /></label>
-            <p className="text-xs text-[var(--color-text-secondary)]">Leave quantity or expiry blank to stop tracking it.</p>
-          </>}
+          </select></label>}
+
         </fieldset>
         {error && <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">{error}</p>}
         <div className="flex justify-end gap-2">

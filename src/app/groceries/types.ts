@@ -17,4 +17,14 @@ export type GroceryItem = {
   expiresOn: string | null;
   expiryIsEstimate: boolean;
   timesAdded: number;
+  lots: GroceryLot[];
+};
+
+export type GroceryLot = {
+  id: string;
+  itemId: string;
+  quantity: number | null;
+  expiresOn: string | null;
+  expiryIsEstimate: boolean;
+  createdAt: string;
 };

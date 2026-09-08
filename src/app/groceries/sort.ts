@@ -1,4 +1,3 @@
-import { categoryPosition } from "./categories";
 
 export type SortMode = "expiry" | "name";
 
@@ -37,16 +36,7 @@ export function sortPantry<T extends SortableItem>(items: readonly T[], mode: So
   });
 }
 
-/**
- * Shopping order: category position, then name.
- *
- * The shopping view holds no expiry data — `grocery_finish` clears the date on the way out of the
- * pantry — so the pantry's sort control is deliberately not offered here. Category position
- * approximates walking a store aisle by aisle.
- */
+/** Shopping lists are alphabetical, independent of pantry categories. */
 export function sortShopping<T extends SortableItem>(items: readonly T[]): T[] {
-  return [...items].sort((a, b) => {
-    const positions = categoryPosition(a.category) - categoryPosition(b.category);
-    return positions !== 0 ? positions : byName(a, b);
-  });
+  return [...items].sort(byName);
 }

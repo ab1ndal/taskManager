@@ -22,13 +22,13 @@ import type { GroceryItem } from "./types";
 
 const items: GroceryItem[] = [
   { id: "g1", name: "Rice", category: "pantry", inStock: true, needed: false,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 4 },
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 4 , lots: []},
   { id: "g2", name: "Milk", category: "dairy", inStock: false, needed: true,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 9 },
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 9 , lots: []},
   { id: "g3", name: "Spinach", category: "produce", inStock: true, needed: true,
-    quantity: null, expiresOn: "2026-09-07", expiryIsEstimate: true, timesAdded: 2 },
+    quantity: null, expiresOn: "2026-09-07", expiryIsEstimate: true, timesAdded: 2 , lots: []},
   { id: "g4", name: "Old thing", category: "pantry", inStock: false, needed: false,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 1 },
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 1 , lots: []},
 ];
 
 const props = { workspaceId: "11111111-1111-4111-8111-111111111111", items, today: "2026-09-06" };
@@ -75,7 +75,7 @@ describe("GroceriesClient", () => {
       quantity: null,
       expiresOn: null,
       expiryIsEstimate: false,
-      timesAdded: 1,
+      timesAdded: 1, lots: [],
     }));
 
     render(<GroceriesClient {...props} items={many} view="stock" />);
@@ -100,4 +100,16 @@ it("retains the selected workspace in both view links", () => {
   for (const [label, view] of [["Shopping list", "buy"], ["Pantry", "stock"]]) {
     expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", `/groceries?view=${view}&workspace=${props.workspaceId}`);
   }
+});
+
+it("shopping ignores a pantry category filter and shows no category controls", () => {
+  const many = Array.from({ length: 20 }, (_, i): GroceryItem => ({
+    ...props.items[0], id: `m${i}`, name: `Product ${i}`, category: i < 3 ? "dairy" : "pantry", needed: true,
+  }));
+  const { rerender } = render(<GroceriesClient {...props} items={many} view="stock" />);
+  fireEvent.click(screen.getByRole("button", { name: /dairy/i }));
+  rerender(<GroceriesClient {...props} items={many} view="buy" />);
+  expect(screen.queryByRole("group", { name: /filter/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole("combobox", { name: "Category" })).not.toBeInTheDocument();
+  expect(screen.getAllByText(/^Product /)).toHaveLength(20);
 });

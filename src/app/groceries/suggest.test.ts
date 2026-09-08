@@ -11,6 +11,7 @@ const item = (name: string, timesAdded: number): GroceryItem => ({
   expiresOn: null,
   expiryIsEstimate: false,
   timesAdded,
+  lots: [],
 });
 
 const items = [item("Oat milk", 12), item("Oats, rolled", 3), item("Olive oil", 7), item("Rice", 1)];

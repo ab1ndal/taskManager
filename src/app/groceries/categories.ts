@@ -41,7 +41,7 @@ export function categoryLabel(slug: string): string {
   return bySlug.get(slug)?.label ?? slug;
 }
 
-/** Sort position for the shopping view, which walks a store roughly in aisle order. */
+/** Stable position in the pantry category catalog. */
 export function categoryPosition(slug: string): number {
   return bySlug.get(slug)?.position ?? Number.MAX_SAFE_INTEGER;
 }

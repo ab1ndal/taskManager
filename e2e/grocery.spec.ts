@@ -36,6 +36,8 @@ test.describe("grocery list", () => {
 
     // Bought returns it to the pantry and takes it off the list.
     await page.getByRole("button", { name: new RegExp(`bought ${ITEM}`, "i") }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText(ITEM)).toBeHidden();
 
     // Finished, keeping it on the list.
@@ -107,14 +109,19 @@ test("edits pantry details and retains workspace between views", async ({ page }
   await page.getByRole("menuitem", { name: "Edit item" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Category").selectOption("dairy");
-  await dialog.getByLabel("Quantity").fill("3");
-  await dialog.getByLabel("Expiry date").fill("2020-01-01");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await row.locator("summary").click();
+  await row.getByRole("button", { name: "Edit batch" }).click();
+  await dialog.getByLabel("Quantity (optional)").fill("3");
+  await dialog.getByRole("combobox", { name: "Expiry", exact: true }).selectOption("date");
+  await dialog.getByLabel("Expiry date", { exact: true }).fill("2020-01-01");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
   await expect(row.getByText("3", { exact: true })).toBeVisible();
-  await expect(row.getByText("expired", { exact: true })).toBeVisible();
+  await expect(row.getByText("expired", { exact: true }).first()).toBeVisible();
   await row.getByRole("button", { name: "Still good" }).click();
-  await expect(row.getByText("expired", { exact: true })).toBeHidden();
+  await expect(row.getByText("expired", { exact: true })).toHaveCount(0);
   await row.getByRole("button", { name: "Need", exact: true }).click();
   await expect(row.getByRole("button", { name: "Need", exact: true })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("link", { name: "Shopping list", exact: true }).click();
@@ -125,4 +132,53 @@ test("edits pantry details and retains workspace between views", async ({ page }
   await page.getByRole("link", { name: "Pantry", exact: true }).click();
   await expect(page).toHaveURL(/view=stock&workspace=/);
   expect(new URL(page.url()).searchParams.get("workspace")).toBe(workspace);
+});
+
+test("keeps repeat purchases independent and clears only the expired batch", async ({ page }) => {
+  const name = "E2E Milk batches";
+  await page.goto("/groceries?view=buy");
+  await expect(page.getByRole("combobox", { name: "Category" })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Add an item" }).fill(name);
+  await page.getByRole("textbox", { name: "Add an item" }).press("Enter");
+  await page.getByRole("button", { name: `Bought ${name}` }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Quantity (optional)").fill("2");
+  await dialog.getByRole("combobox", { name: "Expiry", exact: true }).selectOption("date");
+  await dialog.getByLabel("Expiry date", { exact: true }).fill("2020-01-01");
+  await dialog.getByRole("button", { name: "Save and add another batch" }).click();
+  await expect(dialog.getByRole("status")).toContainText("Batch saved");
+  // The shopping row disappears after purchase, but the dialog must remain mounted.
+  await dialog.getByLabel("Quantity (optional)").fill("3");
+  await dialog.getByRole("combobox", { name: "Expiry", exact: true }).selectOption("date");
+  await dialog.getByLabel("Expiry date", { exact: true }).fill("2100-01-01");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole("link", { name: "Pantry", exact: true }).click();
+  const row = page.locator("li").filter({ has: page.getByRole("button", { name: `Actions for ${name}` }) });
+  await expect(row.getByText("5", { exact: true })).toBeVisible();
+  await row.locator("summary").click();
+  await expect(row.locator("[data-lot-id]")).toHaveCount(2);
+  await expect(row.getByText("2020-01-01", { exact: true })).toBeVisible();
+  await expect(row.getByText("2100-01-01", { exact: true })).toBeVisible();
+  const sweep = page.getByRole("region", { name: "Expired batches" });
+  await expect(sweep.getByText(name, { exact: true })).toBeVisible();
+  const tooSmall = await page.locator('button, input, select, summary').evaluateAll((els) => els
+    .filter((el) => el.getClientRects().length > 0 && el.getBoundingClientRect().height < 44)
+    .map((el) => ({ text: el.textContent, height: el.getBoundingClientRect().height })));
+  expect(tooSmall).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await sweep.getByRole("button", { name: "Gone", exact: true }).click();
+  await expect(sweep).toBeHidden();
+  await expect(row.locator("[data-lot-id]")).toHaveCount(1);
+  await expect(row.getByText("3", { exact: true })).toBeVisible();
+  await expect(row.getByRole("button", { name: "Need", exact: true })).toHaveAttribute("aria-pressed", "false");
+  // A later trip with no date must preserve the remaining printed date and make the total unknown.
+  await row.getByRole("button", { name: /actions/i }).click();
+  await page.getByRole("menuitem", { name: "Record purchase" }).click();
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(row.locator("[data-lot-id]")).toHaveCount(2);
+  await expect(row.getByRole("button", { name: /one fewer/i })).toHaveCount(0);
+  await expect(row.getByText("Quantity unknown")).toBeVisible();
+  await expect(row.getByText("2100-01-01", { exact: true }).last()).toBeVisible();
 });

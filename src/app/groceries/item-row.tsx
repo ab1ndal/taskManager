@@ -7,9 +7,11 @@ import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { RowMenu } from "@/components/row-menu";
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR, type ActionResult } from "@/app/tasks/action-result";
-import { adjustQuantity, extendExpiry, finishItem, forgetItem, markBought, setNeeded } from "./actions";
-import { addDays, categoryLabel, shelfLifeDays } from "./categories";
+import { adjustQuantity, finishItem, forgetItem, setNeeded } from "./actions";
+import { categoryLabel } from "./categories";
 import { isExpired } from "./sort";
+import { LotRow } from "./lot-row";
+import { LotDialog } from "./lot-dialog";
 import { EditItemDialog } from "./edit-item-dialog";
 import type { GroceryItem } from "./types";
 
@@ -70,9 +72,11 @@ function ExpiryLine({ item, today }: { item: GroceryItem; today: string }) {
 export function PantryRow({ item, today }: { item: GroceryItem; today: string }) {
   const { pending, call } = useActionCall();
   const [editing, setEditing] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   return (
-    <li className="flex items-center gap-3 min-h-11 px-3 py-2 border-b border-[var(--color-border)]">
+    <li className="px-3 py-2 border-b border-[var(--color-border)]">
+      <div className="flex items-center gap-3 min-h-11">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-medium break-words text-[var(--color-text-primary)]">
@@ -82,31 +86,6 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           <ExpiryLine item={item} today={today} />
-          {item.expiresOn !== null && isExpired(item.expiresOn, today) && (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() =>
-                call(() =>
-                  // extendExpiry, not editItem: editItem's schema makes name, category and
-                  // quantity required, so this button used to write all three back from props up
-                  // to a foreground-refresh interval stale, reverting the other phone's concurrent
-                  // rename or count change (tasks/lessons.md L10).
-                  extendExpiry({
-                    itemId: item.id,
-                    // A flat week is wrong for most categories — frozen food pushed out by seven
-                    // days would read as expired again next week — so the nudge uses the
-                    // category's own shelf life, falling back to a week only when a category
-                    // carries none.
-                    expiresOn: addDays(today, shelfLifeDays(item.category) ?? 7),
-                  }),
-                )
-              }
-              className="min-h-11 text-2xs font-medium text-[var(--color-accent-text)]"
-            >
-              Still good
-            </button>
-          )}
           {item.quantity !== null && (
             <span className="flex items-center gap-1">
               <button
@@ -151,6 +130,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
       <RowMenu
         label={`Actions for ${item.name}`}
         items={[
+          { label: "Record purchase", onSelect: () => setPurchasing(true), icon: <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" /> },
           { label: "Edit item", onSelect: () => setEditing(true), icon: <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" /> },
           {
             label: "Finished — add to list",
@@ -170,12 +150,18 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
           },
         ]}
       />
+      </div>
+      <details>
+        <summary className="min-h-11 flex items-center cursor-pointer text-xs text-[var(--color-accent-text)]">{item.lots.length} {item.lots.length === 1 ? "batch" : "batches"} · View and edit</summary>
+        <ul>{item.lots.map((lot) => <LotRow key={lot.id} item={item} lot={lot} today={today} />)}</ul>
+      </details>
+      {purchasing && <LotDialog item={item} onClose={() => setPurchasing(false)} />}
       {editing && <EditItemDialog item={item} onClose={() => setEditing(false)} />}
     </li>
   );
 }
 
-export function ShoppingRow({ item }: { item: GroceryItem }) {
+export function ShoppingRow({ item, onPurchase }: { item: GroceryItem; onPurchase: (item: GroceryItem) => void }) {
   const { pending, call } = useActionCall();
   const [editing, setEditing] = useState(false);
 
@@ -187,7 +173,7 @@ export function ShoppingRow({ item }: { item: GroceryItem }) {
           type="button"
           aria-label={`Bought ${item.name}`}
           disabled={pending}
-          onClick={() => call(() => markBought({ itemId: item.id }))}
+          onClick={() => onPurchase(item)}
           className="flex-1 flex items-center gap-3 min-h-11 px-3 py-2 text-left"
         >
           <span className="shrink-0 inline-flex items-center justify-center size-6 rounded-full border border-[var(--color-control-idle)]">
@@ -198,7 +184,6 @@ export function ShoppingRow({ item }: { item: GroceryItem }) {
               <span className="text-sm font-medium break-words text-[var(--color-text-primary)]">
                 {item.name}
               </span>
-              <span className={CATEGORY_TAG}>{categoryLabel(item.category)}</span>
             </span>
             {/* What the shopper actually wants at the shelf: how much is already at home. */}
             {item.inStock && item.quantity !== null && (
@@ -227,7 +212,7 @@ export function ShoppingRow({ item }: { item: GroceryItem }) {
           ]}
         />
       </div>
-      {editing && <EditItemDialog item={item} onClose={() => setEditing(false)} />}
+      {editing && <EditItemDialog shopping item={item} onClose={() => setEditing(false)} />}
     </li>
   );
 }

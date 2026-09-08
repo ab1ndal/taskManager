@@ -1,4 +1,4 @@
-import { addGroceryItemSchema, adjustQuantitySchema, editItemSchema } from "./schemas";
+import { addGroceryItemSchema, adjustQuantitySchema, editLotSchema } from "./schemas";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 
@@ -50,10 +50,10 @@ describe("adjustQuantitySchema", () => {
   });
 });
 
-describe("editItemSchema", () => {
+describe("editLotSchema", () => {
   it("allows clearing the expiry with null", () => {
-    const parsed = editItemSchema.parse({
-      itemId: workspaceId, name: "Milk", category: "dairy", expiresOn: null, quantity: null,
+    const parsed = editLotSchema.parse({
+      lotId: workspaceId, expiresOn: null, quantity: null,
     });
     expect(parsed.expiresOn).toBeNull();
   });
