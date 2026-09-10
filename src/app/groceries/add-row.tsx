@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR } from "@/app/tasks/action-result";
-import { StockFields, type ExpiryMode } from "./stock-fields";
+import { type ExpiryMode } from "./stock-fields";
 import { addGroceryItem } from "./actions";
 import { GROCERY_CATEGORIES, isCategorySlug, type CategorySlug } from "./categories";
 import type { GroceryItem } from "./types";
@@ -84,7 +84,7 @@ export function AddRow({
           placeholder={target === "list" ? "Add to the list" : "Add to the pantry"}
           autoComplete="off"
           enterKeyHint="done"
-          className="flex-1 min-w-0 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
+          className="flex-[0.6] min-w-0 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
         />
         {target === "stock" && <select
           value={category ?? "pantry"}
@@ -92,15 +92,7 @@ export function AddRow({
             if (isCategorySlug(event.target.value)) setCategory(event.target.value);
           }}
           aria-label="Category"
-          // WebKit ignores min-height on a menulist select, so the height is explicit. See
-          // tasks/lessons.md.
-          // A native select renders at the width of its widest option ("Pantry & dry goods"),
-          // which alone overflows a 393px viewport once the input and Add button sit beside it.
-          // min-w-0 + shrink let it give up that intrinsic width; max-w-28 caps it at a size the
-          // 393px layout (the narrower of the two shipping phones) actually has room for, with the
-          // remainder going to the input. The selected label clips at that width — an accepted
-          // native-control limitation, not a bug.
-          className="h-11 min-w-0 shrink max-w-28 px-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm"
+          className="h-11 min-w-0 shrink max-w-48 px-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm"
         >
           {GROCERY_CATEGORIES.map((c) => (
             <option key={c.slug} value={c.slug}>
@@ -116,10 +108,28 @@ export function AddRow({
           Add
         </button>
         </div>
-        {target === "stock" && <details>
-          <summary className="min-h-11 flex items-center text-xs cursor-pointer">Purchase quantity and expiry</summary>
-          <StockFields quantity={quantity} setQuantity={setQuantity} date={date} setDate={setDate} mode={mode} setMode={setMode} />
-        </details>}
+        {target === "stock" && <>
+          <label className="block text-sm">Quantity (optional)
+            <input className="w-24 min-h-10 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base" type="number" inputMode="numeric" min={1} max={999} step={1}
+              value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+          </label>
+          <details>
+            <summary className="min-h-11 flex items-center text-xs cursor-pointer">Expiry details</summary>
+            <div className="space-y-3 min-w-0 pt-2">
+              <label className="block text-sm">Expiry
+                <select className="block w-full min-w-0 h-11 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base" value={mode} onChange={(e) => setMode(e.target.value as ExpiryMode)}>
+                  <option value="none">No expiry date</option>
+                  <option value="date">Enter expiry date</option>
+                  <option value="estimate">Estimate from pantry category</option>
+                </select>
+              </label>
+              {mode === "date" && <label className="block text-sm">Expiry date
+                <input className="block w-full min-w-0 h-11 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base" type="date" required min="2020-01-01" max="2100-01-01"
+                  value={date} onChange={(e) => setDate(e.target.value)} />
+              </label>}
+            </div>
+          </details>
+        </>}
       </form>
 
       {suggestions.length > 0 && (
