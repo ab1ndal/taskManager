@@ -24,6 +24,7 @@ export function NewTaskModal({
   onTaskError,
   initialWorkspaceId,
   boardColumnId,
+  nextSortKey,
 }: {
   open: boolean;
   onClose: () => void;
@@ -39,6 +40,13 @@ export function NewTaskModal({
    * it meaningless and the server would fall back to the leftmost column anyway.
    */
   boardColumnId?: string;
+  /**
+   * Sort key for the optimistic row, so it lands where the real one will. assign_task_member
+   * (migration 009) always appends at max(member_sort_key) + 1000 for the assignee, so the caller
+   * passes that same computed value. Falls back to 0 for a caller with no list to measure against
+   * (the board does not wire optimistic add at all today).
+   */
+  nextSortKey?: number;
 }) {
   const firstWorkspace = workspaces.find((w) => w.id === initialWorkspaceId) ?? workspaces[0];
   const getInitialMembers = (wsId: string) =>
@@ -154,7 +162,7 @@ export function NewTaskModal({
       due_at: input.dueAt ? `${input.dueAt}T00:00:00Z` : null,
       completed_at: null,
       workspace: { id: ws.id, name: ws.name, kind: ws.kind },
-      member_sort_key: 0,
+      member_sort_key: nextSortKey ?? 0,
       assignee_count: input.memberIds.length,
       member_ids: input.memberIds,
       subtasks: [],
@@ -162,13 +170,18 @@ export function NewTaskModal({
       recurrence,
     };
 
-    // Optimistic actions: fire callback, close modal, reset form, toast
-    onTaskCreated?.(optimisticTask);
+    // Close modal, reset form, toast — none of this needs to wait on the server.
     resetForm();
     onClose();
     toast("Task created");
 
     startTransition(async () => {
+      // `onTaskCreated` dispatches a React `useOptimistic` update in the parent. That dispatch has
+      // to happen inside the same transition as the awaited call below: useOptimistic discards an
+      // optimistic entry the instant its own transition settles, so firing it in a separate,
+      // synchronous transition (as before) would make the temp row vanish before the server ever
+      // responded, rather than staying until this transition — success or failure — concludes it.
+      onTaskCreated?.(optimisticTask);
       const result = await createTaskWithSubtasks(input);
 
       if (!result.ok) {

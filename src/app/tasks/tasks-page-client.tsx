@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useOptimistic, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
@@ -99,6 +99,18 @@ export function buildDragEndHandler({
   };
 }
 
+/** The one optimistic update this page renders ahead of the server: a temp row for a task being
+ *  added. (Checking a task complete/reopen is optimistic too, but flipped locally in TaskCard —
+ *  see its own useOptimistic — since that is purely the checkbox's own visual state.) */
+type OptimisticTaskAction = { type: "add"; task: RawTask };
+
+function applyOptimisticTaskAction(state: RawTask[], action: OptimisticTaskAction): RawTask[] {
+  switch (action.type) {
+    case "add":
+      return [...state, action.task];
+  }
+}
+
 function SidebarLink({
   href,
   icon,
@@ -145,8 +157,18 @@ export function TasksPageClient({
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [localTasks, setLocalTasks] = useState<RawTask[]>(initialTasks);
-  const [optimisticTaskIds, setOptimisticTaskIds] = useState<Set<string>>(new Set());
   const [editingTask, setEditingTask] = useState<RawTask | null>(null);
+
+  // `optimisticTasks` overlays a temp row for a task being added on top of `localTasks`. React
+  // drops the dispatched entry the moment the transition that dispatched it settles — success or
+  // failure — unless `localTasks` itself was updated to match by then, which is exactly the
+  // rollback/reconcile behaviour the add needs: a failure reverts on its own, and a success is
+  // reconciled by the revalidation-driven `localTasks` update below landing before (or as) the
+  // transition ends.
+  const [optimisticTasks, dispatchOptimisticTask] = useOptimistic(
+    localTasks,
+    applyOptimisticTaskAction
+  );
 
   // Server data is the source of truth: once a revalidation delivers a new list, the optimistic
   // overlay is dropped. Adjusting during render rather than in an effect avoids the extra pass that
@@ -155,30 +177,34 @@ export function TasksPageClient({
   if (syncedFrom !== initialTasks) {
     setSyncedFrom(initialTasks);
     setLocalTasks(initialTasks);
-    setOptimisticTaskIds(new Set());
   }
 
   const hasWorkspace = workspaces.length > 0;
 
   function handleTaskCreated(task: RawTask) {
-    setLocalTasks((prev) => [...prev, task]);
-    setOptimisticTaskIds((prev) => new Set([...prev, task.id]));
-  }
-
-  function handleTaskError(taskId: string) {
-    setLocalTasks((prev) => prev.filter((t) => t.id !== taskId));
-    setOptimisticTaskIds((prev) => {
-      const next = new Set(prev);
-      next.delete(taskId);
-      return next;
-    });
+    dispatchOptimisticTask({ type: "add", task });
   }
 
   function handleReorderError(message: string) {
     toast(message, "error");
   }
 
-  const filtered = localTasks.filter((t) => {
+  // A task only exists in `optimisticTasks` and not yet in `localTasks` while its add is still in
+  // flight — the same distinction `optimisticTaskIds` used to track by hand.
+  function isOptimistic(taskId: string): boolean {
+    return !localTasks.some((t) => t.id === taskId);
+  }
+
+  // assign_task_member (migration 009) appends a new assignment at max(member_sort_key) + 1000, so
+  // the optimistic row's key is computed the same way here — off `optimisticTasks` rather than
+  // `localTasks`, so a second add started before the first one's revalidation lands still appends
+  // after it instead of colliding on the same key.
+  const nextSortKey =
+    optimisticTasks.length > 0
+      ? Math.max(...optimisticTasks.map((t) => t.member_sort_key)) + 1000
+      : 0;
+
+  const filtered = optimisticTasks.filter((t) => {
     if (workspaceFilter && t.workspace.kind !== workspaceFilter) return false;
     if (viewFilter === "shared" && t.assignee_count <= 1) return false;
     return true;
@@ -189,7 +215,7 @@ export function TasksPageClient({
   // `hasAnyTasks` is computed from the *filtered* list, so an empty "Shared" tab used to render the
   // same "No tasks yet. Add one to get started." as a genuinely empty account. Distinguish them.
   const isFiltered = Boolean(workspaceFilter || viewFilter);
-  const emptyVariant = !hasAnyTasks && isFiltered && localTasks.length > 0 ? "no-matches" : "no-tasks";
+  const emptyVariant = !hasAnyTasks && isFiltered && optimisticTasks.length > 0 ? "no-matches" : "no-tasks";
 
   return (
     <>
@@ -223,7 +249,7 @@ export function TasksPageClient({
         workspaces={workspaces}
         currentMemberIds={currentMemberIds}
         onTaskCreated={handleTaskCreated}
-        onTaskError={handleTaskError}
+        nextSortKey={nextSortKey}
       />
 
       {editingTask && (
@@ -358,7 +384,7 @@ export function TasksPageClient({
                                 key={task.id}
                                 draggableId={task.id}
                                 index={index}
-                                isDragDisabled={optimisticTaskIds.has(task.id)}
+                                isDragDisabled={isOptimistic(task.id)}
                                 // The drag handle is a real <button> (needed for its own
                                 // aria-label/44px hit target), and the library refuses to start a
                                 // drag from any native interactive element (button/input/etc)
@@ -371,7 +397,7 @@ export function TasksPageClient({
                                   <div
                                     ref={dragProvided.innerRef}
                                     {...dragProvided.draggableProps}
-                                    className={optimisticTaskIds.has(task.id) ? "opacity-40" : undefined}
+                                    className={isOptimistic(task.id) ? "opacity-40" : undefined}
                                   >
                                     <TaskCard
                                       taskId={task.id}

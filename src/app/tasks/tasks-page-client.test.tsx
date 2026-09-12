@@ -135,7 +135,10 @@ describe("TasksPageClient — optimistic insert (handleTaskCreated)", () => {
     expect(screen.getByTestId("mock-modal")).toHaveAttribute("data-on-task-created", "wired");
   });
 
-  it("wires onTaskError prop to NewTaskModal", () => {
+  // onTaskError is no longer wired: the add now dispatches through React's useOptimistic, which
+  // reverts a temp row on its own once the transition that added it settles without a matching
+  // base-state update — there is nothing left for a manual error callback to undo.
+  it("does not wire onTaskError to NewTaskModal", () => {
     render(
       <TasksPageClient
         workspaces={workspaces}
@@ -144,7 +147,7 @@ describe("TasksPageClient — optimistic insert (handleTaskCreated)", () => {
         initialTasks={[]}
       />
     );
-    expect(screen.getByTestId("mock-modal")).toHaveAttribute("data-on-task-error", "wired");
+    expect(screen.getByTestId("mock-modal")).toHaveAttribute("data-on-task-error", "missing");
   });
 });
 
