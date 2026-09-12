@@ -1,13 +1,14 @@
 jest.mock("@/app/tasks/actions", () => ({
   completeTask: jest.fn(),
+  reopenTask: jest.fn(),
   deleteTask: jest.fn(),
 }));
 
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
 import { axe } from "jest-axe";
-import { completeTask, deleteTask } from "@/app/tasks/actions";
+import { completeTask, deleteTask, reopenTask } from "@/app/tasks/actions";
 import { toast } from "@/components/toaster";
 import { TaskCard, DeadlineBadge, EmptyState } from "../task-card";
 
@@ -208,6 +209,77 @@ describe("TaskCard — mutation failures", () => {
     await waitFor(() =>
       expect(toast).toHaveBeenCalledWith("Something went wrong. Please try again.", "error")
     );
+  });
+});
+
+describe("TaskCard — optimistic complete/reopen", () => {
+  const baseProps = {
+    taskId: "c0000000-0000-4000-8000-000000000001",
+    title: "Buy groceries",
+    workspace: "Household",
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it("flips the checkbox to completed immediately, before the server responds", async () => {
+    let resolveServer!: (v: { ok: boolean; error?: string }) => void;
+    (completeTask as jest.Mock).mockReturnValue(
+      new Promise((res) => {
+        resolveServer = res;
+      })
+    );
+    render(<TaskCard {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: 'Mark "Buy groceries" complete' }));
+
+    // The button already reads as completed even though completeTask has not resolved yet.
+    expect(screen.getByRole("button", { name: 'Reopen "Buy groceries"' })).toBeInTheDocument();
+    await act(async () => {
+      resolveServer({ ok: true });
+    });
+  });
+
+  it("reverts the checkbox to incomplete when completing is rejected by the server", async () => {
+    (completeTask as jest.Mock).mockResolvedValue({ ok: false, error: "Forbidden: not assigned" });
+    render(<TaskCard {...baseProps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: 'Mark "Buy groceries" complete' }));
+    expect(screen.getByRole("button", { name: 'Reopen "Buy groceries"' })).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: 'Mark "Buy groceries" complete' })).toBeInTheDocument()
+    );
+    expect(toast).toHaveBeenCalledWith("Forbidden: not assigned", "error");
+  });
+
+  it("flips a completed card back to open immediately when reopened, before the server responds", async () => {
+    let resolveServer!: (v: { ok: boolean; error?: string }) => void;
+    (reopenTask as jest.Mock).mockReturnValue(
+      new Promise((res) => {
+        resolveServer = res;
+      })
+    );
+    render(<TaskCard {...baseProps} completed />);
+
+    fireEvent.click(screen.getByRole("button", { name: 'Reopen "Buy groceries"' }));
+
+    expect(screen.getByRole("button", { name: 'Mark "Buy groceries" complete' })).toBeInTheDocument();
+    await act(async () => {
+      resolveServer({ ok: true });
+    });
+  });
+
+  it("reverts a card back to completed when reopening is rejected by the server", async () => {
+    (reopenTask as jest.Mock).mockResolvedValue({ ok: false, error: "Forbidden: not assigned" });
+    render(<TaskCard {...baseProps} completed />);
+
+    fireEvent.click(screen.getByRole("button", { name: 'Reopen "Buy groceries"' }));
+    expect(screen.getByRole("button", { name: 'Mark "Buy groceries" complete' })).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: 'Reopen "Buy groceries"' })).toBeInTheDocument()
+    );
+    expect(toast).toHaveBeenCalledWith("Forbidden: not assigned", "error");
   });
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { Circle, CircleCheck, GripVertical, Pencil, Repeat, RotateCcw, Trash2 } from "lucide-react";
 import { completeTask, deleteTask, reopenTask } from "@/app/tasks/actions";
 import { ICON_PRIMARY, ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
@@ -74,6 +74,26 @@ export function TaskCard({
     });
   }
 
+  // The checkbox flips the instant it's pressed; completeTask/reopenTask confirm in the background.
+  // useOptimistic reverts this on its own once the transition that dispatched it settles — success
+  // or failure alike — unless the `completed` prop itself has by then changed to match (a
+  // revalidation-driven re-render from the parent), so a rejected mutation needs no manual rollback,
+  // just the error toast.
+  const [optimisticCompleted, setOptimisticCompleted] = useOptimistic(completed ?? false);
+
+  function toggleComplete() {
+    const next = !optimisticCompleted;
+    startTransition(async () => {
+      setOptimisticCompleted(next);
+      // Completing a parent completes its open subtasks server-side, so an open subtask is no
+      // longer a reason to block this.
+      const result = next ? await completeTask(taskId) : await reopenTask(taskId);
+      if (!result.ok) {
+        toast(result.error ?? (next ? "Failed to complete task" : "Failed to reopen task"), "error");
+      }
+    });
+  }
+
   /**
    * The row is the task, so pressing it opens the task — a two-step menu-first gesture to read
    * something is unusual for a list. One guard rather than a `stopPropagation` on every control:
@@ -120,16 +140,11 @@ export function TaskCard({
           mistake, or one whose work came back, had no way out of the completed section at all.
         */}
         <button
-          onClick={() => {
-            // Completing a parent completes its open subtasks server-side, so an open subtask is no
-            // longer a reason to block the button.
-            if (completed) runAction(() => reopenTask(taskId), "Failed to reopen task");
-            else runAction(() => completeTask(taskId), "Failed to complete task");
-          }}
-          aria-label={completed ? `Reopen "${title}"` : `Mark "${title}" complete`}
+          onClick={toggleComplete}
+          aria-label={optimisticCompleted ? `Reopen "${title}"` : `Mark "${title}" complete`}
           className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
         >
-          {completed ? (
+          {optimisticCompleted ? (
             <CircleCheck
               size={ICON_PRIMARY}
               strokeWidth={ICON_STROKE}
@@ -154,7 +169,7 @@ export function TaskCard({
             an ellipsis — there is no hover on touch to reveal the rest. The clamp stays above `sm`,
             where the row competes with two more controls.
           */}
-          <p className={`text-sm font-medium line-clamp-none sm:line-clamp-2 ${completed ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
+          <p className={`text-sm font-medium line-clamp-none sm:line-clamp-2 ${optimisticCompleted ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
             {title}
           </p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -186,7 +201,7 @@ export function TaskCard({
           hovered or something inside it takes focus — so four grey glyphs stop competing with the
           task title while remaining tappable and visible to a keyboard user the moment they arrive.
         */}
-        {!completed && onEdit && (
+        {!optimisticCompleted && onEdit && (
           <button
             onClick={onEdit}
             aria-label={`Edit "${title}"`}
@@ -213,7 +228,7 @@ export function TaskCard({
           <RowMenu
             label={`More actions for "${title}"`}
             items={[
-              ...(!completed && onEdit
+              ...(!optimisticCompleted && onEdit
                 ? [
                     {
                       label: "Edit",
@@ -222,11 +237,11 @@ export function TaskCard({
                     },
                   ]
                 : []),
-              ...(completed
+              ...(optimisticCompleted
                 ? [
                     {
                       label: "Reopen",
-                      onSelect: () => runAction(() => reopenTask(taskId), "Failed to reopen task"),
+                      onSelect: toggleComplete,
                       icon: <RotateCcw size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />,
                     },
                   ]
