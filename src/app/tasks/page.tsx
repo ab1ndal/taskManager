@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import type { RawTask } from "./bucket-tasks";
 import { TasksPageClient } from "./tasks-page-client";
 import { toLocalInputValue } from "./recurrence-time";
@@ -15,7 +15,12 @@ export default async function TasksPage({
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+    error: userError,
+  } = await getUser();
+
+  if (userError) {
+    console.error("tasks: supabase.auth.getUser failed", { error: userError.message });
+  }
 
   // Every query below runs on the user-scoped client, so RLS is what decides what comes back. The
   // explicit id filters are for shaping the result, not for access control — migration 007 made the

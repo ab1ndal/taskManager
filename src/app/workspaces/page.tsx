@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { WorkspacesClient } from "./workspaces-client";
 
 type WorkspaceRow = {
@@ -41,7 +41,12 @@ export default async function WorkspacesPage() {
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+    error: userError,
+  } = await getUser();
+
+  if (userError) {
+    console.error("workspaces: supabase.auth.getUser failed", { error: userError.message });
+  }
 
   const { data: userMembers } = user
     ? await supabase.from("workspace_members").select("workspace_id").eq("auth_user_id", user.id)

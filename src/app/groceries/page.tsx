@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { isCategorySlug, localToday, type CategorySlug } from "./categories";
 import { GroceriesClient } from "./groceries-client";
 import { deriveLots } from "./lots";
@@ -34,7 +34,12 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+    error: userError,
+  } = await getUser();
+
+  if (userError) {
+    console.error("groceries: supabase.auth.getUser failed", { error: userError.message });
+  }
 
   // RLS decides what comes back; the filters below shape the result rather than protect it.
   const { data: members, error: membersError } = user

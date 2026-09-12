@@ -2,9 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
-import { createClient } from "@/lib/supabase/server";
+import { getUser } from "@/lib/supabase/server";
 import { NavLinks } from "@/components/nav-links";
 import { NavUser } from "@/components/nav-user";
 import { Toaster } from "@/components/toaster";
@@ -39,10 +41,25 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+    error,
+  } = await getUser();
+
+  if (error) {
+    console.error("layout: supabase.auth.getUser failed", { error: error.message });
+  }
+
+  // proxy.ts already redirects a signed-out visitor away from every route except /login and
+  // /auth/*, so this only fires when its check and this one disagree (flaky connectivity — see
+  // docs/ios.md). /login itself has no user by design and must not be redirected to itself; the
+  // pathname comes from the `x-pathname` header proxy.ts forwards, since a layout has no other way
+  // to read the current route.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  if (!user && !isAuthRoute) {
+    redirect("/login");
+  }
 
   return (
     <html lang="en">
