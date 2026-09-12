@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/browser";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -8,12 +9,15 @@ import { Avatar } from "@/components/avatar";
 
 export function NavUser({ name, email }: { name: string; email: string }) {
   const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   async function handleLogout() {
+    setSigningOut(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast(error.message, "error");
+      setSigningOut(false);
     } else {
       toast("Signed out");
       router.push("/login");
@@ -43,9 +47,10 @@ export function NavUser({ name, email }: { name: string; email: string }) {
       </Link>
       <button
         onClick={handleLogout}
-        className="inline-flex items-center min-h-11 whitespace-nowrap text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+        disabled={signingOut}
+        className="inline-flex items-center min-h-11 whitespace-nowrap text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors disabled:opacity-50 disabled:pointer-events-none"
       >
-        Sign out
+        {signingOut ? "Signing out…" : "Sign out"}
       </button>
     </div>
   );
