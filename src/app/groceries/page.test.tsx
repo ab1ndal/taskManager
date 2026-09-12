@@ -1,8 +1,11 @@
 import GroceriesPage from "./page";
 
 const query = { select: jest.fn(), eq: jest.fn(), in: jest.fn() };
-const client = { auth: { getUser: async () => ({ data: { user: { id: "user" } } }) }, from: jest.fn(() => query) };
-jest.mock("@/lib/supabase/server", () => ({ createClient: async () => client }));
+const client = { auth: { getUser: async () => ({ data: { user: { id: "user" } }, error: null }) }, from: jest.fn(() => query) };
+jest.mock("@/lib/supabase/server", () => ({
+  createClient: async () => client,
+  getUser: async () => client.auth.getUser(),
+}));
 jest.mock("next/navigation", () => ({ redirect: jest.fn((url: string) => { throw new Error(url); }) }));
 jest.mock("./groceries-client", () => ({ GroceriesClient: () => null }));
 

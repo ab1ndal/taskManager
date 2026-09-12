@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getUser } from "@/lib/supabase/server";
 import { BoardClient } from "./board-client";
 import type { BoardColumn, BoardTask } from "./group-columns";
 import type { Tab20Slug } from "./colors";
@@ -12,7 +12,12 @@ export default async function BoardPage({ searchParams }: { searchParams: Search
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+    error: userError,
+  } = await getUser();
+
+  if (userError) {
+    console.error("board: supabase.auth.getUser failed", { error: userError.message });
+  }
 
   // Every query below runs on the user-scoped client, so RLS is what decides what comes back. The
   // id filters shape the result rather than guard it — same posture as /tasks.
