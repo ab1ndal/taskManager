@@ -7,6 +7,7 @@ import { GENERIC_ERROR } from "@/app/tasks/action-result";
 import { StockFields, type ExpiryMode } from "./stock-fields";
 import { addGroceryItem } from "./actions";
 import { GROCERY_CATEGORIES, isCategorySlug, type CategorySlug } from "./categories";
+import { DictateSheet } from "./dictate-sheet";
 import type { GroceryItem } from "./types";
 import { suggestNames } from "./suggest";
 
@@ -140,6 +141,10 @@ export function AddRow({
           ))}
         </ul>
       )}
+
+      <div className="mt-2">
+        <DictateSheet workspaceId={workspaceId} target={target} />
+      </div>
     </div>
   );
 }
