@@ -4,6 +4,10 @@ import { AddRow } from "./add-row";
 import type { GroceryItem } from "./types";
 
 jest.mock("./actions", () => ({ addGroceryItem: jest.fn(async () => ({ ok: true, itemId: "g9" })) }));
+// AddRow mounts DictateSheet, which imports dictate-actions.ts, which imports the "ai" package —
+// an ESM-only build jest cannot transform. Mocking the boundary these tests actually cross (same
+// pattern as "./actions" above) avoids pulling that dependency in at all.
+jest.mock("./dictate-actions", () => ({ parseGroceryDictation: jest.fn() }));
 
 // Same pattern as new-task-modal.test.tsx / edit-task-modal.test.tsx: a bare jest.fn() spy, so a
 // toast call can be asserted without mounting the real Toaster.

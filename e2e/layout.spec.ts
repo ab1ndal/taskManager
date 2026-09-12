@@ -115,6 +115,20 @@ test("controls on the grocery pantry meet the 44px touch minimum", async ({ page
   expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
 });
 
+// The parsed-review row is not exercised here: it only appears after a real LLM call, and this
+// suite must stay deterministic without one. The entry point and its open textarea are the part
+// that renders unconditionally, so that is what gets the 44px/no-horizontal-scroll check.
+test("controls in the grocery dictate entry point meet the 44px touch minimum", async ({ page }) => {
+  await page.goto("/groceries?view=stock");
+  await page.getByRole("button", { name: "Dictate items" }).click();
+  await expect(page.getByRole("textbox", { name: "Dictated grocery list" })).toBeVisible();
+
+  const undersized = await undersizedControls(page);
+
+  expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
+  expect(await hasHorizontalOverflow(page)).toBe(false);
+});
+
 test("controls inside the grocery edit dialog meet the 44px touch minimum", async ({ page }) => {
   // The dialog only exists over a real row, so this seeds one. The `E2E ` prefix is what the
   // scoped teardown collects (tasks/lessons.md L14): the dev project is shared with everyday
