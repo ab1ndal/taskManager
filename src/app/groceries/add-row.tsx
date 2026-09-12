@@ -76,7 +76,6 @@ export function AddRow({
         }}
         className="space-y-2"
       >
-        <div className="flex items-center gap-2">
         <input
           ref={inputRef}
           value={name}
@@ -85,15 +84,16 @@ export function AddRow({
           placeholder={target === "list" ? "Add to the list" : "Add to the pantry"}
           autoComplete="off"
           enterKeyHint="done"
-          className="flex-[0.6] min-w-0 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
+          className="block w-full min-w-0 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
         />
+        <div className="flex items-center gap-2">
         {target === "stock" && <select
           value={category ?? "pantry"}
           onChange={(event) => {
             if (isCategorySlug(event.target.value)) setCategory(event.target.value);
           }}
           aria-label="Category"
-          className="h-11 min-w-0 shrink max-w-48 px-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm"
+          className="h-11 min-w-0 flex-1 max-w-48 px-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm"
         >
           {GROCERY_CATEGORIES.map((c) => (
             <option key={c.slug} value={c.slug}>
