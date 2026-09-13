@@ -9,6 +9,7 @@ const generateObject = jest.fn();
 jest.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => fake }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: async () => fake }));
 jest.mock("ai", () => ({ generateObject: (...args: unknown[]) => generateObject(...args) }));
+jest.mock("@ai-sdk/anthropic", () => ({ anthropic: (model: string) => model }));
 
 import * as dictateActions from "./dictate-actions";
 

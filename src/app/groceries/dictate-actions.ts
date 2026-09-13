@@ -1,6 +1,7 @@
 "use server";
 
 import { generateObject } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
 
 import { assertWorkspaceMember, requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/app/tasks/action-result";
@@ -18,11 +19,11 @@ import {
 /**
  * Turns one dictated transcript into structured, reviewable grocery rows.
  *
- * Routed through the Vercel AI Gateway with a plain "provider/model" string (per the AI SDK skill)
- * rather than a provider-specific package — nothing else in the repo calls an LLM yet, so there was
- * no existing pattern to match. Haiku is picked over Sonnet/Opus: this is short-text structured
- * extraction, not reasoning, and the review screen is the safety net for a wrong guess, not this
- * model call.
+ * Calls Anthropic directly via `@ai-sdk/anthropic` (ANTHROPIC_API_KEY) — the Vercel AI Gateway's
+ * free-tier routing rejected this model with a 403 (`no_providers_available`), so this bypasses
+ * the gateway rather than working around a billing restriction. Haiku is picked over Sonnet/Opus:
+ * this is short-text structured extraction, not reasoning, and the review screen is the safety net
+ * for a wrong guess, not this model call.
  *
  * Parsing never writes anything — the caller commits each accepted row through the existing
  * `addGroceryItem` action (actions.ts), so there is exactly one insert path for a grocery item
@@ -37,7 +38,7 @@ export async function parseGroceryDictation(
     await assertWorkspaceMember(workspaceId, user.id);
 
     const { object } = await generateObject({
-      model: "anthropic/claude-haiku-4.5",
+      model: anthropic("claude-haiku-4-5-20251001"),
       schema: rawDictatedItemSchema,
       output: "array",
       schemaName: "GroceryDictationItems",
