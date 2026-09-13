@@ -27,9 +27,15 @@ async function flushAsyncEnd() {
 
 describe("useSpeechRecognition", () => {
   const originalSR = (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
+  const originalUserAgent = navigator.userAgent;
+  const originalStandalone = (navigator as unknown as { standalone?: boolean }).standalone;
+  const originalMatchMedia = window.matchMedia;
 
   afterEach(() => {
     (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition = originalSR;
+    Object.defineProperty(navigator, "userAgent", { value: originalUserAgent, configurable: true });
+    (navigator as unknown as { standalone?: boolean }).standalone = originalStandalone;
+    window.matchMedia = originalMatchMedia;
   });
 
   it("reports unsupported when no SpeechRecognition constructor exists", () => {
@@ -273,5 +279,89 @@ describe("useSpeechRecognition", () => {
     // Assert the second instance's state is undisturbed.
     expect(instances[1]!.start).not.toHaveBeenCalled();
     expect(result.current.isListening).toBe(true);
+  });
+
+  it("reports unsupported on an iOS home-screen install, even though the constructor exists", () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(
+      () => new MockSpeechRecognition()
+    );
+    Object.defineProperty(navigator, "userAgent", {
+      value:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Mobile/15E148 Safari/604.1",
+      configurable: true,
+    });
+    window.matchMedia = jest.fn().mockReturnValue({ matches: true }) as unknown as typeof window.matchMedia;
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+
+    expect(result.current.isSupported).toBe(false);
+  });
+
+  it("reports supported for the same iOS UA in an ordinary Safari tab (not standalone)", () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(
+      () => new MockSpeechRecognition()
+    );
+    Object.defineProperty(navigator, "userAgent", {
+      value:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Mobile/15E148 Safari/604.1",
+      configurable: true,
+    });
+    window.matchMedia = jest.fn().mockReturnValue({ matches: false }) as unknown as typeof window.matchMedia;
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+
+    expect(result.current.isSupported).toBe(true);
+  });
+
+  it("stops retrying and surfaces an error after onend loops without ever producing a result", () => {
+    let instance: MockSpeechRecognition | null = null;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instance = new MockSpeechRecognition();
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+    act(() => result.current.start());
+    instance!.start.mockClear();
+
+    // A recognizer that ends the instant it starts, over and over — the failure mode a broken
+    // platform produces, with no silence gap between attempts.
+    for (let i = 0; i < 6; i++) {
+      act(() => instance!.onend?.());
+    }
+
+    expect(instance!.start.mock.calls.length).toBeLessThanOrEqual(5);
+    expect(result.current.isListening).toBe(false);
+    expect(result.current.error).toBe("Speech recognition stopped responding — try typing instead");
+
+    // And it must actually have stopped retrying, not just be slow — one more onend changes nothing.
+    instance!.start.mockClear();
+    act(() => instance!.onend?.());
+    expect(instance!.start).not.toHaveBeenCalled();
+  });
+
+  it("does not count a genuine result-producing session's restarts toward the rapid-loop cap", () => {
+    let instance: MockSpeechRecognition | null = null;
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = jest.fn(() => {
+      instance = new MockSpeechRecognition();
+      return instance;
+    });
+
+    const { result } = renderHook(() => useSpeechRecognition(() => {}));
+    act(() => result.current.start());
+
+    // Six silence-restart cycles, each one preceded by a real result — the ordinary long-dictation
+    // case, which must not trip the loop guard.
+    for (let i = 0; i < 6; i++) {
+      act(() => {
+        instance!.onresult?.({
+          results: [[{ transcript: "hello" }]].map((r) => Object.assign(r, { isFinal: true, 0: r[0] })),
+        });
+      });
+      act(() => instance!.onend?.());
+    }
+
+    expect(result.current.isListening).toBe(true);
+    expect(result.current.error).toBeNull();
   });
 });

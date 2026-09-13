@@ -72,6 +72,13 @@ The push handler deliberately does not prefetch task data. WebKit revokes a push
 the `userVisibleOnly` promise is broken, the service worker has no Supabase session, and the payoff
 would be a few seconds of freshness at the cost of losing push entirely.
 
+`webkitSpeechRecognition` exists as a constructor once the app is installed to the Home Screen, but
+does not actually work there — `start()` ends the session almost immediately with no real listening.
+It works fine in an ordinary Safari tab; only the standalone install is affected.
+`use-speech-recognition.ts` detects iOS + standalone display mode and reports unsupported, which
+hides the in-app mic button (`DictationTextarea`, `dictate-sheet.tsx`) rather than hanging in a tight
+restart loop. The iOS keyboard's own dictation still works on any focused text field regardless.
+
 ## Screen sizes
 
 The two target phones are 393px (iPhone 14 Pro) and 402px (iPhone 16 Pro) wide, and both are
