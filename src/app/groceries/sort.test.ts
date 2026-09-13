@@ -1,4 +1,4 @@
-import { isExpired, sortPantry, sortShopping } from "./sort";
+import { groupByCategory, isExpired, sortPantry, sortShopping } from "./sort";
 
 const item = (name: string, category: string, expiresOn: string | null = null) => ({
   name,
@@ -66,6 +66,31 @@ describe("isExpired", () => {
 
   it("is false with no date", () => {
     expect(isExpired(null, "2026-09-06")).toBe(false);
+  });
+});
+
+describe("groupByCategory", () => {
+  it("groups items in category order, alphabetical within each group", () => {
+    const grouped = groupByCategory([
+      item("Rice", "pantry"),
+      item("Spinach", "produce"),
+      item("Milk", "dairy"),
+      item("Apples", "produce"),
+    ]);
+    expect(grouped.map((g) => [g.category, g.items.map((i) => i.name)])).toEqual([
+      ["produce", ["Apples", "Spinach"]],
+      ["dairy", ["Milk"]],
+      ["pantry", ["Rice"]],
+    ]);
+  });
+
+  it("omits categories with no items", () => {
+    const grouped = groupByCategory([item("Rice", "pantry")]);
+    expect(grouped.map((g) => g.category)).toEqual(["pantry"]);
+  });
+
+  it("returns an empty list for no items", () => {
+    expect(groupByCategory([])).toEqual([]);
   });
 });
 

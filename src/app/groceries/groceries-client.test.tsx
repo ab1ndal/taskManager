@@ -97,6 +97,27 @@ describe("GroceriesClient", () => {
     render(<GroceriesClient {...props} items={[]} view="buy" />);
     expect(screen.getByText(/list is empty/i)).toBeInTheDocument();
   });
+
+  it("groups pantry items under category headers when sorted by name", () => {
+    render(<GroceriesClient {...props} view="stock" />);
+    fireEvent.click(screen.getByRole("button", { name: "By name" }));
+
+    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(["Produce", "Pantry & dry goods"]);
+    expect(screen.getByText("Rice")).toBeInTheDocument();
+  });
+
+  it("drops the category headers once a category filter narrows the list", () => {
+    const many: GroceryItem[] = Array.from({ length: 20 }, (_, i) => ({
+      ...props.items[0], id: `n${i}`, name: `Item ${String(i).padStart(2, "0")}`,
+      category: i < 3 ? "dairy" : "pantry",
+    }));
+    render(<GroceriesClient {...props} items={many} view="stock" />);
+    fireEvent.click(screen.getByRole("button", { name: "By name" }));
+    fireEvent.click(screen.getByRole("button", { name: /dairy/i }));
+
+    expect(screen.queryAllByRole("heading", { level: 3 })).toHaveLength(0);
+  });
 });
 
 it("retains the selected workspace in both view links", () => {
