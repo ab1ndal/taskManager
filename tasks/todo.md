@@ -1,53 +1,15 @@
 # Open work
 
-## Grocery pantry category fix & grouping UI — shipped 2026-09-12
+## Grocery: shopping list category mismatches (deferred)
 
-Production DB category fix (4 items → snacks) run by the user. `groupByCategory()` added to
-`sort.ts`, wired into `groceries-client.tsx`'s pantry "By name" view (category headers; "By expiry"
-and the shopping list stay flat). Tested and merged to main.
-
-Still open: 7 items on the shopping list have wrong categories (Broccoli/Bell Pepper→produce, Chick
+7 items on the shopping list have wrong categories (Broccoli/Bell Pepper→produce, Chick
 Patties→frozen, Bread→baked, shoes/lint roller/oil spray→household). Shopping list doesn't show or
-need categories today — the issue is upstream, on add — so this is deferred, not a regression from
-this change.
+need categories today — the issue is upstream, on add.
 
-## Grocery list — complete and merge-ready, not merged (2026-09-07)
-
-Branch `feat/grocery-list`, head `25efbc2`, based on `aacf10d`. **Nothing is merged and nothing is
-pushed.** All twelve plan tasks are complete and individually reviewed, and the whole-branch review
-found two Criticals that the per-task reviews structurally could not see; both are fixed at the
-server boundary and the fixes were re-reviewed clean.
-
-What the whole-branch review caught, worth remembering because both were silent data loss on the
-ordinary path:
-
-- Re-adding an item by **typing its name** rewrote its stored category to `pantry`, because the
-  upsert's conflict branch overwrote `category` unconditionally and the add row's selector defaults.
-  The column drives shelf-life estimates and list ordering, so the loss was permanent and invisible.
-- **Bought erased a user-entered expiry** for the five categories with no shelf life, because the
-  RPC could not distinguish "no date supplied" from "explicitly no expiry".
-
-Migration `029_grocery_expiry_and_category.sql` fixes both server-side, adds `grocery_extend_expiry`
-so the "Still good" nudge stops writing back stale columns, and re-issues its own grants.
-**Migrations 026-029 are applied to dev only** (`mcdpiuiayfljzvnhtqto`). Production
-(`xamdgvxziobpptcfymug`) has none of them and gets them through the `deploy-migrations` workflow on
-merge.
-
-### Verification baseline
-
-`npm test` is **61 suites / 775 tests**. Anything lower is a regression, not a new baseline.
-typecheck clean, lint 0 errors (1 pre-existing warning), build succeeds. Playwright per project:
-chromium 93, webkit 83, iphone 99, iphone-16-pro 87 — run **per project with `--workers=1`**, since
-the full five-project matrix does not fit in memory on this machine.
-
-Before any e2e run here: kill any stale `next start` on port 3100. `reuseExistingServer: true` will
-otherwise hand the suite a server whose `.next` was rebuilt underneath it, and every server action
-404s — it faked four grocery failures once already.
-
-### Follow-ups, none blocking merge
+## Grocery-list branch follow-ups, none blocking (from the 2026-09-08 merge)
 
 - [ ] `board.spec.ts:297` fails on `iphone-16-pro` on this machine and is **not** one of the two
-      previously known pre-existing failures. Unrelated to this branch; confirm on a machine that is
+      previously known pre-existing failures. Unrelated to grocery-list; confirm on a machine that is
       not under memory pressure.
 - [ ] `029_grocery_expiry_and_category.sql:26-28` — the comment claims more than shipped. A
       perishable's user-asserted date is still replaced by a fresh estimate on every Bought, which is
@@ -56,9 +18,6 @@ otherwise hand the suite a server whose `.next` was rebuilt underneath it, and e
       `E2E ` prefix and workspace scoping bound the damage.
 - [ ] The canonicalizing redirect carries an invalid `?workspace=` through one pass before the
       validation rejects it. Cosmetic.
-
-Deferred minors judged shippable by the final review are recorded in the branch's commits and
-reviews; the execution lessons live in `tasks/lessons.md`.
 
 ## Known exposure: the public workspace directory (accepted 2026-09-06)
 
@@ -81,25 +40,8 @@ the shared list is the intended design.
 - [ ] Proper fix, if the app ever gains a third user: narrow `workspaces_select` to
       `private.is_workspace_member(id)` and gate self-join behind an invite.
 
-## iOS standalone / mobile app — shipped 2026-09-06
+## iOS standalone: confirm resume event on device
 
-Branch `feat/ios-standalone`, merged; head `ed885e5`, working tree clean. All eight plan steps
-and the verification follow-up are complete: manifest served without a session, build-id endpoint,
-`<ResumeRefresh />` with resume and 5-minute polling, push badge, 393px layout fixes, Playwright
-projects for both phones, and the desktop visual baselines. Execution lessons live in
-`tasks/lessons.md`; behaviour is documented in `docs/ios.md`.
-
-### Still outstanding
-
-Push is verified end to end as of 2026-09-07: delivery was confirmed on the 08:00
-America/Los_Angeles tick, and the second device (user `752a8633`) is now subscribed, so
-production `push_subscriptions` holds a row for both users. The digest-seeding, delivery-check
-and second-device items that lived here are done and have been removed rather than left as
-stale checkboxes.
-
-- [ ] Confirm on device whether an app-switcher resume fires `pageshow{persisted:true}` on current
-      iOS. Undocumented anywhere; `ResumeRefresh` listens to both `visibilitychange` and `pageshow`
-      because of it. If only one fires, the other listener can go.
-
-Device checks the user already confirmed on 2026-09-06: launch with Safari closed, refresh after
-backgrounding, task create/edit with the keyboard, board dragging, Settings reachable.
+Confirm on device whether an app-switcher resume fires `pageshow{persisted:true}` on current iOS.
+Undocumented anywhere; `ResumeRefresh` listens to both `visibilitychange` and `pageshow` because of
+it. If only one fires, the other listener can go.

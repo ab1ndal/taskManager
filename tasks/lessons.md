@@ -453,3 +453,39 @@ a regression rather than what it was.
 (`jest.useFakeTimers()` / `setSystemTime`) rather than hardcode a date computed once from the real
 one. This is the same category of bug `localToday()` exists to prevent in the app itself — it
 applies to test code with the same force it applies to product code.
+
+## L19 — Two silent-data-loss bugs a per-task review couldn't see, only the whole-branch review could
+
+**Learned:** 2026-09-07/08, `feat/grocery-list` branch review (merged as `a6c994c`).
+
+All twelve plan tasks were complete and individually reviewed; the whole-branch review still found
+two Criticals invisible at task scope:
+
+- Re-adding an item by **typing its name** rewrote its stored category to `pantry`, because the
+  upsert's conflict branch overwrote `category` unconditionally and the add row's selector defaults.
+  The column drives shelf-life estimates and list ordering, so the loss was permanent and invisible.
+- **Bought erased a user-entered expiry** for the five categories with no shelf life, because the
+  RPC could not distinguish "no date supplied" from "explicitly no expiry".
+
+Migration `029_grocery_expiry_and_category.sql` fixed both server-side and added
+`grocery_extend_expiry` so the "Still good" nudge stops writing back stale columns.
+
+**Rule:** a per-task review checks whether each task does what it says; only a whole-branch review
+catches a later task's default silently undoing an earlier task's guarantee. Budget for one before
+merging a multi-task branch, especially around upsert conflict paths and any RPC that must
+distinguish "field omitted" from "field explicitly cleared".
+
+## L20 — This machine's Playwright memory ceiling, and a stale-server false failure
+
+**Learned:** 2026-09-07/08, verifying the `feat/grocery-list` branch.
+
+The full five-Playwright-project matrix does not fit in memory on this machine — run **per project
+with `--workers=1`**. Baseline pass counts here: chromium 93, webkit 83, iphone 99, iphone-16-pro 87.
+
+Separately: a stale `next start` left running on port 3100 handed the suite a server whose `.next`
+had been rebuilt underneath it — `reuseExistingServer: true` reused it anyway, and every server
+action 404'd, which read as four unrelated grocery failures. Kill any stale `next start` on that
+port before an e2e run.
+
+**Rule:** treat a sudden batch of unrelated-looking e2e failures as a stale-server symptom before
+debugging the feature; check `lsof -i :3100` first. And run this suite per-project, not as one pass.
