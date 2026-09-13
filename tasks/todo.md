@@ -1,5 +1,16 @@
 # Open work
 
+## Grocery pantry category fix & grouping UI — shipped 2026-09-12
+
+Production DB category fix (4 items → snacks) run by the user. `groupByCategory()` added to
+`sort.ts`, wired into `groceries-client.tsx`'s pantry "By name" view (category headers; "By expiry"
+and the shopping list stay flat). Tested and merged to main.
+
+Still open: 7 items on the shopping list have wrong categories (Broccoli/Bell Pepper→produce, Chick
+Patties→frozen, Bread→baked, shoes/lint roller/oil spray→household). Shopping list doesn't show or
+need categories today — the issue is upstream, on add — so this is deferred, not a regression from
+this change.
+
 ## Grocery list — complete and merge-ready, not merged (2026-09-07)
 
 Branch `feat/grocery-list`, head `25efbc2`, based on `aacf10d`. **Nothing is merged and nothing is
