@@ -489,3 +489,27 @@ port before an e2e run.
 
 **Rule:** treat a sudden batch of unrelated-looking e2e failures as a stale-server symptom before
 debugging the feature; check `lsof -i :3100` first. And run this suite per-project, not as one pass.
+
+## L21 — `webkitSpeechRecognition` exists on iOS but is non-functional once installed standalone
+
+**Learned:** 2026-09-12, task-update dictation hanging the app on iPhone.
+
+The task-update mic (`DictationTextarea` → `useSpeechRecognition`) worked in development and in an
+ordinary browser tab, but hung the installed iPhone app the moment it was tapped. Root cause,
+confirmed against Apple's own developer forums: `webkitSpeechRecognition` is defined on `window` in
+iOS Safari — feature detection reports it supported — but the API does not actually function once
+the page is running standalone (added to the Home Screen). `recognition.start()` ends the session
+almost immediately with no real listening, which fed straight into `onend`'s existing
+auto-restart-unless-user-stopped branch (there to survive Chrome's silence timeout) with no cap —
+start, end, start, end, as fast as the engine could cycle, pegging the CPU.
+
+The grocery dictation sheet (`dictate-sheet.tsx`) never hit this: it was built with the iOS
+limitation already known and deliberately has no in-app mic button at all, relying entirely on the
+OS keyboard's own dictation. The task-update feature predates that finding and used the Web Speech
+API unconditionally on every platform.
+
+**Rule:** don't feature-detect a Web Speech API constructor's mere existence as "supported" on iOS —
+check standalone display mode too (`isIosSpeechRecognitionBroken` in `use-speech-recognition.ts`) and
+fall back to the OS keyboard, same as groceries. Separately, any `onend`/error-driven auto-restart
+loop needs a rate cap independent of the platform check — a broken recognizer that ends the instant
+it starts will hang the app the same way regardless of which platform quirk caused it.

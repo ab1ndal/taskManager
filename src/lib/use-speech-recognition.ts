@@ -39,14 +39,49 @@ function getConstructor(): SpeechRecognitionConstructor | null {
   return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
+/**
+ * `webkitSpeechRecognition` exists as a constructor in iOS Safari, but does not actually work once
+ * the app is running standalone (added to the Home Screen) — confirmed against Apple's own
+ * developer forums, not assumed from a general "iOS" rule. `recognition.start()` ends the session
+ * almost immediately with no real listening, which without this check hits the auto-restart branch
+ * in `onend` below over and over and hangs the app in a tight start/end cycle. Safari in an
+ * ordinary browser tab is unaffected — the check is standalone display mode, not iOS as a whole —
+ * so this only removes the in-app mic there; the iOS keyboard's own dictation still works on
+ * whatever text field has focus, same as the grocery dictation sheet already relies on.
+ */
+function isIosSpeechRecognitionBroken(): boolean {
+  if (typeof navigator === "undefined" || typeof window === "undefined") return false;
+  const isIos =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    // iPadOS 13+ reports as "MacIntel" with touch support, unlike any real Mac.
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (!isIos) return false;
+
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches === true ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
 /** Whether the constructor exists never changes after load, so there is nothing to subscribe to. */
 function subscribeToNothing() {
   return () => {};
 }
 
 function getIsSupported() {
-  return getConstructor() !== null;
+  return getConstructor() !== null && !isIosSpeechRecognitionBroken();
 }
+
+/**
+ * A genuine silence-timeout restart is seconds apart from the last one. A recognizer that ends
+ * immediately every time it starts — the iOS-standalone case above manifests exactly like this,
+ * and it is the failure mode `isIosSpeechRecognitionBroken` exists to head off — would otherwise
+ * retry forever with no backoff and peg the CPU. This is a second, platform-independent guard: if
+ * `isIosSpeechRecognitionBroken` misses a case (a future WebKit change, a different broken
+ * platform), the loop still cannot run away.
+ */
+const RAPID_RESTART_WINDOW_MS = 3000;
+const RAPID_RESTART_LIMIT = 5;
 
 /**
  * Wraps the browser's SpeechRecognition API. Chrome ends a session on silence even with
@@ -64,6 +99,9 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const stoppedByUserRef = useRef(true);
   const onResultRef = useRef(onResult);
+  // Timestamps of recent onend-triggered restarts, oldest first. A real result clears it — that
+  // proves this session is actually listening, not just churning through start/end.
+  const restartTimestampsRef = useRef<number[]>([]);
 
   // Kept in an effect rather than assigned during render: writing a ref while rendering is unsafe
   // (and lint-flagged). Recognition events can only arrive after the effect has run, so the
@@ -85,6 +123,7 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
     recognition.interimResults = true;
 
     recognition.onresult = (event) => {
+      restartTimestampsRef.current = [];
       const result = event.results[event.results.length - 1];
       onResultRef.current(result[0].transcript, result.isFinal);
     };
@@ -117,6 +156,17 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
       if (recognitionRef.current !== recognition) return;
 
       if (!stoppedByUserRef.current) {
+        const now = Date.now();
+        restartTimestampsRef.current = [...restartTimestampsRef.current, now].filter(
+          (t) => now - t < RAPID_RESTART_WINDOW_MS
+        );
+        if (restartTimestampsRef.current.length > RAPID_RESTART_LIMIT) {
+          stoppedByUserRef.current = true;
+          recognitionRef.current = null;
+          setIsListening(false);
+          setError("Speech recognition stopped responding — try typing instead");
+          return;
+        }
         try {
           recognition.start();
         } catch (err) {
@@ -129,6 +179,7 @@ export function useSpeechRecognition(onResult: (transcript: string, isFinal: boo
     };
 
     stoppedByUserRef.current = false;
+    restartTimestampsRef.current = [];
     recognitionRef.current = recognition;
     try {
       recognition.start();
