@@ -1,3 +1,4 @@
+import { GROCERY_CATEGORIES, type CategorySlug } from "./categories";
 
 export type SortMode = "expiry" | "name";
 
@@ -39,4 +40,31 @@ export function sortPantry<T extends SortableItem>(items: readonly T[], mode: So
 /** Shopping lists are alphabetical, independent of pantry categories. */
 export function sortShopping<T extends SortableItem>(items: readonly T[]): T[] {
   return [...items].sort(byName);
+}
+
+export type GroupedByCategory<T extends SortableItem> = {
+  category: CategorySlug;
+  items: T[];
+};
+
+/**
+ * Groups items by category in category order, with items sorted by name within each group.
+ * Used for the pantry view when "By name" sort is selected.
+ *
+ * Only categories with at least one item appear, in `GROCERY_CATEGORIES` order.
+ */
+export function groupByCategory<T extends SortableItem>(items: readonly T[]): GroupedByCategory<T>[] {
+  const byCategory = new Map<string, T[]>();
+  for (const item of items) {
+    const current = byCategory.get(item.category) ?? [];
+    byCategory.set(item.category, [...current, item]);
+  }
+
+  for (const group of byCategory.values()) {
+    group.sort(byName);
+  }
+
+  return GROCERY_CATEGORIES.map((c) => c.slug)
+    .filter((slug) => byCategory.has(slug))
+    .map((slug) => ({ category: slug, items: byCategory.get(slug)! }));
 }

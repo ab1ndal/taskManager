@@ -8,7 +8,7 @@ import { LotDialog } from "./lot-dialog";
 import { AddRow } from "./add-row";
 import { categoryLabel } from "./categories";
 import { PantryRow, ShoppingRow } from "./item-row";
-import { sortPantry, sortShopping, type SortMode } from "./sort";
+import { groupByCategory, sortPantry, sortShopping, type SortMode } from "./sort";
 import type { GroceryItem } from "./types";
 import { useForegroundRefresh } from "./use-foreground-refresh";
 
@@ -45,6 +45,11 @@ export function GroceriesClient({
 
     return view === "stock" ? sortPantry(filtered, sort) : sortShopping(filtered);
   }, [inView, view, category, sort]);
+
+  const grouped = useMemo(
+    () => (!category && view === "stock" && sort === "name" ? groupByCategory(visible) : null),
+    [visible, category, view, sort],
+  );
 
   const categories = useMemo(
     () => [...new Set(inView.map((item) => item.category))],
@@ -123,6 +128,21 @@ export function GroceriesClient({
             ? "Nothing tracked yet. Add what's in your kitchen."
             : "List is empty. Tap Need on anything in the pantry."}
         </p>
+      ) : grouped ? (
+        <ul>
+          {grouped.map((group) => (
+            <li key={group.category}>
+              <h3 className="px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                {categoryLabel(group.category)}
+              </h3>
+              <ul>
+                {group.items.map((item) => (
+                  <PantryRow key={item.id} item={item} today={today} />
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
       ) : (
         <ul>
           {visible.map((item) =>
