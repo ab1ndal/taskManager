@@ -133,7 +133,8 @@ Audio must never be stored.
 
 On /groceries, "Dictate items" has its own Record button, which works in the installed iPhone app
 where the browser's speech recognition does not. The clip is held in memory, sent once to OpenAI
-(`gpt-transcribe`) for transcription with the workspace's item names as keyword hints, and dropped;
+(`gpt-transcribe`) for transcription with the workspace's item names plus a fixed list of common
+Hindi grocery words (daal, naan, atta, …) as keyword hints, and dropped;
 it is never written to the database, storage or logs. OpenAI may retain API inputs for up to 30
 days for abuse monitoring unless the account has zero data retention — the product rule is about
 this app not storing audio. The text lands in the editable textarea and nothing is parsed until the

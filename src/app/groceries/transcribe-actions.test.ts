@@ -13,7 +13,7 @@ jest.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => fake }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: async () => fake }));
 
 import { transcribeGroceryAudio } from "./transcribe-actions";
-import { MAX_AUDIO_BYTES } from "./transcribe-schema";
+import { COMMON_KEYWORDS, MAX_AUDIO_BYTES, MAX_KEYWORDS } from "./transcribe-schema";
 
 const originalKey = process.env.OPENAI_API_KEY;
 
@@ -78,7 +78,7 @@ it("sends gpt-transcribe with English and this workspace's item names as keyword
   expect(body.get("model")).toBe("gpt-transcribe");
   expect(body.get("response_format")).toBe("json");
   expect(body.getAll("languages[]")).toEqual(["en"]);
-  expect(body.getAll("keywords[]")).toEqual(["Paneer", "Atta"]);
+  expect(body.getAll("keywords[]").slice(0, 2)).toEqual(["Paneer", "Atta"]);
   expect(body.get("language")).toBeNull();
 });
 
@@ -97,7 +97,38 @@ it("bounds the keyword query to the most-added items", async () => {
 
   const query = fake.queryLog.find((entry) => entry.table === "grocery_items");
   expect(query?.orderBy).toEqual([{ column: "times_added", ascending: false }]);
-  expect(query?.limit).toBe(100);
+  expect(query?.limit).toBe(MAX_KEYWORDS - COMMON_KEYWORDS.length);
+});
+
+it("adds common Hindi grocery words after the workspace's own names", async () => {
+  mockOpenAiReply({ text: "daal and naan" });
+
+  await transcribeGroceryAudio(upload());
+
+  const keywords = sentBody().getAll("keywords[]");
+  expect(keywords).toEqual(expect.arrayContaining(["daal", "naan"]));
+  expect(keywords.indexOf("daal")).toBeGreaterThan(keywords.indexOf("Atta"));
+});
+
+it("does not repeat a common word the workspace already has, keeping the workspace's spelling", async () => {
+  mockOpenAiReply({ text: "paneer" });
+
+  await transcribeGroceryAudio(upload());
+
+  const keywords = sentBody().getAll("keywords[]").map((k) => String(k).toLowerCase());
+  expect(keywords.filter((k) => k === "paneer")).toHaveLength(1);
+  expect(sentBody().getAll("keywords[]")).toContain("Paneer");
+});
+
+it("never sends more than the keyword cap", async () => {
+  mockOpenAiReply({ text: "milk" });
+  fake.tables.grocery_items = Array.from({ length: 150 }, (_, i) => ({
+    id: `x${i}`, workspace_id: WORKSPACE, name: `Item ${i}`, times_added: 150 - i,
+  }));
+
+  await transcribeGroceryAudio(upload());
+
+  expect(sentBody().getAll("keywords[]").length).toBeLessThanOrEqual(MAX_KEYWORDS);
 });
 
 it("rejects a non-member without calling OpenAI", async () => {
