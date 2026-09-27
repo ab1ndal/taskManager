@@ -3,6 +3,8 @@ import {
   addDays,
   categoryLabel,
   estimatedExpiry,
+  formatDay,
+  formatExpiry,
   localToday,
   shelfLifeDays,
 } from "./categories";
@@ -63,5 +65,39 @@ describe("shelfLifeDays", () => {
 
   it("returns null for a category that does not expire", () => {
     expect(shelfLifeDays("pantry")).toBeNull();
+  });
+});
+
+describe("formatExpiry", () => {
+  const today = "2026-09-27";
+
+  it("names the next two days", () => {
+    expect(formatExpiry("2026-09-27", today)).toBe("today");
+    expect(formatExpiry("2026-09-28", today)).toBe("tomorrow");
+  });
+
+  it("counts days within the coming week", () => {
+    expect(formatExpiry("2026-09-30", today)).toBe("3 days left");
+    expect(formatExpiry("2026-10-03", today)).toBe("6 days left");
+  });
+
+  it("falls back to a short date a week or more out", () => {
+    expect(formatExpiry("2026-10-04", today)).toBe("Oct 4");
+  });
+
+  it("adds the year only when it differs from today's", () => {
+    expect(formatExpiry("2027-02-24", today)).toBe("Feb 24, 2027");
+  });
+
+  it("dates a past expiry rather than counting backwards", () => {
+    expect(formatExpiry("2026-09-25", today)).toBe("Sep 25");
+  });
+});
+
+describe("formatDay", () => {
+  it("formats a timestamp as a short Pacific calendar date", () => {
+    // 01:30Z on the 28th is still the 27th in Pacific time.
+    expect(formatDay("2026-09-28T01:30:00Z", "2026-09-27")).toBe("Sep 27");
+    expect(formatDay("2025-12-31T20:00:00Z", "2026-09-27")).toBe("Dec 31, 2025");
   });
 });

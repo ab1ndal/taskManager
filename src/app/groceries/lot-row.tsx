@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR, type ActionResult } from "@/app/tasks/action-result";
 import { discardLot, extendLot } from "./actions";
-import { addDays, shelfLifeDays } from "./categories";
+import { addDays, formatDay, formatExpiry, shelfLifeDays } from "./categories";
 import { LotDialog } from "./lot-dialog";
 import { isExpired } from "./sort";
 import type { GroceryItem, GroceryLot } from "./types";
@@ -21,10 +21,10 @@ export function LotRow({ item, lot, today }: { item: GroceryItem; lot: GroceryLo
   }
   return <li className="py-2 border-t border-[var(--color-border)]" data-lot-id={lot.id}>
     <div className="flex flex-wrap items-center gap-x-3 text-xs">
-      <span>{lot.expiresOn ? `${lot.expiryIsEstimate ? "~" : ""}${lot.expiresOn}` : "No expiry date"}</span>
+      <span>{lot.expiresOn ? `${lot.expiryIsEstimate ? "~" : ""}${formatExpiry(lot.expiresOn, today)}` : "No expiry date"}</span>
       {expired && <span className="rounded-full px-2 py-1 bg-[var(--color-warning-surface)] text-[var(--color-warning-text)]">expired</span>}
       <span>{lot.quantity === null ? "Quantity unknown" : `Quantity ${lot.quantity}`}</span>
-      <span className="text-[var(--color-text-muted)]">Added {new Date(lot.createdAt).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles" })}</span>
+      <span className="text-[var(--color-text-muted)]">Added {formatDay(lot.createdAt, today)}</span>
     </div>
     <div className="flex flex-wrap gap-2">
       {expired && <button type="button" disabled={pending} className="min-h-11 px-3 text-xs text-[var(--color-accent-text)]"

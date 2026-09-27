@@ -15,6 +15,15 @@ import { useForegroundRefresh } from "./use-foreground-refresh";
 /** Below this many rows a filter row is chrome, not help. */
 const FILTER_THRESHOLD = 15;
 
+/** Sort and filter pills share one look, so a selected filter reads as selected as clearly as a sort. */
+function chipClass(selected: boolean) {
+  return `shrink-0 inline-flex items-center min-h-11 px-3 rounded-full text-xs font-medium ${
+    selected
+      ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
+      : "text-[var(--color-text-secondary)]"
+  }`;
+}
+
 export function GroceriesClient({
   workspaceId,
   items,
@@ -83,11 +92,7 @@ export function GroceriesClient({
               type="button"
               aria-pressed={sort === mode}
               onClick={() => setSort(mode)}
-              className={`inline-flex items-center min-h-11 px-3 rounded-full text-xs font-medium ${
-                sort === mode
-                  ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
-                  : "text-[var(--color-text-secondary)]"
-              }`}
+              className={chipClass(sort === mode)}
             >
               {mode === "expiry" ? "By expiry" : "By name"}
             </button>
@@ -101,7 +106,7 @@ export function GroceriesClient({
             type="button"
             aria-pressed={category === null}
             onClick={() => setCategory(null)}
-            className="shrink-0 inline-flex items-center min-h-11 px-3 rounded-full text-xs"
+            className={chipClass(category === null)}
           >
             All
           </button>
@@ -111,7 +116,7 @@ export function GroceriesClient({
               type="button"
               aria-pressed={category === slug}
               onClick={() => setCategory(slug)}
-              className="shrink-0 inline-flex items-center min-h-11 px-3 rounded-full text-xs"
+              className={chipClass(category === slug)}
             >
               {categoryLabel(slug)}
             </button>

@@ -181,7 +181,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
     <div
       role="group"
       aria-labelledby={headingId}
-      className="space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+      className="basis-full space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 id={headingId} className="text-sm font-medium">

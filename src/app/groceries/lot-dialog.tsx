@@ -52,11 +52,16 @@ export function LotDialog({ item, lot, onClose }: {
       </fieldset>
       {saved && <p role="status" className="text-sm">Batch saved. Enter the next batch.</p>}
       {error && <p role="alert" className="text-sm text-[var(--color-danger-text)]">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-2">
-        <button type="button" disabled={pending} onClick={onClose} className="min-h-11 px-3">{saved ? "Done" : "Cancel"}</button>
-        {!lot && <button type="button" disabled={pending} onClick={() => save(true)} className="min-h-11 px-3">Save and add another batch</button>}
+      {/* Three actions do not fit one line at phone width, and wrapping stranded Save alone on a second
+          row. Purchase entry stacks them full width instead, primary first, the way an iOS sheet does. */}
+      {lot ? <div className="flex justify-end gap-2">
+        <button type="button" disabled={pending} onClick={onClose} className="min-h-11 px-3">Cancel</button>
         <button type="submit" disabled={pending} className="min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)]">{pending ? "Saving…" : "Save"}</button>
-      </div>
+      </div> : <div className="grid gap-2">
+        <button type="submit" disabled={pending} className="min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)] font-medium">{pending ? "Saving…" : "Save"}</button>
+        <button type="button" disabled={pending} onClick={() => save(true)} className="min-h-11 px-4 rounded-full border border-[var(--color-border)]">Save and add another batch</button>
+        <button type="button" disabled={pending} onClick={onClose} className="min-h-11 px-3 text-[var(--color-text-secondary)]">{saved ? "Done" : "Cancel"}</button>
+      </div>}
     </form>
   </Dialog>;
 }

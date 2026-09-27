@@ -1,5 +1,15 @@
 # Open work
 
+## Grocery iPhone UX (branch `fix/grocery-iphone-ux`, 2026-09-27, uncommitted)
+
+Done: add bar pinned below nav, only name + Add sticky; readable expiry; inline batch toggle;
+filter chip selected state; Forget confirm; stacked purchase-dialog buttons; 40px qty input fixed.
+Verified: jest 696/696, grocery + layout e2e 88/88 (iphone, iphone-16-pro, chromium).
+
+- [ ] Discuss with owner before building (changes what a tap does, contradicts docs/product.md):
+      one-tap Bought with undo toast instead of the purchase dialog; undo for Remove/Finished/Gone.
+- [ ] Check on the installed iPhone: sticky add bar under the notch/nav, keyboard over the bar.
+
 ## Grocery dictation Record button (branch `feat/grocery-voice-transcription`, 2026-09-27)
 
 - [ ] Add `OPENAI_API_KEY` to `.env.local` and to Vercel (Preview + Production).
@@ -12,9 +22,6 @@
 - [ ] Confirm OpenAI accepts `keywords[]` / `languages[]` as sent (never exercised against the live
       API — no key on this machine when it was built). A 400 naming either field means the
       multipart encoding in `transcribe-actions.ts` is wrong.
-- [ ] Pre-existing, not from this branch: `add-row.tsx:114` quantity input is `min-h-10` (40px), so
-      the pantry and dictate-entry 44px sweeps in `e2e/layout.spec.ts` fail on every project.
-      Introduced by caaf77d (2026-09-10).
 
 ## Grocery: shopping list category mismatches (deferred)
 
