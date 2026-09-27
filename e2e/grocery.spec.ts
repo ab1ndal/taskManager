@@ -111,7 +111,7 @@ test("edits pantry details and retains workspace between views", async ({ page }
   await dialog.getByLabel("Category").selectOption("dairy");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
-  await row.locator("summary").click();
+  await row.getByRole("button", { name: /^\d+ batch/ }).click();
   await row.getByRole("button", { name: "Edit batch" }).click();
   await dialog.getByLabel("Quantity (optional)").fill("3");
   await dialog.getByRole("combobox", { name: "Expiry", exact: true }).selectOption("date");
@@ -156,10 +156,10 @@ test("keeps repeat purchases independent and clears only the expired batch", asy
   await page.getByRole("link", { name: "Pantry", exact: true }).click();
   const row = page.locator("li").filter({ has: page.getByRole("button", { name: `Actions for ${name}` }) });
   await expect(row.getByText("5", { exact: true })).toBeVisible();
-  await row.locator("summary").click();
+  await row.getByRole("button", { name: /^\d+ batch/ }).click();
   await expect(row.locator("[data-lot-id]")).toHaveCount(2);
-  await expect(row.getByText("2020-01-01", { exact: true })).toBeVisible();
-  await expect(row.getByText("2100-01-01", { exact: true })).toBeVisible();
+  await expect(row.getByText("Jan 1, 2020", { exact: true })).toBeVisible();
+  await expect(row.getByText("Jan 1, 2100", { exact: true })).toBeVisible();
   const sweep = page.getByRole("region", { name: "Expired batches" });
   await expect(sweep.getByText(name, { exact: true })).toBeVisible();
   const tooSmall = await page.locator('button, input, select, summary').evaluateAll((els) => els
@@ -180,5 +180,5 @@ test("keeps repeat purchases independent and clears only the expired batch", asy
   await expect(row.locator("[data-lot-id]")).toHaveCount(2);
   await expect(row.getByRole("button", { name: /one fewer/i })).toHaveCount(0);
   await expect(row.getByText("Quantity unknown")).toBeVisible();
-  await expect(row.getByText("2100-01-01", { exact: true }).last()).toBeVisible();
+  await expect(row.getByText("Jan 1, 2100", { exact: true }).last()).toBeVisible();
 });

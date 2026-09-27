@@ -197,5 +197,11 @@ category filtering above 15 items and expiry/name sorting. Expired batches appea
 section with Still good and Gone; removing one never removes fresh stock. Estimates use a muted `~`
 and expired stock uses amber, never task-deadline red.
 
+The pantry is laid out for a phone. Only the name field and Add stay pinned (below the nav) while
+scrolling; category, quantity, expiry and dictation scroll away with the page. Expiry reads as time
+left ("today", "tomorrow", "3 days left") inside a week and as a short date ("Oct 4") beyond it.
+Each row's batch count is an inline toggle rather than a separate line. Forget this item asks for
+confirmation first, because it is permanent and sits one menu slot from Remove from list.
+
 Foreground polling refreshes shared data every 20 seconds. Failed reads show a retryable error
 screen instead of a misleading empty list.

@@ -16,7 +16,7 @@ jest.mock("./actions", () => ({
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 import { PantryRow, ShoppingRow } from "./item-row";
-import { editItem, extendLot } from "./actions";
+import { editItem, extendLot, forgetItem } from "./actions";
 import type { GroceryItem } from "./types";
 
 const base: GroceryItem = {
@@ -33,7 +33,7 @@ const base: GroceryItem = {
 
 beforeEach(() => jest.clearAllMocks());
 const expiredLot = { id: "l1", itemId: "g1", quantity: 3, expiresOn: "2026-09-01", expiryIsEstimate: false, createdAt: "2026-09-01T12:00:00Z" };
-function expand() { fireEvent.click(screen.getByText(/batch.*View and edit/)); screen.getByText(/batch.*View and edit/).closest("details")!.open = true; }
+function expand() { fireEvent.click(screen.getByRole("button", { name: /^\d+ batch/ })); }
 
 
 describe("PantryRow", () => {
@@ -61,6 +61,21 @@ describe("PantryRow", () => {
     rerender(<PantryRow item={{ ...base, quantity: 6 }} today="2026-09-06" />);
     expect(screen.getByRole("button", { name: /one fewer/i })).toBeInTheDocument();
     expect(screen.getByText("6")).toBeInTheDocument();
+  });
+
+  it("shows how long is left rather than a raw date", () => {
+    render(<PantryRow item={{ ...base, expiresOn: "2026-09-09" }} today="2026-09-06" />);
+    expect(screen.getByText("~3 days left")).toBeInTheDocument();
+  });
+
+  it("keeps batches collapsed until the batch count is tapped", () => {
+    render(<PantryRow item={{ ...base, expiresOn: "2026-09-01", lots: [expiredLot] }} today="2026-09-06" />);
+    const toggle = screen.getByRole("button", { name: "1 batch" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: /still good/i })).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /still good/i })).toBeInTheDocument();
   });
 
   it("reflects the Need state in the toggle", () => {
@@ -108,6 +123,32 @@ describe("PantryRow", () => {
       expiresOn: "2026-09-13",
     });
     expect(editItem).not.toHaveBeenCalled();
+  });
+});
+
+// Forget permanently deletes the row and its batches, one menu slot from a reversible action.
+describe.each([
+  ["PantryRow", () => <PantryRow item={base} today="2026-09-06" />],
+  ["ShoppingRow", () => <ShoppingRow item={{ ...base, needed: true }} onPurchase={jest.fn()} />],
+])("%s forget", (_name, ui) => {
+  function chooseForget() {
+    fireEvent.click(screen.getByRole("button", { name: /actions for spinach/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /forget this item/i }));
+  }
+
+  it("asks before deleting and does nothing on cancel", () => {
+    render(ui());
+    chooseForget();
+    expect(forgetItem).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel forget" }));
+    expect(forgetItem).not.toHaveBeenCalled();
+  });
+
+  it("deletes once confirmed", async () => {
+    render(ui());
+    chooseForget();
+    fireEvent.click(screen.getByRole("button", { name: /confirm forget/i }));
+    await waitFor(() => expect(forgetItem).toHaveBeenCalledWith({ itemId: "g1" }));
   });
 });
 

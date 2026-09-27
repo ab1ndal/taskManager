@@ -549,3 +549,26 @@ the `tsconfig.tsbuildinfo` cache kept the old resolution.
 
 **Rule:** after adding an `@ai-sdk/*` provider, `npm ls @ai-sdk/provider` must show one version.
 After any dependency reshuffle, delete `tsconfig.tsbuildinfo` before trusting a typecheck error.
+
+
+## L25 — A `sticky top-0` bar under a sticky nav is never actually visible
+
+**Learned:** 2026-09-27, grocery iPhone layout pass.
+
+The grocery add row was `sticky top-0 z-10` since it shipped. The root layout's nav is also
+`sticky top-0`, at `z-30`, so once the page scrolled the add row pinned *behind* the nav: the
+"always reachable" input was hidden. No test caught it; only a scrolled iPhone screenshot did.
+
+**Rule:** anything sticky below the nav pins at
+`top-[calc(var(--nav-height)+env(safe-area-inset-top))]`. Also: `sticky` only sticks inside its
+parent, so the sticky element must be a direct child of the long container (hence `AddRow` returns a
+fragment).
+
+## L26 — Jest collects tests from `.claude/worktrees`
+
+**Learned:** 2026-09-27.
+
+`npx jest <path>` also ran copies under `.claude/worktrees/agent-*`, which fail with a duplicate-React
+"reading 'useState'" error and look like real regressions. Run
+`npx jest --testPathIgnorePatterns '/.claude/'` or delete stale worktrees.
+

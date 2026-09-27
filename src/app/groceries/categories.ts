@@ -77,6 +77,47 @@ export function addDays(date: string, days: number): string {
   return `${shifted.getUTCFullYear()}-${mm}-${dd}`;
 }
 
+const DAY_MS = 86_400_000;
+
+/** Days from `from` to `to`, both `YYYY-MM-DD`, compared as UTC calendar dates like `addDays`. */
+function daysBetween(from: string, to: string): number {
+  const utc = (date: string) => {
+    const [year, month, day] = date.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((utc(to) - utc(from)) / DAY_MS);
+}
+
+/** "Oct 4", or "Feb 24, 2027" when the year is not today's. */
+function shortDate(date: string, today: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    ...(date.slice(0, 4) !== today.slice(0, 4) ? { year: "numeric" } : {}),
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
+/**
+ * An expiry as it reads at a glance on a phone. The question at the fridge is "how long have I
+ * got", which "3 days left" answers and "2026-09-30" makes you work out. A week or more out, the
+ * exact day matters less than the month, so it becomes a short date. A past date is dated rather
+ * than counted backwards; the row already says "expired".
+ */
+export function formatExpiry(expiresOn: string, today: string): string {
+  const days = daysBetween(today, expiresOn);
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  if (days > 1 && days < 7) return `${days} days left`;
+  return shortDate(expiresOn, today);
+}
+
+/** A timestamp's calendar day in the app's timezone, in the same short form as `formatExpiry`. */
+export function formatDay(timestamp: string, today: string): string {
+  return shortDate(localToday(new Date(timestamp)), today);
+}
+
 /** The prefilled expiry for a category, or null when that category does not expire. */
 export function estimatedExpiry(slug: string, now: Date = new Date()): string | null {
   const shelfLife = bySlug.get(slug)?.shelfLifeDays ?? null;

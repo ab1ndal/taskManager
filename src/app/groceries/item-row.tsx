@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Pencil, ListPlus, Minus, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Pencil, ListPlus, Minus, Plus, Trash2, X } from "lucide-react";
 
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RowMenu } from "@/components/row-menu";
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR, type ActionResult } from "@/app/tasks/action-result";
 import { adjustQuantity, finishItem, forgetItem, setNeeded } from "./actions";
-import { categoryLabel } from "./categories";
+import { categoryLabel, formatExpiry } from "./categories";
 import { isExpired } from "./sort";
 import { LotRow } from "./lot-row";
 import { LotDialog } from "./lot-dialog";
@@ -41,6 +42,27 @@ function useActionCall() {
   return { pending, call };
 }
 
+/**
+ * Forget is the one grocery action with no way back: it deletes the row, every batch and the name
+ * autocomplete would have offered. It sits in the same menu as the reversible "Remove from list",
+ * one slot below it, which on a phone is a single mis-tap away — so it asks first.
+ */
+function ForgetConfirm({ item, onConfirm, onCancel }: { item: GroceryItem; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <ConfirmDialog
+      open
+      id={`forget-${item.id}`}
+      title={<>Forget &quot;{item.name}&quot;?</>}
+      body="This removes it from the pantry, the list and suggestions. It cannot be undone."
+      confirmLabel="Forget"
+      confirmAriaLabel={`Confirm forget "${item.name}"`}
+      cancelAriaLabel="Cancel forget"
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
+  );
+}
+
 const CATEGORY_TAG =
   "text-2xs font-medium px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] " +
   "text-[var(--color-text-secondary)]";
@@ -54,7 +76,7 @@ function ExpiryLine({ item, today }: { item: GroceryItem; today: string }) {
   if (item.expiresOn === null) return null;
 
   const expired = isExpired(item.expiresOn, today);
-  const label = `${item.expiryIsEstimate ? "~" : ""}${item.expiresOn}`;
+  const label = `${item.expiryIsEstimate ? "~" : ""}${formatExpiry(item.expiresOn, today)}`;
 
   return (
     <span className="text-2xs text-[var(--color-text-muted)]">
@@ -73,9 +95,12 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
   const { pending, call } = useActionCall();
   const [editing, setEditing] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
+  const [showBatches, setShowBatches] = useState(false);
+  const batchesId = `batches-${item.id}`;
 
   return (
-    <li className="px-3 py-2 border-b border-[var(--color-border)]">
+    <li className="px-3 py-1 border-b border-[var(--color-border)]">
       <div className="flex items-center gap-3 min-h-11">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
@@ -84,7 +109,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
           </span>
           <span className={CATEGORY_TAG}>{categoryLabel(item.category)}</span>
         </div>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center gap-x-2 flex-wrap">
           <ExpiryLine item={item} today={today} />
           {item.quantity !== null && (
             <span className="flex items-center gap-1">
@@ -108,6 +133,25 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
                 <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} />
               </button>
             </span>
+          )}
+          {/* On the meta line rather than a row of its own: a third 44px line per item cost roughly
+              a third of the rows that fit on a phone screen. */}
+          {item.lots.length > 0 && (
+            <button
+              type="button"
+              aria-expanded={showBatches}
+              aria-controls={batchesId}
+              onClick={() => setShowBatches((open) => !open)}
+              className="inline-flex items-center gap-0.5 min-h-11 text-2xs text-[var(--color-accent-text)]"
+            >
+              {item.lots.length} {item.lots.length === 1 ? "batch" : "batches"}
+              <ChevronDown
+                size={14}
+                strokeWidth={ICON_STROKE}
+                aria-hidden="true"
+                className={`motion-safe:transition-transform ${showBatches ? "rotate-180" : ""}`}
+              />
+            </button>
           )}
         </div>
       </div>
@@ -144,17 +188,23 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
           },
           {
             label: "Forget this item",
-            onSelect: () => call(() => forgetItem({ itemId: item.id })),
+            onSelect: () => setForgetting(true),
             icon: <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />,
             danger: true,
           },
         ]}
       />
       </div>
-      <details>
-        <summary className="min-h-11 flex items-center cursor-pointer text-xs text-[var(--color-accent-text)]">{item.lots.length} {item.lots.length === 1 ? "batch" : "batches"} · View and edit</summary>
-        <ul>{item.lots.map((lot) => <LotRow key={lot.id} item={item} lot={lot} today={today} />)}</ul>
-      </details>
+      {showBatches && (
+        <ul id={batchesId}>{item.lots.map((lot) => <LotRow key={lot.id} item={item} lot={lot} today={today} />)}</ul>
+      )}
+      {forgetting && (
+        <ForgetConfirm
+          item={item}
+          onCancel={() => setForgetting(false)}
+          onConfirm={() => { setForgetting(false); call(() => forgetItem({ itemId: item.id })); }}
+        />
+      )}
       {purchasing && <LotDialog item={item} onClose={() => setPurchasing(false)} />}
       {editing && <EditItemDialog item={item} onClose={() => setEditing(false)} />}
     </li>
@@ -164,6 +214,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
 export function ShoppingRow({ item, onPurchase }: { item: GroceryItem; onPurchase: (item: GroceryItem) => void }) {
   const { pending, call } = useActionCall();
   const [editing, setEditing] = useState(false);
+  const [forgetting, setForgetting] = useState(false);
 
   return (
     <li className="border-b border-[var(--color-border)]">
@@ -205,7 +256,7 @@ export function ShoppingRow({ item, onPurchase }: { item: GroceryItem; onPurchas
             },
             {
               label: "Forget this item",
-              onSelect: () => call(() => forgetItem({ itemId: item.id })),
+              onSelect: () => setForgetting(true),
               icon: <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />,
               danger: true,
             },
@@ -213,6 +264,13 @@ export function ShoppingRow({ item, onPurchase }: { item: GroceryItem; onPurchas
         />
       </div>
       {editing && <EditItemDialog shopping item={item} onClose={() => setEditing(false)} />}
+      {forgetting && (
+        <ForgetConfirm
+          item={item}
+          onCancel={() => setForgetting(false)}
+          onConfirm={() => { setForgetting(false); call(() => forgetItem({ itemId: item.id })); }}
+        />
+      )}
     </li>
   );
 }
