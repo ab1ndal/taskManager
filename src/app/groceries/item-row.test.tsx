@@ -15,6 +15,12 @@ jest.mock("./actions", () => ({
 // toast call can be asserted without mounting the real Toaster.
 jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
+// jsdom does not implement showModal(); stub it so the forget confirmation's Dialog doesn't throw
+// on mount, and set `open` so testing-library treats the dialog content as visible.
+HTMLDialogElement.prototype.showModal = jest.fn(function (this: HTMLDialogElement) {
+  this.setAttribute("open", "");
+});
+
 import { PantryRow, ShoppingRow } from "./item-row";
 import { editItem, extendLot, forgetItem } from "./actions";
 import type { GroceryItem } from "./types";
