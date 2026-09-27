@@ -128,7 +128,7 @@ export function ColorPicker({
             return next;
           })
         }
-        className="flex min-h-11 min-w-11 items-center justify-center rounded-sm border border-transparent p-1.5 hover:border-[var(--color-border)]"
+        className="flex min-h-11 min-w-11 items-center justify-center rounded-sm border border-transparent p-1.5 hover:border-(--color-border)"
       >
         <span
           className="block h-6 w-6 rounded-full ring-1 ring-inset ring-black/10"
@@ -141,7 +141,7 @@ export function ColorPicker({
           role="radiogroup"
           aria-label={label}
           onKeyDown={onGroupKeyDown}
-          className="absolute left-0 top-full z-10 mt-1 grid w-max grid-cols-5 gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-xl"
+          className="absolute left-0 top-full z-10 mt-1 grid w-max grid-cols-5 gap-2 rounded-md border border-(--color-border) bg-(--color-surface) p-3 shadow-xl"
         >
           {TAB20_SLUGS.map((slug, index) => {
             const selected = slug === value;

@@ -111,7 +111,7 @@ export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] 
         aria-controls={open ? menuId : undefined}
         onClick={() => (open ? closeMenu({ focusTrigger: false }) : openMenu(0))}
         onKeyDown={onTriggerKeyDown}
-        className="w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+        className="w-11 h-11 flex items-center justify-center text-(--color-text-muted) hover:text-(--color-accent) transition-colors"
       >
         <MoreVertical size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
       </button>
@@ -122,7 +122,7 @@ export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] 
           role="menu"
           aria-label={label}
           onKeyDown={onMenuKeyDown}
-          className="absolute right-0 top-11 z-20 min-w-[10rem] rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-1 shadow-[var(--shadow-card)]"
+          className="absolute right-0 top-11 z-20 min-w-[10rem] rounded-md border border-(--color-border) bg-(--color-surface) p-1 shadow-(--shadow-card)"
         >
           {items.map((item, index) => (
             <button
@@ -137,8 +137,8 @@ export function RowMenu({ label, items }: { label: string; items: RowMenuItem[] 
                 closeMenu({ focusTrigger: false });
                 item.onSelect();
               }}
-              className={`flex w-full items-center gap-2 min-h-11 px-3 rounded-sm text-sm text-left transition-colors hover:bg-[var(--color-accent-subtle)] ${
-                item.danger ? "text-[var(--color-danger-text)]" : "text-[var(--color-text-primary)]"
+              className={`flex w-full items-center gap-2 min-h-11 px-3 rounded-sm text-sm text-left transition-colors hover:bg-(--color-accent-subtle) ${
+                item.danger ? "text-(--color-danger-text)" : "text-(--color-text-primary)"
               }`}
             >
               {item.icon}

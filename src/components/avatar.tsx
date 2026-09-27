@@ -10,7 +10,7 @@ export function Avatar({ name, email, size = "sm" }: {
 
   return (
     <div
-      className={`${sizeClasses} rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)] font-semibold flex items-center justify-center flex-shrink-0`}
+      className={`${sizeClasses} rounded-full bg-(--color-accent-subtle) text-(--color-accent-text) font-semibold flex items-center justify-center flex-shrink-0`}
       aria-label={`Avatar for ${name || email}`}
     >
       {initials}

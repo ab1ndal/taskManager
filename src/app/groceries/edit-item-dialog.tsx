@@ -14,7 +14,7 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
   const [category, setCategory] = useState<string>(item.category);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const control = "block w-full min-w-0 h-11 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base";
+  const control = "block w-full min-w-0 h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base";
 
   return (
     <Dialog open onClose={onClose} ariaLabelledBy={titleId} initialFocusSelector="input">
@@ -48,10 +48,10 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
           </select></label>}
 
         </fieldset>
-        {error && <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">{error}</p>}
+        {error && <p role="alert" className="rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={pending} className="min-h-11 px-4">Cancel</button>
-          <button type="submit" disabled={pending} className="min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)]">{pending ? "Saving…" : "Save"}</button>
+          <button type="submit" disabled={pending} className="min-h-11 px-4 rounded-full bg-(--color-accent) text-(--color-text-on-accent)">{pending ? "Saving…" : "Save"}</button>
         </div>
       </form>
     </Dialog>

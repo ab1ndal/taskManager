@@ -107,14 +107,14 @@ export function DeleteColumnDialog({
       onClose={onClose}
       initialFocusSelector="[data-cancel-button]"
       ariaLabelledBy={headingId}
-      className="w-full max-w-md rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl backdrop:bg-[var(--color-scrim)] max-h-[90dvh] overflow-y-auto"
+      className="w-full max-w-md rounded-lg border border-(--color-border) bg-(--color-surface) p-6 shadow-xl backdrop:bg-(--color-scrim) max-h-[90dvh] overflow-y-auto"
     >
       <h3 id={headingId} className="text-base font-semibold">
         Delete “{column.name}”?
       </h3>
 
       {column.isDone && (
-        <p className="mt-3 rounded-sm bg-[var(--color-warning-surface)] p-2 text-sm text-[var(--color-warning-text)]">
+        <p className="mt-3 rounded-sm bg-(--color-warning-surface) p-2 text-sm text-(--color-warning-text)">
           This is where completed tasks appear. Without it, completed tasks will no longer appear on
           the board.
         </p>
@@ -122,20 +122,20 @@ export function DeleteColumnDialog({
 
       <div className="mt-3">
         {tasks === null ? (
-          <p className="text-sm text-[var(--color-text-secondary)]" aria-busy="true">
+          <p className="text-sm text-(--color-text-secondary)" aria-busy="true">
             Loading this column’s tasks…
           </p>
         ) : tasks.length === 0 ? (
-          <p className="text-sm text-[var(--color-text-secondary)]">This column is empty.</p>
+          <p className="text-sm text-(--color-text-secondary)">This column is empty.</p>
         ) : (
           <>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm text-(--color-text-secondary)">
               {tasks.length} {tasks.length === 1 ? "task is" : "tasks are"} in this column. Choose
               where each one goes.
             </p>
 
-            <label className="mt-3 flex items-center gap-2 rounded-sm bg-[var(--color-accent-subtle)] p-2 text-sm">
-              <span className="text-[var(--color-text-secondary)]">Move all tasks to</span>
+            <label className="mt-3 flex items-center gap-2 rounded-sm bg-(--color-accent-subtle) p-2 text-sm">
+              <span className="text-(--color-text-secondary)">Move all tasks to</span>
               <select
                 aria-label="Move all tasks to"
                 defaultValue=""
@@ -144,7 +144,7 @@ export function DeleteColumnDialog({
                   if (!target) return;
                   setTargetByTaskId(Object.fromEntries(tasks.map((task) => [task.id, target])));
                 }}
-                className="h-11 flex-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-sm"
+                className="h-11 flex-1 rounded-sm border border-(--color-border) bg-(--color-bg) px-2 text-sm"
               >
                 <option value="">Choose a column…</option>
                 {siblings.map((sibling) => (
@@ -159,7 +159,7 @@ export function DeleteColumnDialog({
               {tasks.map((task) => (
                 <li
                   key={task.id}
-                  className="flex items-center gap-2 border-t border-[var(--color-border)] py-2 first:border-t-0"
+                  className="flex items-center gap-2 border-t border-(--color-border) py-2 first:border-t-0"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm" title={task.title}>
                     {task.title}
@@ -170,7 +170,7 @@ export function DeleteColumnDialog({
                     onChange={(event) =>
                       setTargetByTaskId((prev) => ({ ...prev, [task.id]: event.target.value }))
                     }
-                    className="h-11 w-40 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-2 text-sm"
+                    className="h-11 w-40 rounded-sm border border-(--color-border) bg-(--color-bg) px-2 text-sm"
                   >
                     {siblings.map((sibling) => (
                       <option key={sibling.id} value={sibling.id}>
@@ -185,7 +185,7 @@ export function DeleteColumnDialog({
         )}
       </div>
 
-      <p className="mt-4 border-t border-[var(--color-border)] pt-3 text-sm text-[var(--color-text-secondary)]">
+      <p className="mt-4 border-t border-(--color-border) pt-3 text-sm text-(--color-text-secondary)">
         This applies to everyone in the workspace.
       </p>
 
@@ -194,7 +194,7 @@ export function DeleteColumnDialog({
           type="button"
           data-cancel-button
           onClick={onClose}
-          className="min-h-11 rounded-sm border border-[var(--color-border)] px-4 py-2 text-sm transition-colors hover:bg-[var(--color-accent-subtle)]"
+          className="min-h-11 rounded-sm border border-(--color-border) px-4 py-2 text-sm transition-colors hover:bg-(--color-accent-subtle)"
         >
           Cancel
         </button>
@@ -202,7 +202,7 @@ export function DeleteColumnDialog({
           type="button"
           onClick={confirm}
           disabled={busy || tasks === null}
-          className="min-h-11 rounded-sm bg-[var(--color-danger-solid)] px-4 py-2 text-sm font-medium text-[var(--color-text-on-solid)] transition-colors hover:bg-[var(--color-danger-solid-hover)] disabled:opacity-50"
+          className="min-h-11 rounded-sm bg-(--color-danger-solid) px-4 py-2 text-sm font-medium text-(--color-text-on-solid) transition-colors hover:bg-(--color-danger-solid-hover) disabled:opacity-50"
         >
           Delete column
         </button>

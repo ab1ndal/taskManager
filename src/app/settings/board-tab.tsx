@@ -21,7 +21,7 @@ export async function BoardTab() {
 
   if (workspaceIds.length === 0) {
     return (
-      <p className="text-sm text-[var(--color-text-secondary)]">
+      <p className="text-sm text-(--color-text-secondary)">
         Join or create a workspace to configure board columns.
       </p>
     );

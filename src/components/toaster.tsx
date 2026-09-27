@@ -38,9 +38,9 @@ export function toast(message: string, type: "success" | "warning" | "error" = "
  * colour would go unreadable on one of the two.
  */
 const toastSurfaces: Record<Toast["type"], string> = {
-  error: "bg-[var(--color-danger-solid)] text-[var(--color-text-on-solid)]",
-  warning: "bg-[var(--color-warning-solid)] text-[var(--color-text-on-solid)]",
-  success: "bg-[var(--color-inverse-surface)] text-[var(--color-inverse-text)]",
+  error: "bg-(--color-danger-solid) text-(--color-text-on-solid)",
+  warning: "bg-(--color-warning-solid) text-(--color-text-on-solid)",
+  success: "bg-(--color-inverse-surface) text-(--color-inverse-text)",
 };
 
 function toastClasses(type: Toast["type"]) {

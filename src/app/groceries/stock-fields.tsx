@@ -1,7 +1,7 @@
 "use client";
 
 export type ExpiryMode = "none" | "date" | "estimate";
-const control = "block w-full min-w-0 h-11 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base";
+const control = "block w-full min-w-0 h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base";
 
 export function StockFields({ quantity, setQuantity, date, setDate, mode, setMode }: {
   quantity: string; setQuantity: (value: string) => void;
@@ -24,6 +24,6 @@ export function StockFields({ quantity, setQuantity, date, setDate, mode, setMod
       <input className={control} type="date" required min="2020-01-01" max="2100-01-01"
         value={date} onChange={(e) => setDate(e.target.value)} />
     </label>}
-    <p className="text-xs text-[var(--color-text-secondary)]">Leave quantity blank when you haven’t counted it.</p>
+    <p className="text-xs text-(--color-text-secondary)">Leave quantity blank when you haven’t counted it.</p>
   </div>;
 }

@@ -24,15 +24,15 @@ import type { BoardTask } from "./group-columns";
  * --color-surface so the deadline stays the loudest signal on it.
  */
 const VARIANT_CLASS = {
-  red: "bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]",
-  yellow: "bg-[var(--color-warning-surface)] text-[var(--color-warning-text)]",
-  green: "bg-[var(--color-success-surface)] text-[var(--color-success-text)]",
+  red: "bg-(--color-danger-surface) text-(--color-danger-text)",
+  yellow: "bg-(--color-warning-surface) text-(--color-warning-text)",
+  green: "bg-(--color-success-surface) text-(--color-success-text)",
 } as const;
 
 const KIND_CLASS: Record<string, string> = {
   household:
-    "bg-[var(--color-kind-household-surface)] text-[var(--color-kind-household-text)]",
-  work: "bg-[var(--color-kind-work-surface)] text-[var(--color-kind-work-text)]",
+    "bg-(--color-kind-household-surface) text-(--color-kind-household-text)",
+  work: "bg-(--color-kind-work-surface) text-(--color-kind-work-text)",
 };
 
 export function BoardCard({
@@ -82,10 +82,10 @@ export function BoardCard({
         @hello-pangea/dnd's own inline `transform`. A Tailwind `scale-*` class there would be
         overridden by that inline style on every frame of the drag.
       */
-      className={`relative rounded-md border bg-[var(--color-surface)] p-3 transition-[transform,box-shadow,opacity] duration-150 ease-out ${
+      className={`relative rounded-md border bg-(--color-surface) p-3 transition-[transform,box-shadow,opacity] duration-150 ease-out ${
         isDragging
-          ? "scale-[1.02] border-[var(--color-accent)]"
-          : "border-[var(--color-border)] hover:border-[var(--color-accent)]"
+          ? "scale-[1.02] border-(--color-accent)"
+          : "border-(--color-border) hover:border-(--color-accent)"
       } ${pending ? "opacity-40" : ""}`}
       style={{ boxShadow: isDragging ? "var(--shadow-lifted)" : "var(--shadow-card)" }}
     >
@@ -117,8 +117,8 @@ export function BoardCard({
         <h3
           className={`pr-7 text-sm font-medium [overflow-wrap:anywhere] ${
             task.completedAt
-              ? "text-[var(--color-text-muted)] line-through"
-              : "text-[var(--color-text-primary)]"
+              ? "text-(--color-text-muted) line-through"
+              : "text-(--color-text-primary)"
           }`}
         >
           {task.title}
@@ -171,7 +171,7 @@ export function BoardCard({
           className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
             pillVariant
               ? VARIANT_CLASS[pillVariant]
-              : "bg-[var(--color-surface-sunken)] text-[var(--color-text-muted)]"
+              : "bg-(--color-surface-sunken) text-(--color-text-muted)"
           }`}
         >
           {pillLabel}
@@ -181,7 +181,7 @@ export function BoardCard({
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
               KIND_CLASS[task.workspaceKind] ??
-              "bg-[var(--color-surface-sunken)] text-[var(--color-text-secondary)]"
+              "bg-(--color-surface-sunken) text-(--color-text-secondary)"
             }`}
           >
             {task.workspaceName}
@@ -193,7 +193,7 @@ export function BoardCard({
             aria-label={`Shared with ${task.assigneeCount - 1} other ${
               task.assigneeCount - 1 === 1 ? "person" : "people"
             }`}
-            className="inline-flex items-center rounded-full bg-[var(--color-accent-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--color-accent-text)]"
+            className="inline-flex items-center rounded-full bg-(--color-accent-subtle) px-2 py-0.5 text-xs font-medium text-(--color-accent-text)"
           >
             +{task.assigneeCount - 1}
           </span>

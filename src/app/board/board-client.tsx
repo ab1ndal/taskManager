@@ -317,10 +317,10 @@ export function BoardClient({
             <section
               key={column.key}
               aria-label={`${column.name}, ${items.length} task${items.length === 1 ? "" : "s"}`}
-              className="flex w-72 shrink-0 flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)]"
+              className="flex w-72 shrink-0 flex-col rounded-lg border border-(--color-border) bg-(--color-bg)"
             >
               <header
-                className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-lg border-b-2 bg-[var(--color-surface)] px-3 py-2.5"
+                className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-t-lg border-b-2 bg-(--color-surface) px-3 py-2.5"
                 style={{ borderBottomColor: accent }}
               >
                 <div className="flex min-w-0 items-center gap-2">
@@ -329,13 +329,13 @@ export function BoardClient({
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ backgroundColor: accent }}
                   />
-                  <h2 className="truncate text-sm font-semibold text-[var(--color-text-primary)]">
+                  <h2 className="truncate text-sm font-semibold text-(--color-text-primary)">
                     {column.name}
                   </h2>
                 </div>
                 {/* An empty column says so in its body; a `0` here as well is the same fact twice. */}
                 {items.length > 0 && (
-                  <span className="shrink-0 rounded-full bg-[var(--color-surface-sunken)] px-2 py-0.5 text-xs font-medium tabular-nums text-[var(--color-text-secondary)]">
+                  <span className="shrink-0 rounded-full bg-(--color-surface-sunken) px-2 py-0.5 text-xs font-medium tabular-nums text-(--color-text-secondary)">
                     {items.length}
                   </span>
                 )}
@@ -352,7 +352,7 @@ export function BoardClient({
                       tell where a card would land was to let go and see.
                     */
                     className={`flex flex-1 flex-col gap-2 p-2 transition-colors duration-150 ease-out ${
-                      snapshot.isDraggingOver ? "bg-[var(--color-accent-subtle)]" : ""
+                      snapshot.isDraggingOver ? "bg-(--color-accent-subtle)" : ""
                     } ${column.isDone && doneExpanded ? "max-h-[60dvh] overflow-y-auto" : ""}`}
                   >
                     {items.map((task, index) => (
@@ -383,7 +383,7 @@ export function BoardClient({
                       column keeps its own footer instead, which already explains itself.
                     */}
                     {items.length === 0 && !snapshot.isDraggingOver && (
-                      <p className="grid flex-1 place-content-center px-2 py-6 text-center text-xs text-[var(--color-text-muted)]">
+                      <p className="grid flex-1 place-content-center px-2 py-6 text-center text-xs text-(--color-text-muted)">
                         {column.isDone ? "Nothing finished yet." : "Drop a task here, or add one below."}
                       </p>
                     )}
@@ -405,7 +405,7 @@ export function BoardClient({
                     type="button"
                     onClick={() => setAddingIn({ columnId, workspaceId })}
                     aria-label={`Add a task to ${column.name}`}
-                    className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-b-lg border-t border-[var(--color-border)] px-3 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-accent-subtle)] hover:text-[var(--color-accent-text)]"
+                    className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-b-lg border-t border-(--color-border) px-3 text-sm font-medium text-(--color-text-secondary) transition-colors hover:bg-(--color-accent-subtle) hover:text-(--color-accent-text)"
                   >
                     <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                     Add task
@@ -434,7 +434,7 @@ export function BoardClient({
                     }}
                     aria-disabled={footerDisabled}
                     aria-busy={loadingOlder}
-                    className="min-h-11 w-full rounded-b-lg border-t border-[var(--color-border)] px-3 text-sm font-medium text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-accent-subtle)] aria-disabled:cursor-default aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
+                    className="min-h-11 w-full rounded-b-lg border-t border-(--color-border) px-3 text-sm font-medium text-(--color-text-secondary) transition-colors hover:bg-(--color-accent-subtle) aria-disabled:cursor-default aria-disabled:opacity-60 aria-disabled:hover:bg-transparent"
                   >
                     {label}
                     {/* The label change ("Loading…" / "No older tasks") is otherwise silent to a

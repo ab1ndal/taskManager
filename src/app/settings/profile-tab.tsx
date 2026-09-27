@@ -46,17 +46,17 @@ export function ProfileTab() {
     return (
       <div className="max-w-sm" aria-busy="true">
         <span className="sr-only">Loading your profile…</span>
-        <div className="mb-6 h-7 w-24 animate-pulse rounded-sm bg-[var(--color-border)]" />
+        <div className="mb-6 h-7 w-24 animate-pulse rounded-sm bg-(--color-border)" />
         <div className="mb-6 flex items-center gap-4">
-          <div className="h-14 w-14 animate-pulse rounded-full bg-[var(--color-border)]" />
+          <div className="h-14 w-14 animate-pulse rounded-full bg-(--color-border)" />
           <div className="flex flex-col gap-2">
-            <div className="h-4 w-32 animate-pulse rounded-sm bg-[var(--color-border)]" />
-            <div className="h-4 w-44 animate-pulse rounded-sm bg-[var(--color-border)]" />
+            <div className="h-4 w-32 animate-pulse rounded-sm bg-(--color-border)" />
+            <div className="h-4 w-44 animate-pulse rounded-sm bg-(--color-border)" />
           </div>
         </div>
         <div className="flex flex-col gap-4">
-          <div className="h-[38px] animate-pulse rounded-sm bg-[var(--color-border)]" />
-          <div className="h-[38px] animate-pulse rounded-sm bg-[var(--color-border)]" />
+          <div className="h-[38px] animate-pulse rounded-sm bg-(--color-border)" />
+          <div className="h-[38px] animate-pulse rounded-sm bg-(--color-border)" />
         </div>
       </div>
     );
@@ -69,14 +69,14 @@ export function ProfileTab() {
       <div className="flex items-center gap-4 mb-6">
         <Avatar name={name} email={email} size="lg" />
         <div>
-          <p className="text-sm font-semibold text-[var(--color-text-primary)]">{name || "—"}</p>
-          <p className="text-sm text-[var(--color-text-secondary)]">{email}</p>
+          <p className="text-sm font-semibold text-(--color-text-primary)">{name || "—"}</p>
+          <p className="text-sm text-(--color-text-secondary)">{email}</p>
         </div>
       </div>
 
       <form onSubmit={handleSave} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="name" className="text-xs font-medium text-[var(--color-text-secondary)]">
+          <label htmlFor="name" className="text-xs font-medium text-(--color-text-secondary)">
             Name
           </label>
           <input
@@ -85,14 +85,14 @@ export function ProfileTab() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+            className="min-h-11 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-[9px] text-sm"
             placeholder="Your name"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-[var(--color-text-secondary)]">Email</label>
-          <p className="rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm text-[var(--color-text-muted)] break-words">
+          <label className="text-xs font-medium text-(--color-text-secondary)">Email</label>
+          <p className="rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-[9px] text-sm text-(--color-text-muted) wrap-break-word">
             {email}
           </p>
         </div>
@@ -100,7 +100,7 @@ export function ProfileTab() {
         <button
           type="submit"
           disabled={loading}
-          className="w-fit min-h-11 rounded-sm bg-[var(--color-accent)] px-5 py-[10px] text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 transition-colors"
+          className="w-fit min-h-11 rounded-sm bg-(--color-accent) px-5 py-[10px] text-sm font-medium text-(--color-text-on-accent) hover:bg-(--color-accent-hover) disabled:opacity-50 transition-colors"
         >
           {loading ? "Saving…" : "Save changes"}
         </button>

@@ -41,8 +41,8 @@ export function NavLinks() {
             // minimum fits without changing how the bar looks.
             className={`flex-shrink-0 inline-flex items-center min-h-11 text-sm font-medium transition-colors duration-150 ${
               active
-                ? "text-[var(--color-text-primary)]"
-                : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                ? "text-(--color-text-primary)"
+                : "text-(--color-text-secondary) hover:text-(--color-text-primary)"
             }`}
           >
             {label}

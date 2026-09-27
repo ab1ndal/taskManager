@@ -14,7 +14,8 @@ describe("recurrenceSchema", () => {
   });
 
   it("defaults isActive to true when omitted", () => {
-    const { isActive, ...withoutActive } = validRecurrence;
+    const withoutActive: Partial<typeof validRecurrence> = { ...validRecurrence };
+    delete withoutActive.isActive;
     const parsed = recurrenceSchema.parse(withoutActive);
     expect(parsed.isActive).toBe(true);
   });

@@ -102,13 +102,13 @@ export function ColumnRow({
     <li
       ref={innerRef}
       {...draggableProps}
-      className="flex items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2"
+      className="flex items-center gap-3 rounded-md border border-(--color-border) bg-(--color-surface) px-3 py-2"
     >
       {dragHandleProps && (
         <button
           type="button"
           aria-label={`Reorder "${column.name}"`}
-          className="flex min-h-11 min-w-11 shrink-0 cursor-grab items-center justify-center text-[var(--color-text-muted)] active:cursor-grabbing"
+          className="flex min-h-11 min-w-11 shrink-0 cursor-grab items-center justify-center text-(--color-text-muted) active:cursor-grabbing"
           {...dragHandleProps}
         >
           <GripVertical size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
@@ -133,17 +133,17 @@ export function ColumnRow({
             if (nameError) setNameError(null);
           }}
           onBlur={saveName}
-          className="min-h-11 rounded-sm border border-transparent bg-transparent px-2 text-sm font-medium text-[var(--color-text-primary)] hover:border-[var(--color-border)]"
+          className="min-h-11 rounded-sm border border-transparent bg-transparent px-2 text-sm font-medium text-(--color-text-primary) hover:border-(--color-border)"
         />
         {nameError && (
-          <span id={`${captionId}-name-error`} className="px-2 text-xs text-[var(--color-danger-text)]">
+          <span id={`${captionId}-name-error`} className="px-2 text-xs text-(--color-danger-text)">
             {nameError}
           </span>
         )}
         {column.isDone && (
           <span
             id={`${captionId}-done`}
-            className="flex items-center gap-1 px-2 text-xs text-[var(--color-text-secondary)]"
+            className="flex items-center gap-1 px-2 text-xs text-(--color-text-secondary)"
           >
             <CheckCircle2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             Completed tasks land here
@@ -165,8 +165,8 @@ export function ColumnRow({
           setConfirmingDelete(true);
         }}
         title={deleteDisabled ? "A workspace needs at least one active column" : undefined}
-        className={`flex min-h-11 min-w-11 items-center justify-center rounded-sm text-[var(--color-danger-text)] ${
-          deleteDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-[var(--color-danger-surface)]"
+        className={`flex min-h-11 min-w-11 items-center justify-center rounded-sm text-(--color-danger-text) ${
+          deleteDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-(--color-danger-surface)"
         }`}
       >
         <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />

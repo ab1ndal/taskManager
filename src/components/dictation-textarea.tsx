@@ -74,8 +74,8 @@ export function DictationTextarea({
           disabled={textareaProps.disabled}
           className={`absolute right-1.5 bottom-1.5 w-11 h-11 flex items-center justify-center rounded-full text-sm disabled:opacity-50 transition-colors ${
             isDictating
-              ? "bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]"
-              : "text-[var(--color-text-muted)] hover:bg-[var(--color-accent-subtle)] hover:text-[var(--color-accent-text)]"
+              ? "bg-(--color-danger-surface) text-(--color-danger-text)"
+              : "text-(--color-text-muted) hover:bg-(--color-accent-subtle) hover:text-(--color-accent-text)"
           }`}
         >
           {isDictating ? (
@@ -91,7 +91,7 @@ export function DictationTextarea({
         </button>
       )}
       {dictation.errorField === field && dictation.error && (
-        <p role="alert" className="mt-1 text-2xs text-[var(--color-danger-text)]">
+        <p role="alert" className="mt-1 text-2xs text-(--color-danger-text)">
           {dictation.error}
         </p>
       )}

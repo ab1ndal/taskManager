@@ -210,14 +210,14 @@ export function NewTaskModal({
       <Dialog
         open={open}
         onClose={onClose}
-        className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm text-center backdrop:bg-[var(--color-scrim)]"
+        className="rounded-lg border border-(--color-border) bg-(--color-surface) shadow-xl p-6 w-full max-w-sm text-center backdrop:bg-(--color-scrim)"
       >
-        <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+        <p className="text-sm text-(--color-text-secondary) mb-4">
           You must join a workspace before creating tasks.
         </p>
         <a
           href="/workspaces"
-          className="text-sm font-medium text-[var(--color-accent)] hover:underline"
+          className="text-sm font-medium text-(--color-accent) hover:underline"
         >
           Go to Workspaces
         </a>
@@ -269,7 +269,7 @@ export function NewTaskModal({
             so there is no single control for it to point at.
           */}
           <div>
-            <p className="block text-xs text-[var(--color-text-muted)] mb-2">
+            <p className="block text-xs text-(--color-text-muted) mb-2">
               Subtasks
             </p>
             <div className="flex flex-col gap-1">
@@ -283,13 +283,13 @@ export function NewTaskModal({
               {subtaskRows.map((row, i) => (
                 <div
                   key={i}
-                  className="flex flex-col gap-2 rounded-sm border border-[var(--color-border)] p-2"
+                  className="flex flex-col gap-2 rounded-sm border border-(--color-border) p-2"
                 >
                   <div className="flex items-center gap-2">
                     <Circle
                       size={ICON_SECONDARY}
                       strokeWidth={ICON_STROKE}
-                      className="text-[var(--color-text-muted)] shrink-0"
+                      className="text-(--color-text-muted) shrink-0"
                       aria-hidden="true"
                     />
                     <input
@@ -301,14 +301,14 @@ export function NewTaskModal({
                       onKeyDown={(e) => handleSubtaskKeyDown(e, row.title)}
                       disabled={disabled}
                       ref={i === subtaskRows.length - 1 ? lastSubtaskRef : undefined}
-                      className="min-h-11 flex-1 min-w-0 border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                      className="min-h-11 flex-1 min-w-0 border border-(--color-border) rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
                     />
                     <button
                       type="button"
                       onClick={() => removeSubtask(i)}
                       disabled={disabled}
                       aria-label={`Remove subtask ${i + 1}`}
-                      className="shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-50"
+                      className="shrink-0 w-11 h-11 flex items-center justify-center text-(--color-text-muted) hover:text-(--color-text-primary) disabled:opacity-50"
                     >
                       <X size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                     </button>
@@ -327,7 +327,7 @@ export function NewTaskModal({
                       disabled={disabled}
                       rows={2}
                       wrapperClassName="w-full sm:flex-1 min-w-0"
-                      className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+                      className="min-h-11 w-full border border-(--color-border) rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
                     />
                     <input
                       type="date"
@@ -338,7 +338,7 @@ export function NewTaskModal({
                       // Safari renders a date input without a picker glyph and sizes it to its own
                       // text: at `text-xs` it came out 96px, narrower than the value it holds. The
                       // explicit floor keeps it legible in every engine.
-                      className="min-h-11 w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+                      className="min-h-11 w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-(--color-border) rounded-sm px-2 py-1 text-xs bg-(--color-surface) disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -348,14 +348,14 @@ export function NewTaskModal({
               type="button"
               onClick={addSubtaskRow}
               disabled={disabled}
-              className="mt-1 inline-flex items-center min-h-11 text-sm text-[var(--color-accent)] hover:underline disabled:opacity-50"
+              className="mt-1 inline-flex items-center min-h-11 text-sm text-(--color-accent) hover:underline disabled:opacity-50"
             >
               + Add subtask
             </button>
           </div>
 
           {formError && (
-            <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+            <p role="alert" className="rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)">
               {formError}
             </p>
           )}
@@ -365,14 +365,14 @@ export function NewTaskModal({
               type="button"
               onClick={onClose}
               disabled={disabled}
-              className="min-h-11 px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
+              className="min-h-11 px-4 py-2 text-sm rounded-sm border border-(--color-border) hover:bg-(--color-accent-subtle) transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || selectedMemberIds.length === 0 || pending}
-              className="min-h-11 px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="min-h-11 px-4 py-2 text-sm font-medium rounded-sm bg-(--color-accent) text-(--color-text-on-accent) hover:bg-(--color-accent-hover) disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {pending ? "Adding…" : "Add task"}
             </button>

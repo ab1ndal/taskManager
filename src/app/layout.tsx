@@ -63,17 +63,17 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className={`${inter.className} min-h-screen bg-[var(--color-bg)] text-[var(--color-text-primary)]`}>
+      <body className={`${inter.className} min-h-screen bg-(--color-bg) text-(--color-text-primary)`}>
         {user && (
           // safe-top/safe-x add the notch insets on top of the bar's own height, so a standalone
           // launch does not render the wordmark under the status bar or behind a rounded corner.
           // px-3/gap-3 rather than px-5/gap-4: the bar's intrinsic width was 387px, so on a 393px
           // iPhone "Sign out" wrapped to two lines inside a 52px bar, and below 387px the whole
           // page scrolled sideways. The tighter spacing takes it to ~355px with nothing hidden.
-          <nav className="safe-top sticky top-0 z-30 h-[calc(var(--nav-height)+env(safe-area-inset-top))] border-b border-[var(--color-border)] bg-[var(--color-surface)] flex items-center px-3 gap-3">
+          <nav className="safe-top sticky top-0 z-30 h-[calc(var(--nav-height)+env(safe-area-inset-top))] border-b border-(--color-border) bg-(--color-surface) flex items-center px-3 gap-3">
             {/* Wordmark */}
             <Link href="/tasks" className="inline-flex items-center min-h-11 font-semibold text-base tracking-tight flex-shrink-0 hover:opacity-80 transition-opacity duration-150">
-              hearth<span className="text-[var(--color-accent)]">.</span>
+              hearth<span className="text-(--color-accent)">.</span>
             </Link>
 
             <NavLinks />

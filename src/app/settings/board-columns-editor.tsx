@@ -146,10 +146,10 @@ export function BoardColumnsEditor({
 
   return (
     <section aria-label={`${workspaceName} columns`}>
-      <h2 className="text-base font-semibold tracking-tight text-[var(--color-text-primary)]">
+      <h2 className="text-base font-semibold tracking-tight text-(--color-text-primary)">
         {workspaceName}
       </h2>
-      <p className="mb-3 mt-0.5 flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)]">
+      <p className="mb-3 mt-0.5 flex items-center gap-1.5 text-sm text-(--color-text-secondary)">
         <Users size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
         These columns are shared. Changes apply to everyone in {workspaceName}.
       </p>
@@ -208,19 +208,19 @@ export function BoardColumnsEditor({
               setNewName(event.target.value);
               if (nameError) setNameError(null);
             }}
-            className="min-h-11 flex-1 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 text-sm placeholder:text-[var(--color-text-secondary)]"
+            className="min-h-11 flex-1 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 text-sm placeholder:text-(--color-text-secondary)"
           />
           <button
             type="submit"
             disabled={saving || newName.trim().length === 0}
-            className="flex min-h-11 items-center gap-1.5 rounded-sm bg-[var(--color-accent)] px-4 text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
+            className="flex min-h-11 items-center gap-1.5 rounded-sm bg-(--color-accent) px-4 text-sm font-medium text-(--color-text-on-accent) hover:bg-(--color-accent-hover) disabled:opacity-50"
           >
             <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             Add
           </button>
         </div>
         {nameError && (
-          <span id={errorId} className="px-1 text-xs text-[var(--color-danger-text)]">
+          <span id={errorId} className="px-1 text-xs text-(--color-danger-text)">
             {nameError}
           </span>
         )}

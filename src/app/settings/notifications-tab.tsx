@@ -76,11 +76,11 @@ export function NotificationsTab() {
     finally { setBusy(false); }
   }
 
-  const fieldClass = 'min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm';
+  const fieldClass = 'min-h-11 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm';
   return (
     <section className="max-w-md" aria-labelledby="notifications-heading">
       <h2 id="notifications-heading" className="mb-3 text-xl font-semibold tracking-tight">Notifications</h2>
-      <p className="mb-6 text-sm text-[var(--color-text-secondary)]">Daily digests of your overdue, due today, and upcoming tasks. Work and personal tasks go to their own email addresses. No message when there’s nothing due.</p>
+      <p className="mb-6 text-sm text-(--color-text-secondary)">Daily digests of your overdue, due today, and upcoming tasks. Work and personal tasks go to their own email addresses. No message when there’s nothing due.</p>
       {message && <p role="status" className="mb-4 text-sm">{message}</p>}
       {!loaded ? <p aria-busy="true">Loading notification settings…</p> : (
         <form onSubmit={save} className="flex flex-col gap-5">
@@ -96,8 +96,8 @@ export function NotificationsTab() {
             <label className="flex flex-col gap-2 text-sm">Personal email
               <input type="email" maxLength={254} value={prefs.personal_email} onChange={e => setPrefs({ ...prefs, personal_email: e.target.value.trim() })} className={fieldClass} autoComplete="email" />
             </label>
-            <p className="text-xs text-[var(--color-text-secondary)]">Routing uses workspace type, regardless of its name. Household workspaces use your personal email. Leave an address blank to skip that type’s emails.</p>
-            {!emailAvailable && <p className="text-sm text-[var(--color-text-secondary)]">Email reminders will be available once the sender is configured.</p>}
+            <p className="text-xs text-(--color-text-secondary)">Routing uses workspace type, regardless of its name. Household workspaces use your personal email. Leave an address blank to skip that type’s emails.</p>
+            {!emailAvailable && <p className="text-sm text-(--color-text-secondary)">Email reminders will be available once the sender is configured.</p>}
             <label className="flex min-h-11 items-center gap-3 text-sm">
               <input type="checkbox" checked={prefs.push_enabled} onChange={e => setPrefs({ ...prefs, push_enabled: e.target.checked })} disabled={!deviceEnabled && !prefs.push_enabled} />
               Daily push reminders on connected devices
@@ -105,12 +105,12 @@ export function NotificationsTab() {
             <button type="button" disabled={!pushSupported || !publicKey} onClick={toggleDevice} className={`${fieldClass} w-fit disabled:opacity-50`}>
               {deviceEnabled ? 'Disable on this device' : 'Enable on this device'}
             </button>
-            {!pushSupported && <p className="text-sm text-[var(--color-text-secondary)]">On iPhone, add Hearth to your Home Screen from Safari’s share menu, then open it there to enable notifications.</p>}
-            {pushSupported && !publicKey && <p className="text-sm text-[var(--color-text-secondary)]">Push notifications will be available once delivery is configured.</p>}
+            {!pushSupported && <p className="text-sm text-(--color-text-secondary)">On iPhone, add Hearth to your Home Screen from Safari’s share menu, then open it there to enable notifications.</p>}
+            {pushSupported && !publicKey && <p className="text-sm text-(--color-text-secondary)">Push notifications will be available once delivery is configured.</p>}
             <label className="flex flex-col gap-2 text-sm">Daily reminder time
               <input type="time" required step={900} value={prefs.digest_time} onChange={e => setPrefs({ ...prefs, digest_time: e.target.value })} className={fieldClass} />
             </label>
-            <p className="-mt-3 text-xs text-[var(--color-text-secondary)]">Choose a quarter-hour time. Sent within about 15 minutes of it.</p>
+            <p className="-mt-3 text-xs text-(--color-text-secondary)">Choose a quarter-hour time. Sent within about 15 minutes of it.</p>
             <label className="flex flex-col gap-2 text-sm">Timezone
               <input required list="reminder-timezones" value={prefs.timezone} onChange={e => setPrefs({ ...prefs, timezone: e.target.value })} className={fieldClass} />
               <datalist id="reminder-timezones">{['UTC', ...Intl.supportedValuesOf('timeZone')].map(zone => <option key={zone} value={zone} />)}</datalist>
@@ -118,7 +118,7 @@ export function NotificationsTab() {
             <label className="flex flex-col gap-2 text-sm">Include tasks due in the next (days)
               <input type="number" min={1} max={30} required value={prefs.soon_window_days} onChange={e => setPrefs({ ...prefs, soon_window_days: Number(e.target.value) })} className={fieldClass} />
             </label>
-            <button type="submit" className="min-h-11 w-fit rounded-sm bg-[var(--color-accent)] px-5 py-2 text-sm font-medium text-[var(--color-text-on-accent)]">{busy ? 'Saving…' : 'Save changes'}</button>
+            <button type="submit" className="min-h-11 w-fit rounded-sm bg-(--color-accent) px-5 py-2 text-sm font-medium text-(--color-text-on-accent)">{busy ? 'Saving…' : 'Save changes'}</button>
           </fieldset>
         </form>
       )}

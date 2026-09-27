@@ -64,8 +64,8 @@ function ForgetConfirm({ item, onConfirm, onCancel }: { item: GroceryItem; onCon
 }
 
 const CATEGORY_TAG =
-  "text-2xs font-medium px-2 py-0.5 rounded-full bg-[var(--color-surface-sunken)] " +
-  "text-[var(--color-text-secondary)]";
+  "text-2xs font-medium px-2 py-0.5 rounded-full bg-(--color-surface-sunken) " +
+  "text-(--color-text-secondary)";
 
 /**
  * Grocery expiry deliberately avoids the danger/warning/success trio task-card.tsx uses for
@@ -79,9 +79,9 @@ function ExpiryLine({ item, today }: { item: GroceryItem; today: string }) {
   const label = `${item.expiryIsEstimate ? "~" : ""}${formatExpiry(item.expiresOn, today)}`;
 
   return (
-    <span className="text-2xs text-[var(--color-text-muted)]">
+    <span className="text-2xs text-(--color-text-muted)">
       {expired ? (
-        <span className="font-medium px-2 py-0.5 rounded-full bg-[var(--color-warning-surface)] text-[var(--color-warning-text)]">
+        <span className="font-medium px-2 py-0.5 rounded-full bg-(--color-warning-surface) text-(--color-warning-text)">
           expired
         </span>
       ) : (
@@ -100,11 +100,11 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
   const batchesId = `batches-${item.id}`;
 
   return (
-    <li className="px-3 py-1 border-b border-[var(--color-border)]">
+    <li className="px-3 py-1 border-b border-(--color-border)">
       <div className="flex items-center gap-3 min-h-11">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium break-words text-[var(--color-text-primary)]">
+          <span className="text-sm font-medium wrap-break-word text-(--color-text-primary)">
             {item.name}
           </span>
           <span className={CATEGORY_TAG}>{categoryLabel(item.category)}</span>
@@ -118,7 +118,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
                 aria-label={`One fewer ${item.name}`}
                 disabled={pending}
                 onClick={() => call(() => adjustQuantity({ itemId: item.id, delta: -1 }))}
-                className="inline-flex items-center justify-center size-11 rounded-full text-[var(--color-text-secondary)]"
+                className="inline-flex items-center justify-center size-11 rounded-full text-(--color-text-secondary)"
               >
                 <Minus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} />
               </button>
@@ -128,7 +128,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
                 aria-label={`One more ${item.name}`}
                 disabled={pending}
                 onClick={() => call(() => adjustQuantity({ itemId: item.id, delta: 1 }))}
-                className="inline-flex items-center justify-center size-11 rounded-full text-[var(--color-text-secondary)]"
+                className="inline-flex items-center justify-center size-11 rounded-full text-(--color-text-secondary)"
               >
                 <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} />
               </button>
@@ -142,7 +142,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
               aria-expanded={showBatches}
               aria-controls={batchesId}
               onClick={() => setShowBatches((open) => !open)}
-              className="inline-flex items-center gap-0.5 min-h-11 text-2xs text-[var(--color-accent-text)]"
+              className="inline-flex items-center gap-0.5 min-h-11 text-2xs text-(--color-accent-text)"
             >
               {item.lots.length} {item.lots.length === 1 ? "batch" : "batches"}
               <ChevronDown
@@ -164,8 +164,8 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
         onClick={() => call(() => setNeeded({ itemId: item.id, needed: !item.needed }))}
         className={`shrink-0 inline-flex items-center min-h-11 px-3 rounded-full text-xs font-medium ${
           item.needed
-            ? "bg-[var(--color-accent)] text-[var(--color-text-on-accent)]"
-            : "border border-[var(--color-border)] text-[var(--color-text-secondary)]"
+            ? "bg-(--color-accent) text-(--color-text-on-accent)"
+            : "border border-(--color-border) text-(--color-text-secondary)"
         }`}
       >
         Need
@@ -217,7 +217,7 @@ export function ShoppingRow({ item, onPurchase }: { item: GroceryItem; onPurchas
   const [forgetting, setForgetting] = useState(false);
 
   return (
-    <li className="border-b border-[var(--color-border)]">
+    <li className="border-b border-(--color-border)">
       <div className="flex items-center gap-3">
         {/* The whole row is the target, not just the circle: this is tapped one-handed in a shop. */}
         <button
@@ -227,18 +227,18 @@ export function ShoppingRow({ item, onPurchase }: { item: GroceryItem; onPurchas
           onClick={() => onPurchase(item)}
           className="flex-1 flex items-center gap-3 min-h-11 px-3 py-2 text-left"
         >
-          <span className="shrink-0 inline-flex items-center justify-center size-6 rounded-full border border-[var(--color-control-idle)]">
+          <span className="shrink-0 inline-flex items-center justify-center size-6 rounded-full border border-(--color-control-idle)">
             {pending && <Check size={ICON_SECONDARY} strokeWidth={ICON_STROKE} />}
           </span>
           <span className="min-w-0">
             <span className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium break-words text-[var(--color-text-primary)]">
+              <span className="text-sm font-medium wrap-break-word text-(--color-text-primary)">
                 {item.name}
               </span>
             </span>
             {/* What the shopper actually wants at the shelf: how much is already at home. */}
             {item.inStock && item.quantity !== null && (
-              <span className="block text-2xs text-[var(--color-text-muted)]">
+              <span className="block text-2xs text-(--color-text-muted)">
                 have {item.quantity}
               </span>
             )}
