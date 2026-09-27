@@ -513,3 +513,39 @@ check standalone display mode too (`isIosSpeechRecognitionBroken` in `use-speech
 fall back to the OS keyboard, same as groceries. Separately, any `onend`/error-driven auto-restart
 loop needs a rate cap independent of the platform check — a broken recognizer that ends the instant
 it starts will hang the app the same way regardless of which platform quirk caused it.
+
+## L22 — Jest's modern fake timers fake `queueMicrotask` too
+
+**Learned:** 2026-09-27, `use-audio-recorder.test.ts`.
+
+A fake `MediaRecorder` fired `onstop` via `queueMicrotask` (browser-shaped async, per the
+useSpeechRecognition lesson). Under `jest.useFakeTimers()` four tests hung with `onstop` never
+running, while the one test that called `advanceTimersByTime` passed — because advancing timers
+also flushes faked microtasks. Looked like a hook bug; was the harness.
+
+**Rule:** when a test both fakes timers and relies on microtasks, use
+`jest.useFakeTimers({ doNotFake: ["queueMicrotask"] })`.
+
+## L23 — `@ai-sdk/openai` cannot drive `gpt-transcribe` properly
+
+**Learned:** 2026-09-27, grocery transcription.
+
+`gpt-transcribe` (OpenAI's recommended model for recorded speech) takes `keywords[]` and
+`languages[]` (plural — do not also send `language`). `@ai-sdk/openai` 4.0.78's transcription
+options have neither, and it would default this model to `response_format=verbose_json`. The call is
+one multipart POST, so `transcribe-actions.ts` uses plain `fetch` and the SDK was not added. Recheck
+if a later SDK release adds the fields.
+
+
+## L24 — AI SDK provider skew, then a stale `tsconfig.tsbuildinfo`
+
+**Learned:** 2026-09-27, swapping the grocery parser to `@ai-sdk/openai`.
+
+`@ai-sdk/openai@4.0.78` depends on `@ai-sdk/provider@4.0.18`; `ai@7.0.99` was on 4.0.14. Two
+copies made `openai(...)` fail typecheck as "LanguageModelV4 is not assignable to LanguageModel".
+Fix was bumping `ai` to the release on the same provider version (7.0.118). After that, typecheck
+still failed pointing into the now-deleted nested copy: `tsconfig.json` has `incremental: true` and
+the `tsconfig.tsbuildinfo` cache kept the old resolution.
+
+**Rule:** after adding an `@ai-sdk/*` provider, `npm ls @ai-sdk/provider` must show one version.
+After any dependency reshuffle, delete `tsconfig.tsbuildinfo` before trusting a typecheck error.

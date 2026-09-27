@@ -79,6 +79,12 @@ It works fine in an ordinary Safari tab; only the standalone install is affected
 hides the in-app mic button (`DictationTextarea`, `dictate-sheet.tsx`) rather than hanging in a tight
 restart loop. The iOS keyboard's own dictation still works on any focused text field regardless.
 
+Recording, unlike recognition, does work there: `getUserMedia` plus `MediaRecorder`, which produces
+`audio/mp4` on iOS. The grocery dictation sheet's Record button (`use-audio-recorder.ts`) records a
+clip and sends it to OpenAI for transcription instead of relying on the keyboard. The recording
+stops on `visibilitychange` to hidden, because iOS cuts the microphone when the app is backgrounded.
+Whether iOS re-asks for microphone permission on every launch of the installed app is not verified.
+
 ## Screen sizes
 
 The two target phones are 393px (iPhone 14 Pro) and 402px (iPhone 16 Pro) wide, and both are

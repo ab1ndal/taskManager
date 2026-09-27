@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
-import { Mic, TriangleAlert, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
+import { LoaderCircle, Mic, Square, TriangleAlert, Trash2 } from "lucide-react";
 
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR } from "@/app/tasks/action-result";
@@ -9,6 +9,9 @@ import { addGroceryItem } from "./actions";
 import { parseGroceryDictation } from "./dictate-actions";
 import { GROCERY_CATEGORIES, isCategorySlug } from "./categories";
 import type { ReviewGroceryItem } from "./dictate-schema";
+import { transcribeGroceryAudio } from "./transcribe-actions";
+import { MAX_RECORDING_MS, RECORDING_BITS_PER_SECOND } from "./transcribe-schema";
+import { useAudioRecorder, type RecorderStatus } from "@/lib/use-audio-recorder";
 
 type ReviewRow = ReviewGroceryItem & { id: string; error?: string };
 
@@ -22,9 +25,11 @@ const inputClass =
 /**
  * Dictation entry point for one grocery view (shopping list or pantry).
  *
- * Speech-to-text happens in the OS keyboard, not here (docs/ios.md — iOS Safari has no
- * `SpeechRecognition`): this component's job starts once the user has typed or dictated a
- * transcript into the textarea. Parsing never inserts anything by itself — every accepted row goes
+ * Speech-to-text is a recorded clip sent to OpenAI (`transcribeGroceryAudio`), not the browser's
+ * `SpeechRecognition`, which does not work in the installed iPhone app (docs/ios.md). The returned
+ * text is appended to the editable textarea — typing and the OS keyboard's own dictation still
+ * work there too — and nothing is parsed until the user taps Parse. Parsing never inserts anything
+ * by itself — every accepted row goes
  * through `addGroceryItem`, the same action the plain add row uses, so there is one insert path
  * whether an item was typed one at a time or dictated as a list.
  */
@@ -35,9 +40,54 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, startParsing] = useTransition();
   const [committing, startCommitting] = useTransition();
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcribeError, setTranscribeError] = useState<string | null>(null);
+  // Bumped whenever the sheet resets, so a transcription that returns after Cancel is dropped
+  // rather than written into a sheet the user already closed.
+  const sessionRef = useRef(0);
   const headingId = useId();
 
+  const onRecorded = useCallback(
+    async (audio: Blob) => {
+      const session = sessionRef.current;
+      setTranscribing(true);
+      setTranscribeError(null);
+      const formData = new FormData();
+      formData.append("workspaceId", workspaceId);
+      formData.append("audio", audio);
+      try {
+        const result = await transcribeGroceryAudio(formData);
+        if (session !== sessionRef.current) return;
+        if (!result.ok) {
+          setTranscribeError(result.error);
+        } else if (result.text === "") {
+          setTranscribeError("Didn't catch anything — try again a little closer to the mic.");
+        } else {
+          setTranscript((current) => (current.trim() === "" ? result.text : `${current.trimEnd()} ${result.text}`));
+        }
+      } catch (error) {
+        console.error("grocery transcription call rejected", error);
+        if (session === sessionRef.current) setTranscribeError(GENERIC_ERROR);
+      } finally {
+        if (session === sessionRef.current) setTranscribing(false);
+      }
+    },
+    [workspaceId],
+  );
+
+  const recorder = useAudioRecorder({
+    onRecorded,
+    maxDurationMs: MAX_RECORDING_MS,
+    audioBitsPerSecond: RECORDING_BITS_PER_SECOND,
+  });
+  const recording = recorder.status !== "idle";
+  const busy = recording || transcribing;
+
   function reset() {
+    sessionRef.current += 1;
+    recorder.cancel();
+    setTranscribing(false);
+    setTranscribeError(null);
     setOpen(false);
     setTranscript("");
     setRows(null);
@@ -45,7 +95,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
   }
 
   function parse() {
-    if (parsing || transcript.trim() === "") return;
+    if (parsing || busy || transcript.trim() === "") return;
     setParseError(null);
     startParsing(async () => {
       try {
@@ -148,10 +198,30 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
             value={transcript}
             onChange={(event) => setTranscript(event.target.value)}
             aria-label="Dictated grocery list"
-            placeholder="Tap the keyboard mic and say your list, e.g. “milk, dozen eggs, couple lemons, we're low on olive oil”"
+            placeholder={
+              recorder.isSupported
+                ? "Tap Record and say your list, e.g. “milk, dozen eggs, couple lemons, we're low on olive oil”"
+                : "Tap the keyboard mic and say your list, e.g. “milk, dozen eggs, couple lemons, we're low on olive oil”"
+            }
             rows={4}
             className={`${inputClass} py-2 resize-y`}
           />
+          {recorder.isSupported && (
+            <RecordControl
+              status={recorder.status}
+              transcribing={transcribing}
+              onStart={() => {
+                setTranscribeError(null);
+                void recorder.start();
+              }}
+              onStop={recorder.stop}
+            />
+          )}
+          {(recorder.error ?? transcribeError) && (
+            <p role="alert" className="text-sm text-[var(--color-danger-text)]">
+              {recorder.error ?? transcribeError}
+            </p>
+          )}
           {parseError && (
             <p role="alert" className="text-sm text-[var(--color-danger-text)]">
               {parseError}
@@ -160,7 +230,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
           <button
             type="button"
             onClick={parse}
-            disabled={parsing || transcript.trim() === ""}
+            disabled={parsing || busy || transcript.trim() === ""}
             className="min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm font-medium disabled:opacity-50"
           >
             {parsing ? "Parsing…" : "Parse"}
@@ -262,6 +332,89 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function formatElapsed(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Record / Stop / Transcribing button with an elapsed-time readout. Text labels, not icon-only, so
+ * the state is never conveyed by colour or a pulsing dot alone; motion is `motion-safe` only.
+ */
+function RecordControl({
+  status,
+  transcribing,
+  onStart,
+  onStop,
+}: {
+  status: RecorderStatus;
+  transcribing: boolean;
+  onStart: () => void;
+  onStop: () => void;
+}) {
+  const [elapsedMs, setElapsedMs] = useState(0);
+
+  useEffect(() => {
+    if (status !== "recording") return;
+    const startedAt = Date.now();
+    const interval = setInterval(() => setElapsedMs(Date.now() - startedAt), 250);
+    return () => {
+      clearInterval(interval);
+      setElapsedMs(0);
+    };
+  }, [status]);
+
+  const announcement =
+    status === "starting"
+      ? "Waiting for microphone"
+      : status === "recording"
+        ? "Recording"
+        : transcribing
+          ? "Transcribing"
+          : "";
+
+  return (
+    <div className="flex items-center gap-3">
+      {status === "idle" ? (
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={transcribing}
+          className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-medium disabled:opacity-50"
+        >
+          {transcribing ? (
+            <LoaderCircle size={16} aria-hidden className="motion-safe:animate-spin" />
+          ) : (
+            <Mic size={16} aria-hidden />
+          )}
+          {transcribing ? "Transcribing…" : "Record"}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onStop}
+          className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-full border border-[var(--color-danger-text)] text-[var(--color-danger-text)] bg-[var(--color-surface)] text-sm font-medium"
+        >
+          <Square size={14} aria-hidden fill="currentColor" />
+          Stop
+        </button>
+      )}
+      {status === "recording" && (
+        <span className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] tabular-nums">
+          <span aria-hidden className="size-2 rounded-full bg-[var(--color-danger-text)] motion-safe:animate-pulse" />
+          Recording {formatElapsed(elapsedMs)} / {formatElapsed(MAX_RECORDING_MS)}
+        </span>
+      )}
+      {status === "starting" && (
+        <span className="text-sm text-[var(--color-text-secondary)]">Waiting for microphone…</span>
+      )}
+      <span aria-live="polite" className="sr-only">
+        {announcement}
+      </span>
     </div>
   );
 }
