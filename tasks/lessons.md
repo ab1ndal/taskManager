@@ -571,4 +571,7 @@ fragment).
 `npx jest <path>` also ran copies under `.claude/worktrees/agent-*`, which fail with a duplicate-React
 "reading 'useState'" error and look like real regressions. Run
 `npx jest --testPathIgnorePatterns '/.claude/'` or delete stale worktrees.
+**Resolved 2026-09-27:** `jest.config.ts` and `eslint.config.mjs` now ignore `.claude/`, so plain
+`npx jest` / `npx eslint .` only see the real tree. Tests that open `Dialog` must stub
+`HTMLDialogElement.prototype.showModal` (jsdom lacks it) — copy the stub from any dialog test.
 
