@@ -22,12 +22,12 @@ export default function TasksError({
   return (
     <div className="flex flex-col items-center gap-4 py-20 text-center">
       <h2 className="text-base font-semibold">Your tasks could not be loaded</h2>
-      <p className="max-w-sm text-sm text-[var(--color-text-secondary)]">
+      <p className="max-w-sm text-sm text-(--color-text-secondary)">
         Something went wrong while loading this page. Trying again usually helps.
       </p>
       <button
         onClick={reset}
-        className="min-h-11 rounded-sm bg-[var(--color-accent)] px-4 py-2 text-sm font-medium text-[var(--color-text-on-accent)] transition-colors hover:bg-[var(--color-accent-hover)]"
+        className="min-h-11 rounded-sm bg-(--color-accent) px-4 py-2 text-sm font-medium text-(--color-text-on-accent) transition-colors hover:bg-(--color-accent-hover)"
       >
         Try again
       </button>

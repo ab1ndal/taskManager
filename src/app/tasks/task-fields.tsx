@@ -103,7 +103,7 @@ export function TaskFields({
         never associated with anything.
       */}
       <div>
-        <label htmlFor={`${idPrefix}-title`} className="block text-xs text-[var(--color-text-muted)] mb-1">
+        <label htmlFor={`${idPrefix}-title`} className="block text-xs text-(--color-text-muted) mb-1">
           Title
         </label>
         <input
@@ -113,12 +113,12 @@ export function TaskFields({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           disabled={disabled}
-          className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
+          className="min-h-11 w-full border border-(--color-border) rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
         />
       </div>
 
       <div>
-        <label htmlFor={`${idPrefix}-description`} className="block text-xs text-[var(--color-text-muted)] mb-1">
+        <label htmlFor={`${idPrefix}-description`} className="block text-xs text-(--color-text-muted) mb-1">
           Details (optional)
         </label>
         <DictationTextarea
@@ -131,12 +131,12 @@ export function TaskFields({
           onChange={onDescriptionChange}
           disabled={disabled}
           rows={3}
-          className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
+          className="min-h-11 w-full border border-(--color-border) rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
         />
       </div>
 
       <div>
-        <label htmlFor={`${idPrefix}-due`} className="block text-xs text-[var(--color-text-muted)] mb-1">
+        <label htmlFor={`${idPrefix}-due`} className="block text-xs text-(--color-text-muted) mb-1">
           Due date (optional)
         </label>
         <input
@@ -145,7 +145,7 @@ export function TaskFields({
           value={dueAt}
           onChange={(e) => onDueAtChange(e.target.value)}
           disabled={disabled}
-          className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+          className="min-h-11 w-full border border-(--color-border) rounded-sm px-3 py-2 text-sm bg-(--color-surface) disabled:opacity-50"
         />
       </div>
 
@@ -155,7 +155,7 @@ export function TaskFields({
       */}
       {showWorkspace && (
         <div>
-          <label htmlFor={`${idPrefix}-workspace`} className="block text-xs text-[var(--color-text-muted)] mb-1">
+          <label htmlFor={`${idPrefix}-workspace`} className="block text-xs text-(--color-text-muted) mb-1">
             Workspace
           </label>
           <select
@@ -163,7 +163,7 @@ export function TaskFields({
             value={workspaceId}
             onChange={(e) => onWorkspaceChange(e.target.value)}
             disabled={disabled}
-            className="h-11 w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+            className="h-11 w-full border border-(--color-border) rounded-sm px-3 py-2 text-sm bg-(--color-surface) disabled:opacity-50"
           >
             {workspaces.map((w) => (
               <option key={w.id} value={w.id}>
@@ -177,7 +177,7 @@ export function TaskFields({
 
       {/* A group of checkboxes needs a group label, which is what fieldset/legend is for. */}
       <fieldset>
-        <legend className="block text-xs text-[var(--color-text-muted)] mb-1">Assign to</legend>
+        <legend className="block text-xs text-(--color-text-muted) mb-1">Assign to</legend>
         <div className="flex flex-col gap-1.5">
           {currentWorkspace?.members.map((m) => (
             <label key={m.id} className="flex items-center gap-2 min-h-11 text-sm cursor-pointer">
@@ -186,7 +186,7 @@ export function TaskFields({
                 checked={selectedMemberIds.includes(m.id)}
                 onChange={() => onToggleMember(m.id)}
                 disabled={disabled}
-                className="rounded accent-[var(--color-accent)]"
+                className="rounded accent-(--color-accent)"
               />
               {m.display_name}
             </label>
@@ -208,19 +208,19 @@ export function TaskFields({
             checked={recurrenceEnabled}
             onChange={handleToggleRecurrence}
             disabled={disabled}
-            className="rounded accent-[var(--color-accent)]"
+            className="rounded accent-(--color-accent)"
           />
           <Repeat size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           Repeats
         </label>
 
         {recurrenceEnabled && recurrence && (
-          <div className="mt-2 flex flex-col gap-2 rounded-sm border border-[var(--color-border)] p-2">
+          <div className="mt-2 flex flex-col gap-2 rounded-sm border border-(--color-border) p-2">
             <div className="flex items-end gap-2">
               <div className="w-20">
                 <label
                   htmlFor={`${idPrefix}-repeat-interval`}
-                  className="block text-xs text-[var(--color-text-muted)] mb-1"
+                  className="block text-xs text-(--color-text-muted) mb-1"
                 >
                   Repeat every
                 </label>
@@ -237,13 +237,13 @@ export function TaskFields({
                     })
                   }
                   disabled={disabled}
-                  className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                  className="min-h-11 w-full border border-(--color-border) rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
                 />
               </div>
               <div className="flex-1">
                 <label
                   htmlFor={`${idPrefix}-repeat-unit`}
-                  className="block text-xs text-[var(--color-text-muted)] mb-1"
+                  className="block text-xs text-(--color-text-muted) mb-1"
                 >
                   Repeat unit
                 </label>
@@ -257,7 +257,7 @@ export function TaskFields({
                     })
                   }
                   disabled={disabled}
-                  className="h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+                  className="h-11 w-full border border-(--color-border) rounded-sm px-2 py-1 text-sm bg-(--color-surface) disabled:opacity-50"
                 >
                   {/* No biweekly: it is weekly with an interval of 2, and migration 012 drops it. */}
                   <option value="daily">days</option>
@@ -270,7 +270,7 @@ export function TaskFields({
             <div>
               <label
                 htmlFor={`${idPrefix}-repeat-start`}
-                className="block text-xs text-[var(--color-text-muted)] mb-1"
+                className="block text-xs text-(--color-text-muted) mb-1"
               >
                 Starting
               </label>
@@ -285,14 +285,14 @@ export function TaskFields({
                 value={recurrence.firstRunAt}
                 onChange={(e) => onRecurrenceChange({ ...recurrence, firstRunAt: e.target.value })}
                 disabled={disabled}
-                className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-[var(--color-surface)] disabled:opacity-50"
+                className="min-h-11 w-full border border-(--color-border) rounded-sm px-2 py-1 text-sm bg-(--color-surface) disabled:opacity-50"
               />
             </div>
 
             <div>
               <label
                 htmlFor={`${idPrefix}-repeat-offset`}
-                className="block text-xs text-[var(--color-text-muted)] mb-1"
+                className="block text-xs text-(--color-text-muted) mb-1"
               >
                 Due hours after it appears (optional)
               </label>
@@ -309,7 +309,7 @@ export function TaskFields({
                   })
                 }
                 disabled={disabled}
-                className="min-h-11 w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                className="min-h-11 w-full border border-(--color-border) rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
               />
             </div>
           </div>

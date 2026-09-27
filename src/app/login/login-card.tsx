@@ -162,33 +162,33 @@ export function LoginCard() {
       />
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-sm rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-8"
+      <div className="relative z-10 w-full max-w-sm rounded-lg border border-(--color-border) bg-(--color-surface) p-8"
         style={{ boxShadow: "var(--shadow-login)" }}>
 
         {/* Wordmark */}
         <p className="mb-6 text-center text-xl font-semibold tracking-tight">
-          hearth<span className="text-[var(--color-accent)]">.</span>
+          hearth<span className="text-(--color-accent)">.</span>
         </p>
 
         {/* Mode heading or tabs */}
         {(mode === "forgot" || mode === "reset") ? (
           <div className="mb-6">
-            <p className="text-base font-semibold text-[var(--color-text-primary)]">
+            <p className="text-base font-semibold text-(--color-text-primary)">
               {mode === "forgot" ? "Reset password" : "Set new password"}
             </p>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            <p className="mt-1 text-xs text-(--color-text-muted)">
               {mode === "forgot" ? "We'll email you a link." : "Choose a new password."}
             </p>
           </div>
         ) : (
-          <div className="mb-6 flex rounded-md bg-[var(--color-accent-subtle)] p-[3px] text-sm">
+          <div className="mb-6 flex rounded-md bg-(--color-accent-subtle) p-[3px] text-sm">
             <button
               type="button"
               onClick={() => { setMode("signin"); setError(""); setDuplicateEmail(false); }}
               className={`flex-1 min-h-11 rounded-sm py-[7px] font-medium transition-colors text-sm ${
                 mode === "signin"
-                  ? "bg-[var(--color-surface)] shadow-sm text-[var(--color-accent)]"
-                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  ? "bg-(--color-surface) shadow-sm text-(--color-accent)"
+                  : "text-(--color-text-secondary) hover:text-(--color-text-primary)"
               }`}
             >
               Sign in
@@ -198,8 +198,8 @@ export function LoginCard() {
               onClick={() => { setMode("signup"); setError(""); setDuplicateEmail(false); }}
               className={`flex-1 min-h-11 rounded-sm py-[7px] font-medium transition-colors text-sm ${
                 mode === "signup"
-                  ? "bg-[var(--color-surface)] shadow-sm text-[var(--color-accent)]"
-                  : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                  ? "bg-(--color-surface) shadow-sm text-(--color-accent)"
+                  : "text-(--color-text-secondary) hover:text-(--color-text-primary)"
               }`}
             >
               Sign up
@@ -210,7 +210,7 @@ export function LoginCard() {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {mode === "signup" && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="name" className="text-xs font-medium text-[var(--color-text-secondary)]">
+              <label htmlFor="name" className="text-xs font-medium text-(--color-text-secondary)">
                 Name
               </label>
               <input
@@ -219,7 +219,7 @@ export function LoginCard() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                className="min-h-11 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-[9px] text-sm"
                 placeholder="Your name"
               />
             </div>
@@ -227,7 +227,7 @@ export function LoginCard() {
 
           {(mode === "signin" || mode === "signup" || mode === "forgot") && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="email" className="text-xs font-medium text-[var(--color-text-secondary)]">
+              <label htmlFor="email" className="text-xs font-medium text-(--color-text-secondary)">
                 Email
               </label>
               <input
@@ -236,7 +236,7 @@ export function LoginCard() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                className="min-h-11 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-[9px] text-sm"
                 placeholder="you@example.com"
               />
             </div>
@@ -245,14 +245,14 @@ export function LoginCard() {
           {(mode === "signin" || mode === "signup") && (
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-xs font-medium text-[var(--color-text-secondary)]">
+                <label htmlFor="password" className="text-xs font-medium text-(--color-text-secondary)">
                   Password
                 </label>
                 {mode === "signin" && (
                   <button
                     type="button"
                     onClick={() => { setMode("forgot"); setError(""); }}
-                    className="inline-flex items-center min-h-11 text-xs text-[var(--color-accent)] hover:underline"
+                    className="inline-flex items-center min-h-11 text-xs text-(--color-accent) hover:underline"
                   >
                     Forgot?
                   </button>
@@ -264,7 +264,7 @@ export function LoginCard() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                className="min-h-11 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-[9px] text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -272,7 +272,7 @@ export function LoginCard() {
 
           {mode === "reset" && sessionChecked && !hasSession && (
             <div className="flex flex-col gap-3">
-              <p className="text-sm text-[var(--color-text-secondary)]">
+              <p className="text-sm text-(--color-text-secondary)">
                 This reset link has expired or already been used.
               </p>
               <button
@@ -284,7 +284,7 @@ export function LoginCard() {
                   setConfirmPassword("");
                   setError("");
                 }}
-                className="text-sm text-[var(--color-accent)] hover:underline text-left"
+                className="text-sm text-(--color-accent) hover:underline text-left"
               >
                 Request a new one →
               </button>
@@ -294,7 +294,7 @@ export function LoginCard() {
           {mode === "reset" && (!sessionChecked || hasSession) && (
             <>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="new-password" className="text-xs font-medium text-[var(--color-text-secondary)]">
+                <label htmlFor="new-password" className="text-xs font-medium text-(--color-text-secondary)">
                   New password
                 </label>
                 <input
@@ -304,11 +304,11 @@ export function LoginCard() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="New password"
-                  className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                  className="min-h-11 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-[9px] text-sm"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="confirm-password" className="text-xs font-medium text-[var(--color-text-secondary)]">
+                <label htmlFor="confirm-password" className="text-xs font-medium text-(--color-text-secondary)">
                   Confirm password
                 </label>
                 <input
@@ -318,36 +318,36 @@ export function LoginCard() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm password"
-                  className="min-h-11 rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-[9px] text-sm"
+                  className="min-h-11 rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-[9px] text-sm"
                 />
               </div>
-              <p className="text-xs text-[var(--color-text-muted)]">Minimum 6 characters</p>
+              <p className="text-xs text-(--color-text-muted)">Minimum 6 characters</p>
             </>
           )}
 
           {error && (
-            <p className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+            <p className="rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)">
               {error}
             </p>
           )}
 
           {mode === "signup" && duplicateEmail && (
-            <div className="flex flex-col gap-2 rounded-sm bg-[var(--color-accent-subtle)] px-3 py-2.5">
-              <p className="text-sm text-[var(--color-text-secondary)]">
+            <div className="flex flex-col gap-2 rounded-sm bg-(--color-accent-subtle) px-3 py-2.5">
+              <p className="text-sm text-(--color-text-secondary)">
                 That email already has an account.
               </p>
               <div className="flex gap-3 text-sm">
                 <button
                   type="button"
                   onClick={() => { setMode("signin"); setDuplicateEmail(false); }}
-                  className="inline-flex items-center min-h-11 text-[var(--color-accent)] hover:underline"
+                  className="inline-flex items-center min-h-11 text-(--color-accent) hover:underline"
                 >
                   Sign in
                 </button>
                 <button
                   type="button"
                   onClick={() => { setMode("forgot"); setPassword(""); setDuplicateEmail(false); }}
-                  className="inline-flex items-center min-h-11 text-[var(--color-accent)] hover:underline"
+                  className="inline-flex items-center min-h-11 text-(--color-accent) hover:underline"
                 >
                   Reset your password
                 </button>
@@ -359,7 +359,7 @@ export function LoginCard() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-1 min-h-11 rounded-sm bg-[var(--color-accent)] px-4 py-[10px] text-sm font-medium text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 transition-colors"
+              className="mt-1 min-h-11 rounded-sm bg-(--color-accent) px-4 py-[10px] text-sm font-medium text-(--color-text-on-accent) hover:bg-(--color-accent-hover) disabled:opacity-50 transition-colors"
             >
               {loading
                 ? mode === "forgot"
@@ -380,15 +380,15 @@ export function LoginCard() {
           {(mode === "signin" || mode === "signup") && (
             <>
               <div className="flex items-center gap-3">
-                <span className="h-px flex-1 bg-[var(--color-border)]" />
-                <span className="text-xs text-[var(--color-text-muted)]">or</span>
-                <span className="h-px flex-1 bg-[var(--color-border)]" />
+                <span className="h-px flex-1 bg-(--color-border)" />
+                <span className="text-xs text-(--color-text-muted)">or</span>
+                <span className="h-px flex-1 bg-(--color-border)" />
               </div>
               <button
                 type="button"
                 onClick={handleGoogle}
                 disabled={loading}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-[10px] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-accent-subtle)] disabled:opacity-50 transition-colors"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-sm border border-(--color-border) bg-(--color-surface) px-4 py-[10px] text-sm font-medium text-(--color-text-primary) hover:bg-(--color-accent-subtle) disabled:opacity-50 transition-colors"
               >
                 <svg aria-hidden="true" viewBox="0 0 18 18" className="h-[18px] w-[18px]">
                   <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62Z" />
@@ -405,7 +405,7 @@ export function LoginCard() {
             <button
               type="button"
               onClick={() => { setMode("signin"); setError(""); }}
-              className="mt-1 inline-flex items-center justify-center min-h-11 text-xs text-[var(--color-accent)] hover:underline text-center"
+              className="mt-1 inline-flex items-center justify-center min-h-11 text-xs text-(--color-accent) hover:underline text-center"
             >
               ← Back to sign in
             </button>

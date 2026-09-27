@@ -127,8 +127,8 @@ function SidebarLink({
       href={href}
       className={`flex items-center gap-2 min-h-11 px-2 rounded-sm text-sm font-medium ${
         active
-          ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
-          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-accent-subtle)]/50"
+          ? "bg-(--color-accent-subtle) text-(--color-accent-text)"
+          : "text-(--color-text-secondary) hover:bg-(--color-accent-subtle)/50"
       }`}
     >
       {icon}
@@ -220,11 +220,11 @@ export function TasksPageClient({
   return (
     <>
       {/* Tab strip — small screens only */}
-      <div className="flex md:hidden items-center gap-2 overflow-x-auto px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="flex md:hidden items-center gap-2 overflow-x-auto px-4 py-2 border-b border-(--color-border) bg-(--color-surface)">
         <button
           onClick={() => setModalOpen(true)}
           disabled={!hasWorkspace}
-          className="shrink-0 whitespace-nowrap flex items-center gap-1 min-h-11 px-3 rounded-full text-sm font-medium bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 whitespace-nowrap flex items-center gap-1 min-h-11 px-3 rounded-full text-sm font-medium bg-(--color-accent) text-(--color-text-on-accent) hover:bg-(--color-accent-hover) transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           New task
@@ -269,17 +269,17 @@ export function TasksPageClient({
       */}
       <div className="flex min-h-[calc(100dvh-var(--nav-height)-env(safe-area-inset-top)-env(safe-area-inset-bottom))]">
         {/* Sidebar — medium screens and up */}
-        <aside className="hidden md:flex w-[200px] flex-col bg-[var(--color-surface)] border-r border-[var(--color-border)] p-3 flex-shrink-0">
+        <aside className="hidden md:flex w-[200px] flex-col bg-(--color-surface) border-r border-(--color-border) p-3 flex-shrink-0">
           <button
             onClick={() => setModalOpen(true)}
             disabled={!hasWorkspace}
-            className="mb-4 w-full flex items-center justify-center gap-1.5 min-h-11 bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-text-on-accent)] text-sm font-medium rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="mb-4 w-full flex items-center justify-center gap-1.5 min-h-11 bg-(--color-accent) hover:bg-(--color-accent-hover) text-(--color-text-on-accent) text-sm font-medium rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
             New task
           </button>
 
-          <p className="text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-(--color-text-muted) px-2 mb-1">
             Views
           </p>
           <SidebarLink
@@ -295,7 +295,7 @@ export function TasksPageClient({
             label="Shared"
           />
 
-          <p className="text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] px-2 mb-1 mt-4">
+          <p className="text-2xs font-semibold uppercase tracking-widest text-(--color-text-muted) px-2 mb-1 mt-4">
             Spaces
           </p>
           {workspaces.map((ws) => (
@@ -322,8 +322,8 @@ export function TasksPageClient({
 
         <main className="flex-1 p-6 overflow-auto">
           {workspaces.length === 0 && (
-            <div className="mb-6 rounded-sm border border-[var(--color-accent-text)] bg-[var(--color-accent-subtle)] px-4 py-3">
-              <p className="text-sm text-[var(--color-accent-text)]">
+            <div className="mb-6 rounded-sm border border-(--color-accent-text) bg-(--color-accent-subtle) px-4 py-3">
+              <p className="text-sm text-(--color-accent-text)">
                 You&apos;re not in any workspace yet.{" "}
                 <a
                   href="/workspaces"
@@ -338,7 +338,7 @@ export function TasksPageClient({
           {userName && (
             <>
               <h2 className="text-xl font-semibold tracking-tight mb-1">Hello, {userName}</h2>
-              <p className="text-sm text-[var(--color-text-secondary)] mb-6">Here are your tasks.</p>
+              <p className="text-sm text-(--color-text-secondary) mb-6">Here are your tasks.</p>
             </>
           )}
 
@@ -367,7 +367,7 @@ export function TasksPageClient({
                   if (!sectionTasks.length) return null;
                   return (
                     <div key={key} className="mb-6">
-                      <p className="text-2xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
+                      <p className="text-2xs font-semibold uppercase tracking-widest text-(--color-text-muted) mb-2">
                         {key}
                       </p>
                       {/* type={key} makes dnd treat each bucket as its own drag universe, so a

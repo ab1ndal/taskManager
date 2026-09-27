@@ -19,15 +19,15 @@ export function LotRow({ item, lot, today }: { item: GroceryItem; lot: GroceryLo
       catch { toast(GENERIC_ERROR, "error"); }
     });
   }
-  return <li className="py-2 border-t border-[var(--color-border)]" data-lot-id={lot.id}>
+  return <li className="py-2 border-t border-(--color-border)" data-lot-id={lot.id}>
     <div className="flex flex-wrap items-center gap-x-3 text-xs">
       <span>{lot.expiresOn ? `${lot.expiryIsEstimate ? "~" : ""}${formatExpiry(lot.expiresOn, today)}` : "No expiry date"}</span>
-      {expired && <span className="rounded-full px-2 py-1 bg-[var(--color-warning-surface)] text-[var(--color-warning-text)]">expired</span>}
+      {expired && <span className="rounded-full px-2 py-1 bg-(--color-warning-surface) text-(--color-warning-text)">expired</span>}
       <span>{lot.quantity === null ? "Quantity unknown" : `Quantity ${lot.quantity}`}</span>
-      <span className="text-[var(--color-text-muted)]">Added {formatDay(lot.createdAt, today)}</span>
+      <span className="text-(--color-text-muted)">Added {formatDay(lot.createdAt, today)}</span>
     </div>
     <div className="flex flex-wrap gap-2">
-      {expired && <button type="button" disabled={pending} className="min-h-11 px-3 text-xs text-[var(--color-accent-text)]"
+      {expired && <button type="button" disabled={pending} className="min-h-11 px-3 text-xs text-(--color-accent-text)"
         onClick={() => call(() => extendLot({ lotId: lot.id, expiresOn: addDays(today, shelfLifeDays(item.category) ?? 7) }))}>Still good</button>}
       <button type="button" disabled={pending} className="min-h-11 px-3 text-xs"
         onClick={() => call(() => discardLot({ lotId: lot.id, keepOnList: true }))}>Gone</button>

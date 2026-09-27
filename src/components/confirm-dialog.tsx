@@ -39,19 +39,19 @@ export function ConfirmDialog({
       onClose={onCancel}
       initialFocusSelector="[data-cancel-button]"
       ariaLabelledBy={id}
-      className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto backdrop:bg-[var(--color-scrim)]"
+      className="rounded-lg border border-(--color-border) bg-(--color-surface) shadow-xl p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto backdrop:bg-(--color-scrim)"
     >
-      <h3 id={id} className="text-base font-semibold mb-2 break-words">
+      <h3 id={id} className="text-base font-semibold mb-2 wrap-break-word">
         {title}
       </h3>
-      <p className="text-sm text-[var(--color-text-secondary)] mb-4">{body}</p>
+      <p className="text-sm text-(--color-text-secondary) mb-4">{body}</p>
       <div className="flex justify-end gap-2">
         <button
           type="button"
           data-cancel-button
           onClick={onCancel}
           aria-label={cancelAriaLabel}
-          className="min-h-11 px-4 py-2 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors"
+          className="min-h-11 px-4 py-2 text-sm rounded-sm border border-(--color-border) hover:bg-(--color-accent-subtle) transition-colors"
         >
           Cancel
         </button>
@@ -59,7 +59,7 @@ export function ConfirmDialog({
           type="button"
           onClick={onConfirm}
           aria-label={confirmAriaLabel}
-          className="min-h-11 px-4 py-2 text-sm font-medium rounded-sm bg-[var(--color-danger-solid)] text-[var(--color-text-on-solid)] hover:bg-[var(--color-danger-solid-hover)] transition-colors"
+          className="min-h-11 px-4 py-2 text-sm font-medium rounded-sm bg-(--color-danger-solid) text-(--color-text-on-solid) hover:bg-(--color-danger-solid-hover) transition-colors"
         >
           {confirmLabel}
         </button>

@@ -29,7 +29,7 @@ export function NavUser({ name, email }: { name: string; email: string }) {
     <div className="flex items-center gap-3">
       <Link
         href="/settings?tab=profile"
-        className="hidden sm:inline-flex items-center min-h-11 text-sm font-medium text-[var(--color-text-primary)] hover:text-[var(--color-accent)] transition-colors"
+        className="hidden sm:inline-flex items-center min-h-11 text-sm font-medium text-(--color-text-primary) hover:text-(--color-accent) transition-colors"
       >
         {name || email}
       </Link>
@@ -48,7 +48,7 @@ export function NavUser({ name, email }: { name: string; email: string }) {
       <button
         onClick={handleLogout}
         disabled={signingOut}
-        className="inline-flex items-center min-h-11 whitespace-nowrap text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors disabled:opacity-50 disabled:pointer-events-none"
+        className="inline-flex items-center min-h-11 whitespace-nowrap text-sm text-(--color-text-secondary) hover:text-(--color-text-primary) transition-colors disabled:opacity-50 disabled:pointer-events-none"
       >
         {signingOut ? "Signing out…" : "Sign out"}
       </button>

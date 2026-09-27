@@ -68,7 +68,7 @@ export function AddRow({
     });
   }
 
-  const control = "h-11 min-w-0 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base";
+  const control = "h-11 min-w-0 px-3 rounded-lg border border-(--color-border) bg-(--color-surface) text-base";
 
   // A fragment, not a wrapper: `sticky` only sticks within its parent, so the bar has to be a direct
   // child of the tall list container. Only the name field, Add and the suggestions stay pinned —
@@ -77,7 +77,7 @@ export function AddRow({
   // sticky at top-0 and stacked above: pinned at top-0 too, the bar slid underneath it.
   return (
     <>
-      <div className="sticky top-[calc(var(--nav-height)+env(safe-area-inset-top))] z-10 bg-[var(--color-bg)] px-3 py-2 border-b border-[var(--color-border)]">
+      <div className="sticky top-[calc(var(--nav-height)+env(safe-area-inset-top))] z-10 bg-(--color-bg) px-3 py-2 border-b border-(--color-border)">
         <form
           id={formId}
           onSubmit={(event) => {
@@ -94,12 +94,12 @@ export function AddRow({
             placeholder={target === "list" ? "Add to the list" : "Add to the pantry"}
             autoComplete="off"
             enterKeyHint="done"
-            className="block w-full min-w-0 flex-1 min-h-11 px-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-base"
+            className="block w-full min-w-0 flex-1 min-h-11 px-3 rounded-lg border border-(--color-border) bg-(--color-surface) text-base"
           />
           <button
             type="submit"
             disabled={pending || name.trim() === ""}
-            className="shrink-0 inline-flex items-center min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm font-medium disabled:opacity-50"
+            className="shrink-0 inline-flex items-center min-h-11 px-4 rounded-full bg-(--color-accent) text-(--color-text-on-accent) text-sm font-medium disabled:opacity-50"
           >
             Add
           </button>
@@ -115,7 +115,7 @@ export function AddRow({
                     setCategory(item.category);
                     submit(item.name, item.category);
                   }}
-                  className="shrink-0 inline-flex items-center min-h-11 px-3 rounded-full bg-[var(--color-surface-sunken)] text-xs"
+                  className="shrink-0 inline-flex items-center min-h-11 px-3 rounded-full bg-(--color-surface-sunken) text-xs"
                 >
                   {item.name}
                 </button>

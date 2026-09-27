@@ -37,7 +37,7 @@ export default async function BoardPage({ searchParams }: { searchParams: Search
     return (
       <main className="p-6">
         <h1 className="mb-2 text-xl font-semibold tracking-tight">Board</h1>
-        <p className="text-sm text-[var(--color-text-secondary)]">
+        <p className="text-sm text-(--color-text-secondary)">
           Join or create a workspace to use the board.
         </p>
       </main>

@@ -30,7 +30,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
     <main className="p-6">
       <h1 className="mb-6 text-xl font-semibold tracking-tight">Settings</h1>
 
-      <nav aria-label="Settings sections" className="mb-6 flex gap-1 overflow-x-auto border-b border-[var(--color-border)] pb-3">
+      <nav aria-label="Settings sections" className="mb-6 flex gap-1 overflow-x-auto border-b border-(--color-border) pb-3">
         <TabPill href="/settings?tab=profile" label="Profile" matchKey="tab" matchValue="profile" />
         <TabPill href="/settings?tab=board" label="Board" matchKey="tab" matchValue="board" />
         <TabPill href="/settings?tab=notifications" label="Notifications" matchKey="tab" matchValue="notifications" />

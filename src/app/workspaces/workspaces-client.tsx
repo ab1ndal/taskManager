@@ -43,12 +43,12 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
     <>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold tracking-tight text-[var(--color-text-primary)]">
+        <h2 className="text-xl font-semibold tracking-tight text-(--color-text-primary)">
           All Workspaces
         </h2>
         <button
           onClick={() => setModalOpen(true)}
-          className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] transition-colors duration-150"
+          className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm bg-(--color-accent) text-(--color-text-on-accent) hover:bg-(--color-accent-hover) transition-colors duration-150"
         >
           Create Workspace
         </button>
@@ -57,10 +57,10 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
       {/* Directory list */}
       {workspaces.length === 0 ? (
         <div className="py-12 text-center">
-          <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
+          <p className="text-sm font-semibold text-(--color-text-primary) mb-1">
             No workspaces yet
           </p>
-          <p className="text-sm text-[var(--color-text-secondary)]">Create the first one!</p>
+          <p className="text-sm text-(--color-text-secondary)">Create the first one!</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -86,11 +86,11 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
           }}
           initialFocusSelector="#ws-name"
           ariaLabelledBy="create-workspace-title"
-          className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-login)] p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto backdrop:bg-[var(--color-scrim)]"
+          className="rounded-lg border border-(--color-border) bg-(--color-surface) shadow-(--shadow-login) p-6 w-full max-w-sm max-h-[90dvh] overflow-y-auto backdrop:bg-(--color-scrim)"
         >
           <h3
             id="create-workspace-title"
-            className="text-base font-semibold text-[var(--color-text-primary)] mb-4"
+            className="text-base font-semibold text-(--color-text-primary) mb-4"
           >
             Create Workspace
           </h3>
@@ -98,7 +98,7 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
               <div className="flex flex-col gap-1.5">
                 <label
                   htmlFor="ws-name"
-                  className="text-xs font-semibold text-[var(--color-text-secondary)]"
+                  className="text-xs font-semibold text-(--color-text-secondary)"
                 >
                   Name
                 </label>
@@ -109,19 +109,19 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Home, Acme Corp"
                   required
-                  className="w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)]"
+                  className="w-full rounded-sm border border-(--color-border) bg-(--color-bg) px-3 py-2 text-sm text-(--color-text-primary) placeholder:text-(--color-text-muted)"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-[var(--color-text-secondary)]">
+                <span className="text-xs font-semibold text-(--color-text-secondary)">
                   Kind
                 </span>
                 <div className="flex gap-3">
                   {(["household", "work"] as const).map((k) => (
                     <label
                       key={k}
-                      className="flex items-center gap-2 text-sm text-[var(--color-text-primary)] cursor-pointer"
+                      className="flex items-center gap-2 text-sm text-(--color-text-primary) cursor-pointer"
                     >
                       <input
                         type="radio"
@@ -129,7 +129,7 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                         value={k}
                         checked={kind === k}
                         onChange={() => setKind(k)}
-                        className="accent-[var(--color-accent)]"
+                        className="accent-(--color-accent)"
                       />
                       {k === "household" ? "Household" : "Work"}
                     </label>
@@ -142,7 +142,7 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
               {formError && (
                 <p
                   role="alert"
-                  className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]"
+                  className="rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)"
                 >
                   {formError}
                 </p>
@@ -152,14 +152,14 @@ export function WorkspacesClient({ workspaces, joinedIds }: WorkspacesClientProp
                 <button
                   type="button"
                   onClick={() => { setModalOpen(false); setFormError(null); }}
-                  className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors duration-150"
+                  className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm text-(--color-text-secondary) hover:text-(--color-text-primary) transition-colors duration-150"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending || !name.trim()}
-                  className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
+                  className="inline-flex items-center min-h-11 text-sm font-semibold px-4 py-2 rounded-sm bg-(--color-accent) text-(--color-text-on-accent) hover:bg-(--color-accent-hover) disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150"
                 >
                   {isPending ? "Creating…" : "Create"}
                 </button>

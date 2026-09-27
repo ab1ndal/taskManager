@@ -65,7 +65,7 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
   if (!workspaceId) {
     return (
       <main className="mx-auto w-full max-w-2xl px-3 py-8">
-        <p className="text-sm text-[var(--color-text-secondary)]">
+        <p className="text-sm text-(--color-text-secondary)">
           Groceries live in a household workspace. Create one first.
         </p>
       </main>

@@ -19,8 +19,8 @@ const FILTER_THRESHOLD = 15;
 function chipClass(selected: boolean) {
   return `shrink-0 inline-flex items-center min-h-11 px-3 rounded-full text-xs font-medium ${
     selected
-      ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
-      : "text-[var(--color-text-secondary)]"
+      ? "bg-(--color-accent-subtle) text-(--color-accent-text)"
+      : "text-(--color-text-secondary)"
   }`;
 }
 
@@ -128,7 +128,7 @@ export function GroceriesClient({
       {purchase && <LotDialog item={purchase} onClose={() => setPurchase(null)} />}
 
       {visible.length === 0 ? (
-        <p className="px-3 py-8 text-sm text-[var(--color-text-secondary)]">
+        <p className="px-3 py-8 text-sm text-(--color-text-secondary)">
           {view === "stock"
             ? "Nothing tracked yet. Add what's in your kitchen."
             : "List is empty. Tap Need on anything in the pantry."}
@@ -137,7 +137,7 @@ export function GroceriesClient({
         <ul>
           {grouped.map((group) => (
             <li key={group.category}>
-              <h3 className="px-3 py-2 text-xs font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+              <h3 className="px-3 py-2 text-xs font-semibold text-(--color-text-secondary) uppercase tracking-wider">
                 {categoryLabel(group.category)}
               </h3>
               <ul>

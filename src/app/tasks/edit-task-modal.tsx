@@ -489,7 +489,7 @@ export function EditTaskModal({
             hideWorkspaceWhenOnlyOne
             workspaceNote={
               isMove && (
-                <p className="mt-1 text-2xs text-[var(--color-text-muted)]">
+                <p className="mt-1 text-2xs text-(--color-text-muted)">
                   Saving moves this task
                   {subtasks.length > 0 &&
                     ` and its ${subtasks.length === 1 ? "subtask" : `${subtasks.length} subtasks`}`}{" "}
@@ -509,7 +509,7 @@ export function EditTaskModal({
           />
 
           {formError && (
-            <p role="alert" className="rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+            <p role="alert" className="rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)">
               {formError}
             </p>
           )}
@@ -519,14 +519,14 @@ export function EditTaskModal({
               type="button"
               onClick={onClose}
               disabled={pending}
-              className="min-h-11 px-4 text-sm rounded-sm border border-[var(--color-border)] hover:bg-[var(--color-accent-subtle)] transition-colors disabled:opacity-50"
+              className="min-h-11 px-4 text-sm rounded-sm border border-(--color-border) hover:bg-(--color-accent-subtle) transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || selectedMemberIds.length === 0 || pending}
-              className="min-h-11 px-4 text-sm font-medium rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] hover:bg-[var(--color-accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="min-h-11 px-4 text-sm font-medium rounded-sm bg-(--color-accent) text-(--color-text-on-accent) hover:bg-(--color-accent-hover) disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Save
             </button>
@@ -543,10 +543,10 @@ export function EditTaskModal({
         The separation is now structural rather than a fill: a hairline rule and a heading open each
         section, which reads as hierarchy instead of as two competing panels.
       */}
-      <section className="mt-6 border-t border-[var(--color-border)] pt-5">
+      <section className="mt-6 border-t border-(--color-border) pt-5">
         <div className="flex items-baseline justify-between gap-2 mb-2">
           <h4 className="text-sm font-semibold">Subtasks</h4>
-          <p className="text-2xs text-[var(--color-text-muted)]">Saves immediately</p>
+          <p className="text-2xs text-(--color-text-muted)">Saves immediately</p>
         </div>
         {/*
           Subtasks used to render as bare text: no way to tick one off, no way to remove one added
@@ -554,13 +554,13 @@ export function EditTaskModal({
           undo. Each row now carries the same two controls the task list has.
         */}
         {subtasks.length === 0 ? (
-          <p className="mb-3 text-sm text-[var(--color-text-muted)]">No subtasks yet.</p>
+          <p className="mb-3 text-sm text-(--color-text-muted)">No subtasks yet.</p>
         ) : (
           <ul className="flex flex-col mb-2">
             {subtasks.map((s) => (
               <li key={s.id} className="flex flex-col">
                 {editingSubtaskId === s.id ? (
-                  <div className="flex flex-col gap-2 rounded-sm border border-[var(--color-border)] p-2 my-1">
+                  <div className="flex flex-col gap-2 rounded-sm border border-(--color-border) p-2 my-1">
                     <input
                       type="text"
                       aria-label={`Subtask title for "${s.title}"`}
@@ -569,7 +569,7 @@ export function EditTaskModal({
                         setSubtaskDraft((d) => ({ ...d, title: e.target.value }))
                       }
                       disabled={subtaskPending}
-                      className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
+                      className="w-full border border-(--color-border) rounded-sm px-2 py-1 text-sm bg-transparent disabled:opacity-50"
                     />
                     <DictationTextarea
                       field={`subtask-${s.id}`}
@@ -581,7 +581,7 @@ export function EditTaskModal({
                       onChange={(value) => setSubtaskDraft((d) => ({ ...d, description: value }))}
                       disabled={subtaskPending}
                       rows={2}
-                      className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+                      className="w-full border border-(--color-border) rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
                     />
                     <input
                       type="date"
@@ -591,14 +591,14 @@ export function EditTaskModal({
                       disabled={subtaskPending}
                       // Safari sizes a date input to its own text and drops the picker glyph; the
                       // floor keeps the value legible in every engine. Same as the new-task modal.
-                      className="w-full sm:w-auto sm:self-start min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+                      className="w-full sm:w-auto sm:self-start min-w-[9rem] border border-(--color-border) rounded-sm px-2 py-1 text-xs bg-(--color-surface) disabled:opacity-50"
                     />
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
                         onClick={() => setEditingSubtaskId(null)}
                         disabled={subtaskPending}
-                        className="min-h-11 px-3 text-sm rounded-sm border border-[var(--color-border)] disabled:opacity-50"
+                        className="min-h-11 px-3 text-sm rounded-sm border border-(--color-border) disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -606,7 +606,7 @@ export function EditTaskModal({
                         type="button"
                         onClick={() => saveSubtaskEdit(s)}
                         disabled={!subtaskDraft.title.trim() || subtaskPending}
-                        className="min-h-11 px-3 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
+                        className="min-h-11 px-3 rounded-sm bg-(--color-accent) text-(--color-text-on-accent) text-sm disabled:opacity-40"
                       >
                         Save subtask
                       </button>
@@ -621,13 +621,13 @@ export function EditTaskModal({
                   aria-label={
                     s.completed_at ? `Reopen "${s.title}"` : `Mark "${s.title}" complete`
                   }
-                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:opacity-50 transition-colors"
+                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-(--color-control-idle) hover:text-(--color-accent) disabled:opacity-50 transition-colors"
                 >
                   {s.completed_at ? (
                     <CircleCheck
                       size={ICON_SECONDARY}
                       strokeWidth={ICON_STROKE}
-                      className="text-[var(--color-accent)]"
+                      className="text-(--color-accent)"
                       aria-hidden="true"
                     />
                   ) : (
@@ -636,8 +636,8 @@ export function EditTaskModal({
                 </button>
                 <div className="flex-1 min-w-0">
                   <span
-                    className={`block text-sm break-words ${
-                      s.completed_at ? "line-through text-[var(--color-text-muted)]" : ""
+                    className={`block text-sm wrap-break-word ${
+                      s.completed_at ? "line-through text-(--color-text-muted)" : ""
                     }`}
                   >
                     {s.title}
@@ -648,14 +648,14 @@ export function EditTaskModal({
                     title, muted, and are what the pencil opens for editing.
                   */}
                   {s.description && (
-                    <span className="block text-2xs text-[var(--color-text-muted)] truncate">
+                    <span className="block text-2xs text-(--color-text-muted) truncate">
                       {s.description}
                     </span>
                   )}
                   {s.due_at && (
                     <time
                       dateTime={s.due_at}
-                      className="block text-2xs text-[var(--color-text-muted)]"
+                      className="block text-2xs text-(--color-text-muted)"
                     >
                       Due {s.due_at.slice(0, 10)}
                     </time>
@@ -666,7 +666,7 @@ export function EditTaskModal({
                   onClick={() => startEditingSubtask(s)}
                   disabled={subtaskPending}
                   aria-label={`Edit "${s.title}"`}
-                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-accent)] disabled:opacity-50 transition-colors"
+                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-(--color-text-muted) hover:text-(--color-accent) disabled:opacity-50 transition-colors"
                 >
                   <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 </button>
@@ -675,7 +675,7 @@ export function EditTaskModal({
                   onClick={() => setSubtaskToDelete(s)}
                   disabled={subtaskPending}
                   aria-label={`Delete "${s.title}"`}
-                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-danger-text)] disabled:opacity-50 transition-colors"
+                  className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-(--color-text-muted) hover:text-(--color-danger-text) disabled:opacity-50 transition-colors"
                 >
                   <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 </button>
@@ -697,7 +697,7 @@ export function EditTaskModal({
             value={subtaskTitle}
             onChange={(e) => setSubtaskTitle(e.target.value)}
             disabled={subtaskPending}
-            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
+            className="w-full border border-(--color-border) rounded-sm px-3 py-2 text-sm bg-transparent disabled:opacity-50"
           />
           <div className="flex flex-col sm:flex-row sm:items-start gap-2">
             <DictationTextarea
@@ -711,7 +711,7 @@ export function EditTaskModal({
               disabled={subtaskPending}
               rows={2}
               wrapperClassName="w-full sm:flex-1 min-w-0"
-              className="w-full border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
+              className="w-full border border-(--color-border) rounded-sm px-2 py-1 text-xs bg-transparent resize-none disabled:opacity-50"
             />
             <input
               type="date"
@@ -719,20 +719,20 @@ export function EditTaskModal({
               value={subtaskDueAt}
               onChange={(e) => setSubtaskDueAt(e.target.value)}
               disabled={subtaskPending}
-              className="w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-[var(--color-border)] rounded-sm px-2 py-1 text-xs bg-[var(--color-surface)] disabled:opacity-50"
+              className="w-full sm:w-auto sm:shrink-0 min-w-[9rem] border border-(--color-border) rounded-sm px-2 py-1 text-xs bg-(--color-surface) disabled:opacity-50"
             />
           </div>
           <button
             type="button"
             onClick={handleAddSubtask}
             disabled={!subtaskTitle.trim() || subtaskPending}
-            className="self-end min-h-11 px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
+            className="self-end min-h-11 px-4 rounded-sm bg-(--color-accent) text-(--color-text-on-accent) text-sm disabled:opacity-40"
           >
             Add subtask
           </button>
         </div>
         {subtaskError && (
-          <p role="alert" className="mt-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+          <p role="alert" className="mt-2 rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)">
             {subtaskError}
           </p>
         )}
@@ -744,18 +744,18 @@ export function EditTaskModal({
         160px inner scroller nested inside a scrollable dialog — two scroll regions competing for
         the same gesture — so it now runs at full height and scrolls with the modal body.
       */}
-      <section className="mt-6 border-t border-[var(--color-border)] pt-5">
+      <section className="mt-6 border-t border-(--color-border) pt-5">
         <div className="flex items-baseline justify-between gap-2 mb-2">
           <h4 className="text-sm font-semibold">Updates</h4>
-          <p className="text-2xs text-[var(--color-text-muted)]">Posts immediately</p>
+          <p className="text-2xs text-(--color-text-muted)">Posts immediately</p>
         </div>
         {updatesLoadError && (
-          <p role="alert" className="mb-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+          <p role="alert" className="mb-2 rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)">
             {updatesLoadError}
           </p>
         )}
         {updates.length === 0 && !updatesLoadError ? (
-          <p className="mb-3 text-sm text-[var(--color-text-muted)]">
+          <p className="mb-3 text-sm text-(--color-text-muted)">
             No updates yet. Add the first one below.
           </p>
         ) : (
@@ -770,11 +770,11 @@ export function EditTaskModal({
                 <time
                   dateTime={u.createdAt}
                   title={formatUpdateTimestamp(u.createdAt)}
-                  className="text-2xs text-[var(--color-text-muted)]"
+                  className="text-2xs text-(--color-text-muted)"
                 >
                   {formatUpdateTime(u.createdAt)}
                 </time>
-                <p className="break-words">{u.updateText}</p>
+                <p className="wrap-break-word">{u.updateText}</p>
               </li>
             ))}
           </ul>
@@ -790,19 +790,19 @@ export function EditTaskModal({
             disabled={updatesPending}
             rows={2}
             wrapperClassName="flex-1 min-w-0"
-            className="w-full border border-[var(--color-border)] rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
+            className="w-full border border-(--color-border) rounded-sm px-3 py-2 text-sm bg-transparent resize-none disabled:opacity-50"
           />
           <button
             type="button"
             onClick={handleAddUpdate}
             disabled={!updateDraft.trim() || updatesPending}
-            className="self-start min-h-11 px-4 rounded-sm bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm disabled:opacity-40"
+            className="self-start min-h-11 px-4 rounded-sm bg-(--color-accent) text-(--color-text-on-accent) text-sm disabled:opacity-40"
           >
             Add update
           </button>
         </div>
         {updateError && (
-          <p role="alert" className="mt-2 rounded-sm bg-[var(--color-danger-surface)] px-3 py-2 text-sm text-[var(--color-danger-text)]">
+          <p role="alert" className="mt-2 rounded-sm bg-(--color-danger-surface) px-3 py-2 text-sm text-(--color-danger-text)">
             {updateError}
           </p>
         )}

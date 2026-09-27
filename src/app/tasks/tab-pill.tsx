@@ -24,8 +24,8 @@ export function TabPill({
       href={href}
       className={`shrink-0 inline-flex items-center min-h-11 whitespace-nowrap px-3 rounded-full text-sm font-medium transition-colors ${
         active
-          ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]"
-          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-accent-subtle)]/50"
+          ? "bg-(--color-accent-subtle) text-(--color-accent-text)"
+          : "text-(--color-text-secondary) hover:bg-(--color-accent-subtle)/50"
       }`}
     >
       {label}

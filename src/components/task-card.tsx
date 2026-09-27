@@ -16,9 +16,9 @@ export type DeadlineVariant = "red" | "yellow" | "green";
  * 2.3:1 and 3.1:1 — below AA for text this small.
  */
 const deadlineStyles: Record<DeadlineVariant, string> = {
-  red: "bg-[var(--color-danger-surface)] text-[var(--color-danger-text)]",
-  yellow: "bg-[var(--color-warning-surface)] text-[var(--color-warning-text)]",
-  green: "bg-[var(--color-success-surface)] text-[var(--color-success-text)]",
+  red: "bg-(--color-danger-surface) text-(--color-danger-text)",
+  yellow: "bg-(--color-warning-surface) text-(--color-warning-text)",
+  green: "bg-(--color-success-surface) text-(--color-success-text)",
 };
 
 export function DeadlineBadge({ variant, label }: { variant: DeadlineVariant; label: string }) {
@@ -31,7 +31,7 @@ export function DeadlineBadge({ variant, label }: { variant: DeadlineVariant; la
 
 export function SharedBadge() {
   return (
-    <span className="text-2xs font-medium px-2 py-0.5 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)]">
+    <span className="text-2xs font-medium px-2 py-0.5 rounded-full bg-(--color-accent-subtle) text-(--color-accent-text)">
       Shared
     </span>
   );
@@ -114,7 +114,7 @@ export function TaskCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`group bg-[var(--color-surface)] rounded-md border border-[var(--color-border)] px-2 py-3 sm:px-4 transition-opacity ${pending ? "opacity-40" : ""} ${onEdit ? "cursor-pointer" : ""}`}
+      className={`group bg-(--color-surface) rounded-md border border-(--color-border) px-2 py-3 sm:px-4 transition-opacity ${pending ? "opacity-40" : ""} ${onEdit ? "cursor-pointer" : ""}`}
       style={{ boxShadow: "var(--shadow-card)" }}
     >
       {/*
@@ -128,7 +128,7 @@ export function TaskCard({
           <button
             type="button"
             aria-label={`Reorder "${title}"`}
-            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-text-muted)] cursor-grab active:cursor-grabbing"
+            className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-(--color-text-muted) cursor-grab active:cursor-grabbing"
             {...dragHandleProps}
           >
             <GripVertical size={ICON_PRIMARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
@@ -142,13 +142,13 @@ export function TaskCard({
         <button
           onClick={toggleComplete}
           aria-label={optimisticCompleted ? `Reopen "${title}"` : `Mark "${title}" complete`}
-          className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
+          className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-(--color-control-idle) hover:text-(--color-accent) disabled:cursor-default transition-colors"
         >
           {optimisticCompleted ? (
             <CircleCheck
               size={ICON_PRIMARY}
               strokeWidth={ICON_STROKE}
-              className="text-[var(--color-text-muted)]"
+              className="text-(--color-text-muted)"
               aria-hidden="true"
             />
           ) : (
@@ -169,7 +169,7 @@ export function TaskCard({
             an ellipsis — there is no hover on touch to reveal the rest. The clamp stays above `sm`,
             where the row competes with two more controls.
           */}
-          <p className={`text-sm font-medium line-clamp-none sm:line-clamp-2 ${optimisticCompleted ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-primary)]"}`}>
+          <p className={`text-sm font-medium line-clamp-none sm:line-clamp-2 ${optimisticCompleted ? "line-through text-(--color-text-muted)" : "text-(--color-text-primary)"}`}>
             {title}
           </p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -187,10 +187,10 @@ export function TaskCard({
                 strokeWidth={ICON_STROKE}
                 role="img"
                 aria-label="Repeats"
-                className="shrink-0 text-[var(--color-text-muted)]"
+                className="shrink-0 text-(--color-text-muted)"
               />
             )}
-            <span className="text-xs text-[var(--color-text-muted)]">{workspace}</span>
+            <span className="text-xs text-(--color-text-muted)">{workspace}</span>
           </div>
         </div>
 
@@ -205,7 +205,7 @@ export function TaskCard({
           <button
             onClick={onEdit}
             aria-label={`Edit "${title}"`}
-            className="hidden sm:flex flex-shrink-0 w-11 h-11 items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-accent)] transition-[opacity,color]"
+            className="hidden sm:flex flex-shrink-0 w-11 h-11 items-center justify-center text-(--color-text-muted) opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-(--color-accent) transition-[opacity,color]"
           >
             <Pencil size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
           </button>
@@ -214,7 +214,7 @@ export function TaskCard({
         <button
           onClick={() => setDeleteConfirmOpen(true)}
           aria-label={`Delete "${title}"`}
-          className="hidden sm:flex flex-shrink-0 w-11 h-11 items-center justify-center text-[var(--color-text-muted)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-[var(--color-danger-text)] transition-[opacity,color]"
+          className="hidden sm:flex flex-shrink-0 w-11 h-11 items-center justify-center text-(--color-text-muted) opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-(--color-danger-text) transition-[opacity,color]"
         >
           <Trash2 size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
         </button>
@@ -286,20 +286,20 @@ export function TaskCard({
                 }}
                 disabled={!!sub.completed_at}
                 aria-label={sub.completed_at ? "Subtask completed" : `Mark "${sub.title}" complete`}
-                className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-[var(--color-control-idle)] hover:text-[var(--color-accent)] disabled:cursor-default transition-colors"
+                className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-(--color-control-idle) hover:text-(--color-accent) disabled:cursor-default transition-colors"
               >
                 {sub.completed_at ? (
                   <CircleCheck
                     size={ICON_SECONDARY}
                     strokeWidth={ICON_STROKE}
-                    className="text-[var(--color-text-muted)]"
+                    className="text-(--color-text-muted)"
                     aria-hidden="true"
                   />
                 ) : (
                   <Circle size={ICON_SECONDARY} strokeWidth={ICON_STROKE} aria-hidden="true" />
                 )}
               </button>
-              <span className={`text-xs ${sub.completed_at ? "line-through text-[var(--color-text-muted)]" : "text-[var(--color-text-secondary)]"}`}>
+              <span className={`text-xs ${sub.completed_at ? "line-through text-(--color-text-muted)" : "text-(--color-text-secondary)"}`}>
                 {sub.title}
               </span>
             </div>
@@ -339,14 +339,14 @@ export function EmptyState({
         <path d="M27 51h10" stroke="var(--color-border)" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
       {variant === "no-tasks" ? (
-        <p className="text-sm text-[var(--color-text-muted)]">
+        <p className="text-sm text-(--color-text-muted)">
           No tasks yet.
           <br />
           Add one to get started.
         </p>
       ) : (
         <>
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <p className="text-sm text-(--color-text-muted)">
             Nothing matches this view.
             <br />
             Your other tasks are still here.
@@ -355,7 +355,7 @@ export function EmptyState({
             <button
               type="button"
               onClick={onClearFilter}
-              className="text-sm font-medium text-[var(--color-accent)] hover:underline"
+              className="text-sm font-medium text-(--color-accent) hover:underline"
             >
               Show all tasks
             </button>

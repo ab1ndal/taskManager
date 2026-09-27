@@ -61,7 +61,7 @@ export function Dialog({
       aria-labelledby={ariaLabelledBy}
       className={
         className ??
-        "rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto backdrop:bg-[var(--color-scrim)]"
+        "rounded-lg border border-(--color-border) bg-(--color-surface) shadow-xl p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto backdrop:bg-(--color-scrim)"
       }
     >
       {children}

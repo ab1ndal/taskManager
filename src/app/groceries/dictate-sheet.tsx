@@ -20,7 +20,7 @@ function toRows(items: ReviewGroceryItem[]): ReviewRow[] {
 }
 
 const inputClass =
-  "block w-full min-w-0 min-h-11 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base";
+  "block w-full min-w-0 min-h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base";
 
 /**
  * Dictation entry point for one grocery view (shopping list or pantry).
@@ -169,7 +169,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 min-h-11 px-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-secondary)]"
+        className="inline-flex items-center gap-1.5 min-h-11 px-3 rounded-full border border-(--color-border) bg-(--color-surface) text-sm text-(--color-text-secondary)"
       >
         <Mic size={16} aria-hidden />
         Dictate items
@@ -181,13 +181,13 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
     <div
       role="group"
       aria-labelledby={headingId}
-      className="basis-full space-y-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+      className="basis-full space-y-3 rounded-lg border border-(--color-border) bg-(--color-surface) p-3"
     >
       <div className="flex items-center justify-between gap-2">
         <h2 id={headingId} className="text-sm font-medium">
           Dictate items
         </h2>
-        <button type="button" onClick={reset} className="min-h-11 px-2 text-sm text-[var(--color-text-secondary)]">
+        <button type="button" onClick={reset} className="min-h-11 px-2 text-sm text-(--color-text-secondary)">
           Cancel
         </button>
       </div>
@@ -218,12 +218,12 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
             />
           )}
           {(recorder.error ?? transcribeError) && (
-            <p role="alert" className="text-sm text-[var(--color-danger-text)]">
+            <p role="alert" className="text-sm text-(--color-danger-text)">
               {recorder.error ?? transcribeError}
             </p>
           )}
           {parseError && (
-            <p role="alert" className="text-sm text-[var(--color-danger-text)]">
+            <p role="alert" className="text-sm text-(--color-danger-text)">
               {parseError}
             </p>
           )}
@@ -231,7 +231,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
             type="button"
             onClick={parse}
             disabled={parsing || busy || transcript.trim() === ""}
-            className="min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm font-medium disabled:opacity-50"
+            className="min-h-11 px-4 rounded-full bg-(--color-accent) text-(--color-text-on-accent) text-sm font-medium disabled:opacity-50"
           >
             {parsing ? "Parsing…" : "Parse"}
           </button>
@@ -244,12 +244,12 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
                 key={row.id}
                 className={`space-y-2 rounded-lg border p-2 ${
                   row.lowConfidence
-                    ? "border-[var(--color-warning-text)] bg-[var(--color-warning-surface)]"
-                    : "border-[var(--color-border)]"
+                    ? "border-(--color-warning-text) bg-(--color-warning-surface)"
+                    : "border-(--color-border)"
                 }`}
               >
                 {row.lowConfidence && (
-                  <p className="flex items-start gap-1.5 text-xs text-[var(--color-warning-text)]">
+                  <p className="flex items-start gap-1.5 text-xs text-(--color-warning-text)">
                     <TriangleAlert size={14} aria-hidden className="shrink-0 mt-0.5" />
                     <span>Not sure about this one — heard “{row.sourceText}”</span>
                   </p>
@@ -265,7 +265,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
                     type="button"
                     onClick={() => removeRow(row.id)}
                     aria-label={`Remove ${row.name}`}
-                    className="shrink-0 inline-flex items-center justify-center min-h-11 min-w-11 rounded-lg text-[var(--color-text-secondary)]"
+                    className="shrink-0 inline-flex items-center justify-center min-h-11 min-w-11 rounded-lg text-(--color-text-secondary)"
                   >
                     <Trash2 size={16} aria-hidden />
                   </button>
@@ -305,7 +305,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
                   </div>
                 )}
                 {row.error && (
-                  <p role="alert" className="text-xs text-[var(--color-danger-text)]">
+                  <p role="alert" className="text-xs text-(--color-danger-text)">
                     {row.error}
                   </p>
                 )}
@@ -317,7 +317,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
               type="button"
               onClick={() => setRows(null)}
               disabled={committing}
-              className="min-h-11 px-3 text-sm text-[var(--color-text-secondary)]"
+              className="min-h-11 px-3 text-sm text-(--color-text-secondary)"
             >
               Back
             </button>
@@ -325,7 +325,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
               type="button"
               onClick={commit}
               disabled={committing || rows.length === 0}
-              className="min-h-11 px-4 rounded-full bg-[var(--color-accent)] text-[var(--color-text-on-accent)] text-sm font-medium disabled:opacity-50"
+              className="min-h-11 px-4 rounded-full bg-(--color-accent) text-(--color-text-on-accent) text-sm font-medium disabled:opacity-50"
             >
               {committing ? "Adding…" : `Add ${rows.length} item${rows.length === 1 ? "" : "s"}`}
             </button>
@@ -384,7 +384,7 @@ function RecordControl({
           type="button"
           onClick={onStart}
           disabled={transcribing}
-          className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-medium disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-full border border-(--color-border) bg-(--color-surface) text-sm font-medium disabled:opacity-50"
         >
           {transcribing ? (
             <LoaderCircle size={16} aria-hidden className="motion-safe:animate-spin" />
@@ -397,20 +397,20 @@ function RecordControl({
         <button
           type="button"
           onClick={onStop}
-          className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-full border border-[var(--color-danger-text)] text-[var(--color-danger-text)] bg-[var(--color-surface)] text-sm font-medium"
+          className="inline-flex items-center gap-1.5 min-h-11 px-4 rounded-full border border-(--color-danger-text) text-(--color-danger-text) bg-(--color-surface) text-sm font-medium"
         >
           <Square size={14} aria-hidden fill="currentColor" />
           Stop
         </button>
       )}
       {status === "recording" && (
-        <span className="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-secondary)] tabular-nums">
-          <span aria-hidden className="size-2 rounded-full bg-[var(--color-danger-text)] motion-safe:animate-pulse" />
+        <span className="inline-flex items-center gap-1.5 text-sm text-(--color-text-secondary) tabular-nums">
+          <span aria-hidden className="size-2 rounded-full bg-(--color-danger-text) motion-safe:animate-pulse" />
           Recording {formatElapsed(elapsedMs)} / {formatElapsed(MAX_RECORDING_MS)}
         </span>
       )}
       {status === "starting" && (
-        <span className="text-sm text-[var(--color-text-secondary)]">Waiting for microphone…</span>
+        <span className="text-sm text-(--color-text-secondary)">Waiting for microphone…</span>
       )}
       <span aria-live="polite" className="sr-only">
         {announcement}

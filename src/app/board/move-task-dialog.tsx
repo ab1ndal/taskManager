@@ -50,28 +50,28 @@ export function MoveTaskDialog({ task, columns, memberId, onClose }: {
     <Dialog open onClose={onClose} ariaLabelledBy={`${id}-title`} initialFocusSelector="select">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <h2 id={`${id}-title`} className="text-base font-semibold">Move task</h2>
-        <p className="break-words text-sm text-[var(--color-text-secondary)]">{task.title}</p>
+        <p className="wrap-break-word text-sm text-(--color-text-secondary)">{task.title}</p>
         <label htmlFor={`${id}-column`} className="text-sm font-medium">Move to column</label>
         <select
           id={`${id}-column`}
           value={columnId}
           onChange={(event) => setColumnId(event.target.value)}
           disabled={pending}
-          className="min-h-11 w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base"
+          className="min-h-11 w-full rounded-sm border border-(--color-border) bg-(--color-surface) px-3 text-base"
         >
           {columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
         </select>
-        <p className="text-sm text-[var(--color-text-secondary)]">
+        <p className="text-sm text-(--color-text-secondary)">
           {target?.isDone && !task.completedAt
             ? "This completes the task and its subtasks. "
             : target && !target.isDone && task.completedAt ? "This reopens the task. " : ""}
           This move applies to everyone assigned to this task in {task.workspaceName}.
         </p>
-        {error && <p role="alert" className="text-sm text-[var(--color-danger-text)]">{error}</p>}
+        {error && <p role="alert" className="text-sm text-(--color-danger-text)">{error}</p>}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="min-h-11 rounded-sm border border-[var(--color-border)] px-4">Cancel</button>
+          <button type="button" onClick={onClose} className="min-h-11 rounded-sm border border-(--color-border) px-4">Cancel</button>
           <button type="submit" disabled={pending || !target || columnId === current}
-            className="min-h-11 rounded-sm bg-[var(--color-accent)] px-4 font-medium text-[var(--color-text-on-accent)] disabled:opacity-50">
+            className="min-h-11 rounded-sm bg-(--color-accent) px-4 font-medium text-(--color-text-on-accent) disabled:opacity-50">
             {pending ? "Moving…" : "Move task"}
           </button>
         </div>

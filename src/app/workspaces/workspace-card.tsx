@@ -58,15 +58,15 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
   const kindLabel = workspace.kind === "household" ? "Household" : "Work";
   const kindClass =
     workspace.kind === "household"
-      ? "bg-[var(--color-kind-household-surface)] text-[var(--color-kind-household-text)]"
-      : "bg-[var(--color-kind-work-surface)] text-[var(--color-kind-work-text)]";
+      ? "bg-(--color-kind-household-surface) text-(--color-kind-household-text)"
+      : "bg-(--color-kind-work-surface) text-(--color-kind-work-text)";
 
   return (
     <div
-      className="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 flex items-center justify-between gap-4 transition-shadow duration-150 hover:shadow-[var(--shadow-card)]"
+      className="rounded-sm border border-(--color-border) bg-(--color-surface) px-4 py-3 flex items-center justify-between gap-4 transition-shadow duration-150 hover:shadow-(--shadow-card)"
     >
       <div className="flex flex-col gap-1 min-w-0">
-        <span className="text-sm font-semibold text-[var(--color-text-primary)] truncate">
+        <span className="text-sm font-semibold text-(--color-text-primary) truncate">
           {workspace.name}
         </span>
         <div className="flex items-center gap-2">
@@ -75,7 +75,7 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
           >
             {kindLabel}
           </span>
-          <span className="text-xs text-[var(--color-text-muted)]">
+          <span className="text-xs text-(--color-text-muted)">
             {workspace.member_count} members
           </span>
         </div>
@@ -89,13 +89,13 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
           confirmation despite this being a destructive action on shared data.
         */
         <div className="shrink-0 flex items-center gap-2">
-          <span className="text-2xs font-semibold px-3 py-1 rounded-full bg-[var(--color-success-surface)] text-[var(--color-success-text)]">
+          <span className="text-2xs font-semibold px-3 py-1 rounded-full bg-(--color-success-surface) text-(--color-success-text)">
             Joined
           </span>
           <button
             onClick={() => setLeaveConfirmOpen(true)}
             disabled={isPending}
-            className="inline-flex items-center min-h-11 text-2xs font-semibold px-3 py-1 rounded-full transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none text-[var(--color-text-secondary)] hover:bg-[var(--color-danger-surface)] hover:text-[var(--color-danger-text)]"
+            className="inline-flex items-center min-h-11 text-2xs font-semibold px-3 py-1 rounded-full transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none text-(--color-text-secondary) hover:bg-(--color-danger-surface) hover:text-(--color-danger-text)"
           >
             {isPending ? "Leaving…" : "Leave"}
           </button>
@@ -104,7 +104,7 @@ export function WorkspaceCard({ workspace, initialJoined }: WorkspaceCardProps) 
         <button
           onClick={handleJoin}
           disabled={isPending}
-          className="shrink-0 inline-flex items-center min-h-11 text-2xs font-semibold px-3 py-1 rounded-full bg-[var(--color-accent-subtle)] text-[var(--color-accent-text)] hover:bg-[var(--color-accent)] hover:text-[var(--color-text-on-accent)] disabled:opacity-50 disabled:pointer-events-none transition-opacity duration-100"
+          className="shrink-0 inline-flex items-center min-h-11 text-2xs font-semibold px-3 py-1 rounded-full bg-(--color-accent-subtle) text-(--color-accent-text) hover:bg-(--color-accent) hover:text-(--color-text-on-accent) disabled:opacity-50 disabled:pointer-events-none transition-opacity duration-100"
         >
           {isPending ? "Joining…" : "Join"}
         </button>
