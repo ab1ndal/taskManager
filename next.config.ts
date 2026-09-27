@@ -9,6 +9,14 @@ const nextConfig: NextConfig = {
     // option: it looks for `typescript/bin/tsc`, which the shim does not ship.
     ignoreBuildErrors: true,
   },
+  experimental: {
+    serverActions: {
+      // Grocery dictation uploads its recording to a server action (transcribe-actions.ts). The
+      // default 1 MB would reject a long list; transcribe-schema.ts caps the audio at 2 MB, and
+      // the extra room covers multipart overhead. Stays under Vercel's 4.5 MB request limit.
+      bodySizeLimit: "3mb",
+    },
+  },
 };
 
 export default nextConfig;

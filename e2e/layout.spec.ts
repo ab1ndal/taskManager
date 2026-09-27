@@ -117,11 +117,14 @@ test("controls on the grocery pantry meet the 44px touch minimum", async ({ page
 
 // The parsed-review row is not exercised here: it only appears after a real LLM call, and this
 // suite must stay deterministic without one. The entry point and its open textarea are the part
-// that renders unconditionally, so that is what gets the 44px/no-horizontal-scroll check.
+// that renders unconditionally, so that is what gets the 44px/no-horizontal-scroll check. The same
+// goes for recording: the Record button is measured, but no clip is ever sent to OpenAI.
 test("controls in the grocery dictate entry point meet the 44px touch minimum", async ({ page }) => {
   await page.goto("/groceries?view=stock");
   await page.getByRole("button", { name: "Dictate items" }).click();
   await expect(page.getByRole("textbox", { name: "Dictated grocery list" })).toBeVisible();
+  // Every Playwright browser has MediaRecorder, so the Record button must be here to be measured.
+  await expect(page.getByRole("button", { name: "Record" })).toBeVisible();
 
   const undersized = await undersizedControls(page);
 

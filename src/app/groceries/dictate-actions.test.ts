@@ -9,7 +9,7 @@ const generateObject = jest.fn();
 jest.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => fake }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: async () => fake }));
 jest.mock("ai", () => ({ generateObject: (...args: unknown[]) => generateObject(...args) }));
-jest.mock("@ai-sdk/anthropic", () => ({ anthropic: (model: string) => model }));
+jest.mock("@ai-sdk/openai", () => ({ openai: (model: string) => model }));
 
 import * as dictateActions from "./dictate-actions";
 
@@ -89,4 +89,14 @@ it("refuses a workspace the caller does not belong to", async () => {
 
   expect(result).toMatchObject({ ok: false, error: expect.stringContaining("Forbidden") });
   expect(generateObject).not.toHaveBeenCalled();
+});
+
+it("parses with gpt-6-luna at low reasoning effort", async () => {
+  mockModelReply([{ name: "Milk", quantity: null, category: "dairy", confidence: 0.9, sourceText: "milk" }]);
+
+  await dictateActions.parseGroceryDictation({ workspaceId: WORKSPACE, transcript: "milk" });
+
+  expect(generateObject).toHaveBeenCalledWith(
+    expect.objectContaining({ model: "gpt-6-luna", providerOptions: { openai: { reasoningEffort: "low" } } }),
+  );
 });
