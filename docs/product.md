@@ -139,6 +139,12 @@ days for abuse monitoring unless the account has zero data retention — the pro
 this app not storing audio. The text lands in the editable textarea and nothing is parsed until the
 user taps Parse. Recordings stop at two minutes.
 
+When adding to the pantry, an expiry said for an item ("milk expiring Friday", "paneer good till
+the 5th", "bread lasts three more days") is resolved to a date against today in the app's timezone
+and prefilled in that item's review row, where it can be changed or cleared. An item with no spoken
+expiry — or a cleared one — gets the category's shelf-life estimate, exactly as a typed pantry add
+does. The shopping list never stores expiry, so it is ignored there.
+
 ## Recurring Tasks
 
 Users can create recurring tasks.

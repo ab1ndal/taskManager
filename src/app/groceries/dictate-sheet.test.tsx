@@ -64,7 +64,7 @@ it("shows editable review rows after a successful parse", async () => {
   jest.mocked(parseGroceryDictation).mockResolvedValue({
     ok: true,
     items: [
-      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk" },
+      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk", expiresOn: null },
     ],
   });
 
@@ -83,7 +83,7 @@ it("flags a low-confidence row with its raw transcript fragment", async () => {
     items: [
       {
         name: "olive oil", quantity: null, category: "pantry", confidence: 0.3,
-        lowConfidence: true, sourceText: "we're low on olive oil",
+        lowConfidence: true, sourceText: "we're low on olive oil", expiresOn: null,
       },
     ],
   });
@@ -102,8 +102,8 @@ it("deletes a row before committing", async () => {
   jest.mocked(parseGroceryDictation).mockResolvedValue({
     ok: true,
     items: [
-      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk" },
-      { name: "Eggs", quantity: 12, category: "dairy", confidence: 0.9, lowConfidence: false, sourceText: "dozen eggs" },
+      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk", expiresOn: null },
+      { name: "Eggs", quantity: 12, category: "dairy", confidence: 0.9, lowConfidence: false, sourceText: "dozen eggs", expiresOn: null },
     ],
   });
 
@@ -123,7 +123,7 @@ it("commits every surviving row through addGroceryItem, respecting the entry poi
   jest.mocked(parseGroceryDictation).mockResolvedValue({
     ok: true,
     items: [
-      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk" },
+      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk", expiresOn: null },
     ],
   });
 
@@ -148,7 +148,7 @@ it("keeps a failed row on screen with its error instead of losing it", async () 
   jest.mocked(parseGroceryDictation).mockResolvedValue({
     ok: true,
     items: [
-      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk" },
+      { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk", expiresOn: null },
     ],
   });
   jest.mocked(addGroceryItem).mockResolvedValue({ ok: false, error: "You already have an item with that name" });
@@ -162,6 +162,66 @@ it("keeps a failed row on screen with its error instead of losing it", async () 
   fireEvent.click(screen.getByRole("button", { name: /add 1 item/i }));
 
   await waitFor(() => expect(screen.getByText(/you already have an item/i)).toBeInTheDocument());
+});
+
+describe("expiry", () => {
+  async function parseInto(target: "stock" | "list", expiresOn: string | null) {
+    jest.mocked(parseGroceryDictation).mockResolvedValue({
+      ok: true,
+      items: [
+        {
+          name: "Milk", quantity: null, category: "dairy", confidence: 0.95,
+          lowConfidence: false, sourceText: "milk expiring friday", expiresOn,
+        },
+      ],
+    });
+    render(<DictateSheet workspaceId={WORKSPACE} target={target} />);
+    open();
+    fireEvent.change(screen.getByLabelText(/dictated grocery list/i), { target: { value: "milk expiring friday" } });
+    fireEvent.click(screen.getByRole("button", { name: /^parse$/i }));
+    await waitFor(() => expect(screen.getByLabelText(/item name/i)).toBeInTheDocument());
+  }
+
+  it("prefills a spoken expiry and commits it", async () => {
+    await parseInto("stock", "2026-10-02");
+    expect(screen.getByLabelText(/^expires$/i)).toHaveValue("2026-10-02");
+
+    fireEvent.click(screen.getByRole("button", { name: /add 1 item/i }));
+
+    await waitFor(() =>
+      expect(addGroceryItem).toHaveBeenCalledWith(expect.objectContaining({ name: "Milk", expiresOn: "2026-10-02" })),
+    );
+  });
+
+  it("omits expiry when none was said, so the category estimate applies as before", async () => {
+    await parseInto("stock", null);
+    expect(screen.getByLabelText(/^expires$/i)).toHaveValue("");
+
+    fireEvent.click(screen.getByRole("button", { name: /add 1 item/i }));
+
+    await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
+    expect(jest.mocked(addGroceryItem).mock.calls[0][0]).not.toHaveProperty("expiresOn");
+  });
+
+  it("falls back to the estimate when the user clears a spoken expiry", async () => {
+    await parseInto("stock", "2026-10-02");
+    fireEvent.change(screen.getByLabelText(/^expires$/i), { target: { value: "" } });
+
+    fireEvent.click(screen.getByRole("button", { name: /add 1 item/i }));
+
+    await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
+    expect(jest.mocked(addGroceryItem).mock.calls[0][0]).not.toHaveProperty("expiresOn");
+  });
+
+  it("neither shows nor sends an expiry for the shopping list", async () => {
+    await parseInto("list", "2026-10-02");
+    expect(screen.queryByLabelText(/^expires$/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /add 1 item/i }));
+
+    await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
+    expect(jest.mocked(addGroceryItem).mock.calls[0][0]).not.toHaveProperty("expiresOn");
+  });
 });
 
 describe("recording", () => {

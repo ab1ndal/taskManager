@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isCategorySlug, type CategorySlug } from "./categories";
+import { expiresOn as expiryDate } from "./schemas";
 
 /**
  * Structured extraction contracts for "dictate items" (docs/product.md § Groceries).
@@ -29,6 +30,12 @@ export const rawDictatedItemSchema = z.object({
   confidence: z.number().min(0).max(1),
   /** The transcript fragment this item came from, shown alongside a low-confidence flag. */
   sourceText: z.string().trim().min(1).max(200),
+  /**
+   * The expiry the speaker said for this item, as the model resolved it to `YYYY-MM-DD`, or null.
+   * A bare string here rather than a date schema: one misresolved date must drop just that date in
+   * `toReviewItem`, not fail the whole list's parse.
+   */
+  expiresOn: z.string().nullable(),
 });
 
 export type RawDictatedItem = z.infer<typeof rawDictatedItemSchema>;
@@ -52,6 +59,8 @@ export type ReviewGroceryItem = {
   confidence: number;
   lowConfidence: boolean;
   sourceText: string;
+  /** Null means none was said, and the pantry falls back to the category's shelf-life estimate. */
+  expiresOn: string | null;
 };
 
 /**
@@ -60,7 +69,8 @@ export type ReviewGroceryItem = {
  * A category the model invents that isn't one of `CATEGORY_SLUGS` falls back to "pantry" — the
  * same fallback the rest of the pantry already uses for an unclassified product (categories.ts
  * `estimatedExpiry`, add-row.tsx's untouched selector) — rather than inventing a new category or
- * rejecting the row outright.
+ * rejecting the row outright. An expiry that is not a real date in the range `addGroceryItem`
+ * accepts is dropped to null for the same reason: the row survives with the category estimate.
  */
 export function toReviewItem(raw: RawDictatedItem): ReviewGroceryItem {
   return {
@@ -70,5 +80,6 @@ export function toReviewItem(raw: RawDictatedItem): ReviewGroceryItem {
     confidence: raw.confidence,
     lowConfidence: raw.confidence < LOW_CONFIDENCE_THRESHOLD,
     sourceText: raw.sourceText,
+    expiresOn: expiryDate.safeParse(raw.expiresOn).success ? raw.expiresOn : null,
   };
 }

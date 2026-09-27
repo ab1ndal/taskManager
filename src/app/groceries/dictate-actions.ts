@@ -7,7 +7,7 @@ import { assertWorkspaceMember, requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { run } from "@/app/tasks/action-run";
 import { parseInput } from "@/app/tasks/schemas";
-import { CATEGORY_SLUGS } from "./categories";
+import { CATEGORY_SLUGS, localToday } from "./categories";
 import {
   dictateInputSchema,
   rawDictatedItemSchema,
@@ -45,28 +45,41 @@ export async function parseGroceryDictation(
       output: "array",
       schemaName: "GroceryDictationItems",
       schemaDescription: "Grocery items extracted from one dictated shopping list.",
-      prompt: buildPrompt(transcript),
+      prompt: buildPrompt(transcript, localToday()),
     });
 
     return { items: object.map(toReviewItem) };
   });
 }
 
-function buildPrompt(transcript: string): string {
+/** "Sunday, 2026-09-27": the weekday is what lets the model resolve "expires Friday". */
+function describeDay(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" })
+    .format(new Date(Date.UTC(year, month - 1, day)));
+  return `${weekday}, ${date}`;
+}
+
+function buildPrompt(transcript: string, today: string): string {
   return [
     "Split the following dictated grocery list into individual items. The speaker may name",
     "several items in one breath, use rough quantities ('a dozen', 'a couple', 'a few'), or just",
     "say they're running low on something with no quantity at all.",
     "",
     "For each item, return:",
-    "- name: the plain product name, singular, no quantity words in it",
+    "- name: the plain product name, singular, no quantity or expiry words in it",
     "- quantity: a whole number if a count was said or clearly implied (e.g. 'a dozen eggs' -> 12,",
     "  'a couple lemons' -> 2), otherwise null — never guess a number nobody implied",
     `- category: your best guess, one of: ${CATEGORY_SLUGS.join(", ")}`,
     "- confidence: 0 to 1, how sure you are this is a real, distinct item with the right name,",
     "  quantity and category",
     "- sourceText: the exact fragment of the transcript this item came from",
+    "- expiresOn: the expiry, use-by or best-before date as YYYY-MM-DD, only if the speaker said one",
+    "  for this item (e.g. 'milk expiring Friday', 'yogurt good till the 5th', 'bread lasts three",
+    "  more days'). Resolve relative dates from today; a bare weekday or day of the month means its",
+    "  next occurrence. Otherwise null — never estimate one from the kind of product",
     "",
+    `Today is ${describeDay(today)}.`,
     `Transcript: "${transcript}"`,
   ].join("\n");
 }

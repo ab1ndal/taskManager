@@ -7,6 +7,7 @@ function raw(overrides: Partial<Parameters<typeof toReviewItem>[0]> = {}) {
     category: "dairy",
     confidence: 0.9,
     sourceText: "milk",
+    expiresOn: null,
     ...overrides,
   };
 }
@@ -55,5 +56,19 @@ describe("toReviewItem", () => {
   it("passes quantity through unchanged, including null", () => {
     expect(toReviewItem(raw({ quantity: 12 })).quantity).toBe(12);
     expect(toReviewItem(raw({ quantity: null })).quantity).toBe(null);
+  });
+
+  it("keeps a spoken expiry date the model resolved", () => {
+    expect(toReviewItem(raw({ expiresOn: "2026-10-02" })).expiresOn).toBe("2026-10-02");
+  });
+
+  it("leaves expiry null when none was said, so the category estimate still applies", () => {
+    expect(toReviewItem(raw({ expiresOn: null })).expiresOn).toBe(null);
+  });
+
+  it("drops a malformed or out-of-range expiry instead of failing the whole parse", () => {
+    expect(toReviewItem(raw({ expiresOn: "Friday" })).expiresOn).toBe(null);
+    expect(toReviewItem(raw({ expiresOn: "2026-02-30" })).expiresOn).toBe(null);
+    expect(toReviewItem(raw({ expiresOn: "1999-01-01" })).expiresOn).toBe(null);
   });
 });
