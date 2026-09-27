@@ -575,3 +575,13 @@ fragment).
 `npx jest` / `npx eslint .` only see the real tree. Tests that open `Dialog` must stub
 `HTMLDialogElement.prototype.showModal` (jsdom lacks it) — copy the stub from any dialog test.
 
+
+## L27 — A `"use server"` file may only export async functions
+
+**Learned:** 2026-09-27, adding transcription keywords.
+
+Exporting a constant from `transcribe-actions.ts` so a test could import it passed jest, tsc and
+eslint, none of which know the rule. Only `next build` rejects it.
+
+**Rule:** constants and helpers a server action shares with tests or the client go in the
+neighbouring `*-schema.ts` module, never exported from the `"use server"` file itself.

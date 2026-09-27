@@ -136,7 +136,11 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
             const result = await addGroceryItem({
               workspaceId,
               name: row.name,
-              ...(target === "stock" ? { category: row.category, quantity: row.quantity } : {}),
+              // A blank expiry is omitted, not sent as null: omitted means "estimate from the
+              // category", which is what every dictated row got before expiry could be spoken.
+              ...(target === "stock"
+                ? { category: row.category, quantity: row.quantity, ...(row.expiresOn ? { expiresOn: row.expiresOn } : {}) }
+                : {}),
               target,
             });
             return { row, ok: result.ok, error: result.ok ? undefined : result.error };
@@ -304,6 +308,19 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
                     </select>
                   </div>
                 )}
+                {target === "stock" && (
+                  <label className="flex items-center gap-2 text-sm text-(--color-text-secondary)">
+                    <span className="shrink-0">Expires</span>
+                    <input
+                      value={row.expiresOn ?? ""}
+                      onChange={(event) => updateRow(row.id, { expiresOn: event.target.value || null })}
+                      type="date"
+                      min="2020-01-01"
+                      max="2100-01-01"
+                      className={`${inputClass} h-11 text-(--color-text-primary)`}
+                    />
+                  </label>
+                )}
                 {row.error && (
                   <p role="alert" className="text-xs text-(--color-danger-text)">
                     {row.error}
@@ -312,6 +329,11 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
               </li>
             ))}
           </ul>
+          {target === "stock" && (
+            <p className="text-xs text-(--color-text-secondary)">
+              Leave expiry blank to use the category’s usual shelf life.
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <button
               type="button"

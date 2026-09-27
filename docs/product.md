@@ -133,11 +133,18 @@ Audio must never be stored.
 
 On /groceries, "Dictate items" has its own Record button, which works in the installed iPhone app
 where the browser's speech recognition does not. The clip is held in memory, sent once to OpenAI
-(`gpt-transcribe`) for transcription with the workspace's item names as keyword hints, and dropped;
+(`gpt-transcribe`) for transcription with the workspace's item names plus a fixed list of common
+Hindi grocery words (daal, naan, atta, …) as keyword hints, and dropped;
 it is never written to the database, storage or logs. OpenAI may retain API inputs for up to 30
 days for abuse monitoring unless the account has zero data retention — the product rule is about
 this app not storing audio. The text lands in the editable textarea and nothing is parsed until the
 user taps Parse. Recordings stop at two minutes.
+
+When adding to the pantry, an expiry said for an item ("milk expiring Friday", "paneer good till
+the 5th", "bread lasts three more days") is resolved to a date against today in the app's timezone
+and prefilled in that item's review row, where it can be changed or cleared. An item with no spoken
+expiry — or a cleared one — gets the category's shelf-life estimate, exactly as a typed pantry add
+does. The shopping list never stores expiry, so it is ignored there.
 
 ## Recurring Tasks
 

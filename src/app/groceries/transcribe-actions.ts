@@ -5,7 +5,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { assertNoError, run } from "@/app/tasks/action-run";
 import { parseInput } from "@/app/tasks/schemas";
-import { AUDIO_EXTENSIONS, baseMediaType, isAudioMediaType, transcribeInputSchema } from "./transcribe-schema";
+import {
+  AUDIO_EXTENSIONS,
+  baseMediaType,
+  COMMON_KEYWORDS,
+  isAudioMediaType,
+  MAX_KEYWORDS,
+  transcribeInputSchema,
+} from "./transcribe-schema";
 
 const TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
 
@@ -16,9 +23,6 @@ const TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
  * few seconds is negligible.
  */
 const TRANSCRIPTION_MODEL = "gpt-transcribe";
-
-/** The workspace's most-added items are the likeliest words in a list; the rest add little. */
-const MAX_KEYWORDS = 100;
 
 const CONTEXT_PROMPT =
   "A person reading out a grocery shopping list or pantry stock. Item names may include " +
@@ -79,14 +83,21 @@ export async function transcribeGroceryAudio(formData: FormData): Promise<Action
   });
 }
 
+/**
+ * The workspace's own item names first, since they are how this household spells things, then the
+ * common words it does not already have. The workspace query leaves room for the common list so the
+ * total stays within `MAX_KEYWORDS`.
+ */
 async function loadKeywords(workspaceId: string): Promise<string[]> {
   const { data, error } = await createAdminClient()
     .from("grocery_items")
     .select("name")
     .eq("workspace_id", workspaceId)
     .order("times_added", { ascending: false })
-    .limit(MAX_KEYWORDS);
+    .limit(MAX_KEYWORDS - COMMON_KEYWORDS.length);
   assertNoError("load grocery keywords", { error });
 
-  return (data ?? []).map((row) => String(row.name).trim()).filter((name) => name !== "");
+  const names = (data ?? []).map((row) => String(row.name).trim()).filter((name) => name !== "");
+  const known = new Set(names.map((name) => name.toLowerCase()));
+  return [...names, ...COMMON_KEYWORDS.filter((word) => !known.has(word))];
 }
