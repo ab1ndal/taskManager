@@ -13,18 +13,11 @@ export type GroceryItem = {
   category: CategorySlug;
   inStock: boolean;
   needed: boolean;
+  /** Null only when the item is not in stock; stock rows always carry a count. */
   quantity: number | null;
   expiresOn: string | null;
   expiryIsEstimate: boolean;
   timesAdded: number;
-  lots: GroceryLot[];
-};
-
-export type GroceryLot = {
-  id: string;
-  itemId: string;
-  quantity: number | null;
-  expiresOn: string | null;
-  expiryIsEstimate: boolean;
-  createdAt: string;
+  /** The item's one stock row (migration 031), or null when it is not in the pantry. */
+  lotId: string | null;
 };

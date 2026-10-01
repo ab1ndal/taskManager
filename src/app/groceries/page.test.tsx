@@ -53,20 +53,24 @@ it("ignores a work workspace the user does belong to", async () => {
   expect(query.eq).toHaveBeenLastCalledWith("workspace_id", "home");
 });
 
-it("loads stock from batches and preserves unknown aggregate quantities", async () => {
+it("maps each item's stock row onto it, and items without one to out of stock", async () => {
   query.eq.mockResolvedValueOnce({ data: [{ workspaces: { id: "home", kind: "household" } }], error: null });
-  query.eq.mockResolvedValueOnce({ data: [{ id: "milk", name: "Milk", category: "dairy", needed: true, times_added: 2 }], error: null });
+  query.eq.mockResolvedValueOnce({ data: [
+    { id: "milk", name: "Milk", category: "dairy", needed: true, times_added: 2 },
+    { id: "salt", name: "Salt", category: "pantry", needed: true, times_added: 1 },
+  ], error: null });
   query.in.mockResolvedValueOnce({ data: [
-    { id: "old", item_id: "milk", quantity: 2, expires_on: "2026-09-12", expiry_is_estimate: false, created_at: "2026-09-01" },
-    { id: "new", item_id: "milk", quantity: null, expires_on: null, expiry_is_estimate: false, created_at: "2026-09-07" },
+    { id: "lot", item_id: "milk", quantity: 2, expires_on: "2026-09-12", expiry_is_estimate: true },
   ], error: null });
   const page = await GroceriesPage({ searchParams: Promise.resolve({ view: "stock" }) });
-  expect(page.props.children.props.items[0]).toMatchObject({ inStock: true, needed: true, quantity: null, expiresOn: "2026-09-12" });
-  expect(page.props.children.props.items[0].lots).toHaveLength(2);
+  expect(page.props.children.props.items).toEqual([
+    expect.objectContaining({ id: "milk", inStock: true, lotId: "lot", quantity: 2, expiresOn: "2026-09-12", expiryIsEstimate: true }),
+    expect.objectContaining({ id: "salt", inStock: false, lotId: null, quantity: null, expiresOn: null, expiryIsEstimate: false }),
+  ]);
 });
-it("surfaces batch query failures instead of pretending the pantry is empty", async () => {
+it("surfaces stock query failures instead of pretending the pantry is empty", async () => {
   query.eq.mockResolvedValueOnce({ data: [{ workspaces: { id: "home", kind: "household" } }], error: null });
   query.eq.mockResolvedValueOnce({ data: [{ id: "milk" }], error: null });
   query.in.mockResolvedValueOnce({ data: null, error: { message: "offline" } });
-  await expect(GroceriesPage({ searchParams: Promise.resolve({ view: "stock" }) })).rejects.toThrow("Could not load grocery batches");
+  await expect(GroceriesPage({ searchParams: Promise.resolve({ view: "stock" }) })).rejects.toThrow("Could not load grocery stock");
 });

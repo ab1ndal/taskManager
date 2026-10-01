@@ -9,9 +9,11 @@ export function StockFields({ quantity, setQuantity, date, setDate, mode, setMod
   mode: ExpiryMode; setMode: (value: ExpiryMode) => void;
 }) {
   return <div className="space-y-3 min-w-0">
-    <label className="block text-sm">Quantity (optional)
+    <label className="block text-sm">Quantity
       <input className={control} type="number" inputMode="numeric" min={1} max={999} step={1}
-        value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+        value={quantity} onChange={(e) => setQuantity(e.target.value)}
+        // Selected on focus so typing replaces the prefilled 1 instead of making it 13.
+        onFocus={(e) => e.target.select()} />
     </label>
     <label className="block text-sm">Expiry
       <select className={control} value={mode} onChange={(e) => setMode(e.target.value as ExpiryMode)}>
@@ -24,6 +26,5 @@ export function StockFields({ quantity, setQuantity, date, setDate, mode, setMod
       <input className={control} type="date" required min="2020-01-01" max="2100-01-01"
         value={date} onChange={(e) => setDate(e.target.value)} />
     </label>}
-    <p className="text-xs text-(--color-text-secondary)">Leave quantity blank when you haven’t counted it.</p>
   </div>;
 }

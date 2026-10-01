@@ -585,3 +585,17 @@ eslint, none of which know the rule. Only `next build` rejects it.
 
 **Rule:** constants and helpers a server action shares with tests or the client go in the
 neighbouring `*-schema.ts` module, never exported from the `"use server"` file itself.
+
+## A `<label>` wrapping a `<select>` puts every option's text in that select's accessible name
+
+**Learned:** 2026-09-30, pantry single-stock branch.
+
+The Expiry select's option "Estimate from pantry category" made `getByLabel("Category")` match two
+selects once Edit item gained the stock fields, so the e2e strict-mode check failed. Match grocery
+selects by role with an anchored name: `getByRole("combobox", { name: /^Category/ })`.
+
+## Firefox cannot launch from the Claude Code sandbox on this machine
+
+`browserType.launch` hangs for 180s per test (`sandbox_extension_issue_file_to_process … Operation
+not permitted`). It's the environment, not the app. Run e2e from the agent with `--project=chromium
+--project=webkit --project=iphone --project=iphone-16-pro`, and run Firefox from a normal terminal.

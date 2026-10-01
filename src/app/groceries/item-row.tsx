@@ -1,18 +1,17 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, ChevronDown, Pencil, ListPlus, Minus, Plus, Trash2, X } from "lucide-react";
+import { Check, Pencil, ListPlus, Minus, Plus, Trash2, X } from "lucide-react";
 
 import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RowMenu } from "@/components/row-menu";
 import { toast } from "@/components/toaster";
 import { GENERIC_ERROR, type ActionResult } from "@/app/tasks/action-result";
-import { adjustQuantity, finishItem, forgetItem, setNeeded } from "./actions";
-import { categoryLabel, formatExpiry } from "./categories";
+import { adjustQuantity, discardLot, extendLot, finishItem, forgetItem, setNeeded } from "./actions";
+import { addDays, categoryLabel, formatExpiry, shelfLifeDays } from "./categories";
 import { isExpired } from "./sort";
-import { LotRow } from "./lot-row";
-import { LotDialog } from "./lot-dialog";
+import { PurchaseDialog } from "./purchase-dialog";
 import { EditItemDialog } from "./edit-item-dialog";
 import type { GroceryItem } from "./types";
 
@@ -43,7 +42,7 @@ function useActionCall() {
 }
 
 /**
- * Forget is the one grocery action with no way back: it deletes the row, every batch and the name
+ * Forget is the one grocery action with no way back: it deletes the row, its stock and the name
  * autocomplete would have offered. It sits in the same menu as the reversible "Remove from list",
  * one slot below it, which on a phone is a single mis-tap away — so it asks first.
  */
@@ -96,8 +95,8 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
   const [editing, setEditing] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [forgetting, setForgetting] = useState(false);
-  const [showBatches, setShowBatches] = useState(false);
-  const batchesId = `batches-${item.id}`;
+  const { lotId } = item;
+  const expired = isExpired(item.expiresOn, today);
 
   return (
     <li className="px-3 py-1 border-b border-(--color-border)">
@@ -134,24 +133,29 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
               </button>
             </span>
           )}
-          {/* On the meta line rather than a row of its own: a third 44px line per item cost roughly
-              a third of the rows that fit on a phone screen. */}
-          {item.lots.length > 0 && (
-            <button
-              type="button"
-              aria-expanded={showBatches}
-              aria-controls={batchesId}
-              onClick={() => setShowBatches((open) => !open)}
-              className="inline-flex items-center gap-0.5 min-h-11 text-2xs text-(--color-accent-text)"
-            >
-              {item.lots.length} {item.lots.length === 1 ? "batch" : "batches"}
-              <ChevronDown
-                size={14}
-                strokeWidth={ICON_STROKE}
-                aria-hidden="true"
-                className={`motion-safe:transition-transform ${showBatches ? "rotate-180" : ""}`}
-              />
-            </button>
+          {/* Expired stock is resolved right on its row, so it never needs a second listing. */}
+          {expired && lotId !== null && (
+            <span className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => call(() => extendLot({
+                  lotId,
+                  expiresOn: addDays(today, shelfLifeDays(item.category) ?? 7),
+                }))}
+                className="inline-flex items-center min-h-11 px-2 text-xs text-(--color-accent-text)"
+              >
+                Still good
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => call(() => discardLot({ lotId, keepOnList: true }))}
+                className="inline-flex items-center min-h-11 px-2 text-xs text-(--color-text-secondary)"
+              >
+                Gone
+              </button>
+            </span>
           )}
         </div>
       </div>
@@ -195,9 +199,6 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
         ]}
       />
       </div>
-      {showBatches && (
-        <ul id={batchesId}>{item.lots.map((lot) => <LotRow key={lot.id} item={item} lot={lot} today={today} />)}</ul>
-      )}
       {forgetting && (
         <ForgetConfirm
           item={item}
@@ -205,7 +206,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
           onConfirm={() => { setForgetting(false); call(() => forgetItem({ itemId: item.id })); }}
         />
       )}
-      {purchasing && <LotDialog item={item} onClose={() => setPurchasing(false)} />}
+      {purchasing && <PurchaseDialog item={item} onClose={() => setPurchasing(false)} />}
       {editing && <EditItemDialog item={item} onClose={() => setEditing(false)} />}
     </li>
   );

@@ -1,5 +1,18 @@
 # Open work
 
+## Pantry search + single stock row (merged to `main` 2026-10-01)
+
+Done: migration 031 (applied to dev 2026-09-30; production via deploy-migrations on the 2026-10-01
+merge, owner confirmed the irreversible batch merge), SQL test rewritten, client moved
+to one stock row (`lotId`), batch UI/expired section removed, inline Still good / Gone, Edit item
+quantity+expiry, pantry add dialog (qty prefilled 1), fuzzy search, docs.
+Verified: tsc, eslint, jest 892/892, `node supabase/tests/run-grocery-lots.mjs` on dev.
+
+E2E: grocery + layout 121/121 on chromium, webkit, iphone, iphone-16-pro. Firefox not run (see
+lessons — sandbox can't launch it).
+- [ ] Run Firefox e2e from a normal terminal.
+- [ ] Check on the installed iPhone: add dialog keyboard (qty selected on focus), search field.
+
 ## Grocery iPhone UX (branch `fix/grocery-iphone-ux`, 2026-09-27, uncommitted)
 
 Done: add bar pinned below nav, only name + Add sticky; readable expiry; inline batch toggle;

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { AddRow } from "./add-row";
 import type { GroceryItem } from "./types";
@@ -15,6 +15,11 @@ jest.mock("@/components/toaster", () => ({ toast: jest.fn() }));
 
 import { toast } from "@/components/toaster";
 
+// jsdom does not implement showModal(); the pantry add dialog needs it.
+HTMLDialogElement.prototype.showModal = jest.fn(function (this: HTMLDialogElement) {
+  this.setAttribute("open", "");
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
 });
@@ -29,7 +34,7 @@ const items: GroceryItem[] = [
     quantity: null,
     expiresOn: null,
     expiryIsEstimate: false,
-    timesAdded: 12, lots: [],
+    timesAdded: 12, lotId: null,
   },
 ];
 
@@ -80,11 +85,42 @@ it("does not submit an empty name", async () => {
   expect(addGroceryItem).not.toHaveBeenCalled();
 });
 
-// Regression: picking a suggestion used to submit whatever the selector held, because
-// setCategory() does not change the binding the current render closed over. grocery_upsert
-// overwrites the category, so a Dairy item re-added this way silently became Pantry and lost its
-// shelf-life estimate for every later purchase.
-it("submits the suggestion's own category, not the selector's", async () => {
+it("opens the pantry add dialog instead of saving at once, with quantity 1", async () => {
+  const { addGroceryItem } = await import("./actions");
+  render(<AddRow {...props} target="stock" />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: "Peas" } });
+  fireEvent.submit(input.closest("form")!);
+
+  expect(addGroceryItem).not.toHaveBeenCalled();
+  expect(screen.getByRole("heading", { name: "Add to pantry · Peas" })).toBeInTheDocument();
+  expect(screen.getByLabelText("Quantity")).toHaveValue(1);
+
+  fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "4" } });
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add" }));
+  await waitFor(() =>
+    expect(addGroceryItem).toHaveBeenCalledWith({
+      workspaceId: props.workspaceId, name: "Peas", category: "pantry", target: "stock", quantity: 4, expiresOn: null,
+    }),
+  );
+  await waitFor(() => expect(screen.queryByRole("heading", { name: /Add to pantry/ })).toBeNull());
+  expect(input).toHaveValue("");
+});
+
+it("keeps the typed name when the pantry add dialog is cancelled", async () => {
+  const { addGroceryItem } = await import("./actions");
+  render(<AddRow {...props} target="stock" />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: "Peas" } });
+  fireEvent.submit(input.closest("form")!);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(addGroceryItem).not.toHaveBeenCalled();
+  expect(input).toHaveValue("Peas");
+});
+
+// Regression: picking a suggestion used to submit whatever the selector held, so a Dairy item
+// re-added this way silently became Pantry and lost its shelf-life estimate.
+it("prefills the suggestion's own category in the pantry add dialog", async () => {
   const { addGroceryItem } = await import("./actions");
   render(<AddRow {...props} target="stock" />);
 
@@ -92,6 +128,8 @@ it("submits the suggestion's own category, not the selector's", async () => {
     target: { value: "oat" },
   });
   fireEvent.click(screen.getByRole("button", { name: /oat milk/i }));
+  expect(screen.getByRole("combobox", { name: "Category" })).toHaveValue("dairy");
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add" }));
 
   await waitFor(() =>
     expect(addGroceryItem).toHaveBeenCalledWith(
@@ -100,12 +138,34 @@ it("submits the suggestion's own category, not the selector's", async () => {
   );
 });
 
-// Regression (Critical 1): the typed path — fill a name, press Enter, selector untouched — always
-// sent category "pantry". grocery_upsert overwrote the column on conflict, so re-adding an
-// existing Dairy item this way rewrote it to Pantry and destroyed its shelf-life estimate. Only
-// the suggestion-chip path was ever tested. The selector now speaks only when the user has moved
-// it; "no category" means "keep what is stored".
-it("omits the category on a typed add when the selector was untouched", async () => {
+// Regression (Critical 1): a typed re-add of an existing Dairy item used to send "pantry" and
+// rewrite the stored category. The dialog now shows the stored one for a matching name.
+it("shows an existing product's stored category for a typed pantry add", () => {
+  render(<AddRow {...props} target="stock" />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: " OAT MILK " } });
+  fireEvent.submit(input.closest("form")!);
+  expect(screen.getByRole("heading", { name: "Add to pantry · Oat milk" })).toBeInTheDocument();
+  expect(screen.getByRole("combobox", { name: "Category" })).toHaveValue("dairy");
+});
+
+it("sends the category the user picks in the pantry add dialog", async () => {
+  const { addGroceryItem } = await import("./actions");
+  render(<AddRow {...props} target="stock" />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: "Peas" } });
+  fireEvent.submit(input.closest("form")!);
+  fireEvent.change(screen.getByRole("combobox", { name: "Category" }), { target: { value: "frozen" } });
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add" }));
+
+  await waitFor(() =>
+    expect(addGroceryItem).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Peas", category: "frozen" }),
+    ),
+  );
+});
+
+it("sends no category on a typed shopping add", async () => {
   const { addGroceryItem } = await import("./actions");
   render(<AddRow {...props} />);
   const input = screen.getByRole("textbox", { name: /add an item/i });
@@ -115,24 +175,6 @@ it("omits the category on a typed add when the selector was untouched", async ()
 
   await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
   expect(jest.mocked(addGroceryItem).mock.calls[0][0]).not.toHaveProperty("category");
-});
-
-it("sends the category once the user actually picks one", async () => {
-  const { addGroceryItem } = await import("./actions");
-  render(<AddRow {...props} target="stock" />);
-
-  fireEvent.change(screen.getByRole("combobox", { name: /category/i }), {
-    target: { value: "frozen" },
-  });
-  const input = screen.getByRole("textbox", { name: /add an item/i });
-  fireEvent.change(input, { target: { value: "Peas" } });
-  fireEvent.submit(input.closest("form")!);
-
-  await waitFor(() =>
-    expect(addGroceryItem).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Peas", category: "frozen" }),
-    ),
-  );
 });
 
 it("has no shopping category selector and suggestions do not send a category", async () => {

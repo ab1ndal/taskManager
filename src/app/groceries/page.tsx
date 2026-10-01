@@ -3,8 +3,6 @@ import { redirect } from "next/navigation";
 import { createClient, getUser } from "@/lib/supabase/server";
 import { isCategorySlug, localToday, type CategorySlug } from "./categories";
 import { GroceriesClient } from "./groceries-client";
-import { deriveLots } from "./lots";
-import type { GroceryLot } from "./types";
 import type { GroceryItem } from "./types";
 
 type SearchParams = Promise<{ view?: string; workspace?: string }>;
@@ -83,28 +81,28 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
   const itemIds = (rows ?? []).map((row) => row.id as string);
   const { data: lotRows, error: lotsError } = itemIds.length
     ? await supabase.from("grocery_lots")
-      .select("id, item_id, quantity, expires_on, expiry_is_estimate, created_at")
+      .select("id, item_id, quantity, expires_on, expiry_is_estimate")
       .in("item_id", itemIds)
     : { data: [], error: null };
-  if (lotsError) throw new Error("Could not load grocery batches", { cause: lotsError });
-  const byItem = new Map<string, GroceryLot[]>();
-  for (const row of lotRows ?? []) {
-    const lot: GroceryLot = {
-      id: row.id, itemId: row.item_id, quantity: row.quantity,
-      expiresOn: row.expires_on, expiryIsEstimate: row.expiry_is_estimate,
-      createdAt: row.created_at,
-    };
-    byItem.set(lot.itemId, [...(byItem.get(lot.itemId) ?? []), lot]);
-  }
+  if (lotsError) throw new Error("Could not load grocery stock", { cause: lotsError });
+  // One stock row per item, enforced by grocery_lots_one_per_item (migration 031).
+  const lotByItem = new Map((lotRows ?? []).map((row) => [row.item_id as string, row]));
 
-  const items: GroceryItem[] = (rows ?? []).map((row) => ({
-    id: row.id as string,
-    name: row.name as string,
-    category: rowCategory(row.category),
-    needed: row.needed as boolean,
-    ...deriveLots(byItem.get(row.id) ?? []),
-    timesAdded: row.times_added as number,
-  }));
+  const items: GroceryItem[] = (rows ?? []).map((row) => {
+    const lot = lotByItem.get(row.id as string);
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      category: rowCategory(row.category),
+      needed: row.needed as boolean,
+      inStock: lot !== undefined,
+      lotId: (lot?.id as string | undefined) ?? null,
+      quantity: (lot?.quantity as number | undefined) ?? null,
+      expiresOn: (lot?.expires_on as string | null | undefined) ?? null,
+      expiryIsEstimate: (lot?.expiry_is_estimate as boolean | undefined) ?? false,
+      timesAdded: row.times_added as number,
+    };
+  });
 
   return (
     <main className="pb-[env(safe-area-inset-bottom)]">
