@@ -141,6 +141,11 @@ test("controls inside the grocery edit dialog meet the 44px touch minimum", asyn
   const input = page.getByRole("textbox", { name: "Add an item" });
   await input.fill(name);
   await input.press("Enter");
+  // Pantry adds ask for the amount first; measure that dialog too while it is open.
+  await expect(page.getByRole("dialog")).toBeVisible();
+  const addDialogUndersized = await undersizedControls(page);
+  await page.getByRole("dialog").getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
 
   const row = page
     .locator("li")
@@ -154,6 +159,7 @@ test("controls inside the grocery edit dialog meet the 44px touch minimum", asyn
 
   await cleanupUiWrites();
 
+  expect(addDialogUndersized, `add dialog controls below 44px tall: ${addDialogUndersized.join(", ")}`).toEqual([]);
   expect(undersized, `controls below 44px tall: ${undersized.join(", ")}`).toEqual([]);
 });
 

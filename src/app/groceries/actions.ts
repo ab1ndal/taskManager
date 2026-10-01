@@ -250,7 +250,7 @@ export async function extendLot(input: ExtendLotInput): Promise<ActionResult> {
     const { error } = await createAdminClient().rpc("grocery_lot_extend", {
       p_lot: lotId, p_expires_on: expiresOn, p_estimate: true,
     });
-    assertNoRpcError("extend batch", { error });
+    assertNoRpcError("extend stock", { error });
     revalidatePath("/groceries");
     return {};
   });
@@ -265,7 +265,7 @@ export async function editLot(input: EditLotInput): Promise<ActionResult> {
       p_lot: lotId, p_quantity: quantity, p_expires_on: expiresOn,
       p_estimate: expiresOn !== null && expiryIsEstimate,
     });
-    assertNoRpcError("edit batch", { error });
+    assertNoRpcError("edit stock", { error });
     revalidatePath("/groceries");
     return {};
   });
@@ -279,7 +279,7 @@ export async function discardLot(input: DiscardLotInput): Promise<ActionResult> 
     const { error } = await createAdminClient().rpc("grocery_lot_discard", {
       p_lot: lotId, p_keep_on_list: keepOnList,
     });
-    assertNoRpcError("discard batch", { error });
+    assertNoRpcError("discard stock", { error });
     revalidatePath("/groceries");
     return {};
   });

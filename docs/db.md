@@ -99,7 +99,7 @@ Follow-up, Completed (the last is_done).
 Migrations 026–030 define one product per workspace and normalized name. Products own `name`,
 `category`, `needed`, `times_added`, membership attribution and timestamps. The unique name index is
 `(workspace_id, lower(btrim(name)))`. `in_stock` defaults false and a lot insert/delete trigger keeps
-it synchronized with batch existence. The existing state-change trigger maintains `state_changed_at`.
+it synchronized with stock-row existence. The existing state-change trigger maintains `state_changed_at`.
 
 | in_stock | needed | State |
 | --- | --- | --- |
@@ -110,28 +110,30 @@ it synchronized with batch existence. The existing state-change trigger maintain
 
 ### grocery_lots
 
-Migration 030 moves quantity and expiry off products into purchase batches:
+Migration 030 moved quantity and expiry off products into purchase batches; migration 031 merged
+those into one stock row per product (`grocery_lots_one_per_item`, unique on `item_id`):
 
 | Column | Meaning |
 | --- | --- |
 | id | uuid primary key |
-| item_id | product FK, cascade on delete; indexed |
-| quantity | nullable positive integer; null means uncounted |
+| item_id | product FK, cascade on delete; unique |
+| quantity | positive integer, not null, default 1 |
 | expires_on | nullable date between 2020-01-01 and 2100-01-01 |
 | expiry_is_estimate | true requires a date |
-| created_at | timestamp when recorded; backfill inherits product creation time |
+| created_at | timestamp the row was first created |
 
-Every purchase creates a new batch, including matching/absent expiry dates. Backfill creates one
-batch per previously in-stock product. Batch dates remain independently editable. Total quantity
-is unknown if any batch is uncounted. Earliest dated expiry drives the pantry summary.
+031's backfill summed each product's batches (uncounted as 1) and kept the earliest-expiring
+batch's date and estimate flag. The table keeps its name so RLS, grants and RPCs carry over.
 
-Stock RPCs lock the parent before accessing batches, serializing purchases, consumption and cleanup.
-`grocery_adjust_quantity` consumes earliest expiry first, undated last; increments correct the latest
-purchase. The final decrement sets needed. `grocery_lot_extend` touches only date/estimate;
-`grocery_lot_edit` changes one batch's quantity/date; `grocery_lot_discard` removes one batch.
-`grocery_finish` deletes all batches; `grocery_forget` deletes the product and cascades.
+Stock RPCs lock the parent before touching its stock row. `grocery_mark_bought` and a `stock`
+`grocery_upsert` merge through `private.grocery_stock_add`: a null quantity counts as 1,
+quantities add, and the earlier date wins (a date beats none) with its estimate flag; on a tie a
+printed date beats an estimate. `grocery_adjust_quantity` steps the count and the final decrement
+deletes the row and sets needed. `grocery_lot_extend` touches only date/estimate;
+`grocery_lot_edit` sets quantity/date; `grocery_lot_discard` removes the row.
+`grocery_finish` deletes it; `grocery_forget` deletes the product and cascades.
 
-Authenticated clients can read products and batches under workspace-membership RLS. Direct table
+Authenticated clients can read products and stock under workspace-membership RLS. Direct table
 writes are revoked; authenticated callers cannot execute the stock RPCs. Server actions independently
 authorize the stored workspace, then call service-role-only RPCs with empty search paths.
 Product name/category edits use an authorized admin table update. Shopping name edits omit category.

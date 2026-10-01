@@ -58,7 +58,7 @@ export const markBoughtSchema = z.object({
 export const extendLotSchema = z.object({ lotId: uuid, expiresOn });
 export const discardLotSchema = z.object({ lotId: uuid, keepOnList: z.boolean() });
 export const editLotSchema = z.object({
-  lotId: uuid, quantity: quantity.nullable(), expiresOn: expiresOn.nullable(),
+  lotId: uuid, quantity, expiresOn: expiresOn.nullable(),
   expiryIsEstimate: z.boolean().default(false),
 });
 

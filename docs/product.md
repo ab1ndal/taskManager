@@ -188,26 +188,27 @@ Need adds an item to the shopping list without removing it from the pantry (low 
 returns it to the pantry and removes it from the list. Finished clears pantry details and either
 keeps the item on the list or archives it. Archived names remain available for autocomplete.
 
-Each purchase creates a separate batch with optional quantity and expiry, including repeat purchases
-with the same date or no date. Pantry shows the earliest expiry and sums quantities only when every
-batch is counted. The batch disclosure provides editing even for a single batch. Finishing a batch
-leaves other purchases intact; finishing the product removes all its stock.
+Each item has one stock record: a quantity and an optional expiry. A purchase merges into it —
+quantities add, and the earlier of the old and new expiry is kept (a date beats no date). Quantity
+defaults to 1 whenever none is given, typed or dictated, so every pantry item has a count and a
+−/+ stepper. Reaching zero removes it from the pantry and adds it to the shopping list.
 
-Bought opens purchase entry with optional quantity, a printed date, no expiry (default), or an
-explicit category-based estimate. Save and add another batch handles multiple expiry dates in one
-trip. The pantry menu offers Record purchase for subsequent trips. A counted item's decrement uses
-the earliest expiry first; reaching zero adds it to the shopping list. Unknown totals have no stepper.
+Adding a name in the pantry opens a dialog asking for quantity (prefilled 1), expiry (none, a
+printed date, or a category estimate) and category (the stored one for a known name). Bought and
+Record purchase open the same quantity and expiry fields. Shopping-list adds save immediately.
 
-Product editing changes name/category in the pantry and name only in shopping. Shopping has no
+Product editing changes name, category, quantity and expiry in the pantry and name only in shopping. Shopping has no
 category controls, tags, filters or category ordering; it sorts alphabetically. Pantry retains
-category filtering above 15 items and expiry/name sorting. Expired batches appear in a cleanup
-section with Still good and Gone; removing one never removes fresh stock. Estimates use a muted `~`
-and expired stock uses amber, never task-deadline red.
+category filtering above 15 items, expiry/name sorting, and a search field. Search matches any part
+of the name, ignoring case, spaces and hyphens; typo matches (one slip from 4 letters, two from 8)
+follow under a "Similar" heading, and queries under 4 letters match exactly only. An expired item
+appears once, in the list, with an amber badge and inline Still good and Gone. Estimates use a
+muted `~` and expired stock uses amber, never task-deadline red.
 
 The pantry is laid out for a phone. Only the name field and Add stay pinned (below the nav) while
-scrolling; category, quantity, expiry and dictation scroll away with the page. Expiry reads as time
+scrolling; dictation scrolls away with the page. Expiry reads as time
 left ("today", "tomorrow", "3 days left") inside a week and as a short date ("Oct 4") beyond it.
-Each row's batch count is an inline toggle rather than a separate line. Forget this item asks for
+Forget this item asks for
 confirmation first, because it is permanent and sits one menu slot from Remove from list.
 
 Foreground polling refreshes shared data every 20 seconds. Failed reads show a retryable error

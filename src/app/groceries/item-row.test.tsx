@@ -7,7 +7,8 @@ jest.mock("./actions", () => ({
   finishItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   adjustQuantity: jest.fn(async () => ({ ok: true, itemId: "g1" })),
   editItem: jest.fn(async () => ({ ok: true, itemId: "g1" })),
-  extendLot: jest.fn(async () => ({ ok: true, itemId: "g1" })),
+  extendLot: jest.fn(async () => ({ ok: true })),
+  discardLot: jest.fn(async () => ({ ok: true })),
   forgetItem: jest.fn(async () => ({ ok: true })),
 }));
 
@@ -22,7 +23,7 @@ HTMLDialogElement.prototype.showModal = jest.fn(function (this: HTMLDialogElemen
 });
 
 import { PantryRow, ShoppingRow } from "./item-row";
-import { editItem, extendLot, forgetItem } from "./actions";
+import { discardLot, editItem, extendLot, forgetItem } from "./actions";
 import type { GroceryItem } from "./types";
 
 const base: GroceryItem = {
@@ -31,15 +32,15 @@ const base: GroceryItem = {
   category: "produce",
   inStock: true,
   needed: false,
-  quantity: null,
+  quantity: 1,
   expiresOn: "2026-09-13",
   expiryIsEstimate: true,
-  timesAdded: 1, lots: [],
+  timesAdded: 1,
+  lotId: "l1",
 };
 
 beforeEach(() => jest.clearAllMocks());
-const expiredLot = { id: "l1", itemId: "g1", quantity: 3, expiresOn: "2026-09-01", expiryIsEstimate: false, createdAt: "2026-09-01T12:00:00Z" };
-function expand() { fireEvent.click(screen.getByRole("button", { name: /^\d+ batch/ })); }
+const expired: GroceryItem = { ...base, expiresOn: "2026-09-01", expiryIsEstimate: false };
 
 
 describe("PantryRow", () => {
@@ -53,35 +54,39 @@ describe("PantryRow", () => {
     expect(screen.queryByText(/~/)).not.toBeInTheDocument();
   });
 
-  it("labels an expired item and offers Still good", () => {
-    render(<PantryRow item={{ ...base, expiresOn: "2026-09-01", lots: [expiredLot] }} today="2026-09-06" />);
-    expect(screen.getAllByText("expired")[0]).toBeInTheDocument();
-    expand();
+  it("labels an expired item and offers Still good and Gone right on the row", () => {
+    render(<PantryRow item={expired} today="2026-09-06" />);
+    expect(screen.getByText("expired")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /still good/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Gone" })).toBeInTheDocument();
   });
 
-  it("shows a stepper only when the item has a count", () => {
-    const { rerender } = render(<PantryRow item={base} today="2026-09-06" />);
-    expect(screen.queryByRole("button", { name: /one fewer/i })).not.toBeInTheDocument();
+  it("offers no expiry actions on fresh stock", () => {
+    render(<PantryRow item={base} today="2026-09-06" />);
+    expect(screen.queryByRole("button", { name: /still good/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Gone" })).not.toBeInTheDocument();
+  });
 
-    rerender(<PantryRow item={{ ...base, quantity: 6 }} today="2026-09-06" />);
+  it("gone removes the stock and puts the item on the list", async () => {
+    render(<PantryRow item={expired} today="2026-09-06" />);
+    fireEvent.click(screen.getByRole("button", { name: "Gone" }));
+    await waitFor(() => expect(discardLot).toHaveBeenCalledWith({ lotId: "l1", keepOnList: true }));
+  });
+
+  it("shows the stepper with the count", () => {
+    render(<PantryRow item={{ ...base, quantity: 6 }} today="2026-09-06" />);
     expect(screen.getByRole("button", { name: /one fewer/i })).toBeInTheDocument();
     expect(screen.getByText("6")).toBeInTheDocument();
+  });
+
+  it("has no batch toggle", () => {
+    render(<PantryRow item={expired} today="2026-09-06" />);
+    expect(screen.queryByRole("button", { name: /batch/ })).not.toBeInTheDocument();
   });
 
   it("shows how long is left rather than a raw date", () => {
     render(<PantryRow item={{ ...base, expiresOn: "2026-09-09" }} today="2026-09-06" />);
     expect(screen.getByText("~3 days left")).toBeInTheDocument();
-  });
-
-  it("keeps batches collapsed until the batch count is tapped", () => {
-    render(<PantryRow item={{ ...base, expiresOn: "2026-09-01", lots: [expiredLot] }} today="2026-09-06" />);
-    const toggle = screen.getByRole("button", { name: "1 batch" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: /still good/i })).not.toBeInTheDocument();
-    fireEvent.click(toggle);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /still good/i })).toBeInTheDocument();
   });
 
   it("reflects the Need state in the toggle", () => {
@@ -97,10 +102,9 @@ describe("PantryRow", () => {
   // life. produce's shelf life is also 7, so it can't tell the two behaviours apart — this uses
   // dairy (10) instead.
   it("still good pushes the expiry out by the category's shelf life, not a flat week", async () => {
-    const dairyItem: GroceryItem = { ...base, category: "dairy", expiresOn: "2026-09-01", lots: [expiredLot] };
+    const dairyItem: GroceryItem = { ...expired, category: "dairy" };
     render(<PantryRow item={dairyItem} today="2026-09-06" />);
 
-    expand();
     fireEvent.click(screen.getByRole("button", { name: /still good/i }));
 
     await waitFor(() => {
@@ -117,10 +121,9 @@ describe("PantryRow", () => {
   // branch had just fixed. extendLot names only the two expiry columns.
   it("still good writes only the expiry, never the stale name, category or quantity", async () => {
     render(
-      <PantryRow item={{ ...base, expiresOn: "2026-09-01", lots: [expiredLot], quantity: 3 }} today="2026-09-06" />,
+      <PantryRow item={{ ...expired, quantity: 3 }} today="2026-09-06" />,
     );
 
-    expand();
     fireEvent.click(screen.getByRole("button", { name: /still good/i }));
 
     await waitFor(() => expect(extendLot).toHaveBeenCalled());
@@ -132,7 +135,7 @@ describe("PantryRow", () => {
   });
 });
 
-// Forget permanently deletes the row and its batches, one menu slot from a reversible action.
+// Forget permanently deletes the row and its stock, one menu slot from a reversible action.
 describe.each([
   ["PantryRow", () => <PantryRow item={base} today="2026-09-06" />],
   ["ShoppingRow", () => <ShoppingRow item={{ ...base, needed: true }} onPurchase={jest.fn()} />],

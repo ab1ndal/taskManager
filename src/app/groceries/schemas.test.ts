@@ -53,8 +53,13 @@ describe("adjustQuantitySchema", () => {
 describe("editLotSchema", () => {
   it("allows clearing the expiry with null", () => {
     const parsed = editLotSchema.parse({
-      lotId: workspaceId, expiresOn: null, quantity: null,
+      lotId: workspaceId, expiresOn: null, quantity: 2,
     });
     expect(parsed.expiresOn).toBeNull();
+  });
+
+  // Stock always carries a count since migration 031; "uncounted" is no longer a state.
+  it("rejects a missing quantity", () => {
+    expect(editLotSchema.safeParse({ lotId: workspaceId, expiresOn: null, quantity: null }).success).toBe(false);
   });
 });

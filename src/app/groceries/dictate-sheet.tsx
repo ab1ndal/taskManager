@@ -289,7 +289,8 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
                       max={999}
                       step={1}
                       aria-label="Quantity"
-                      placeholder="Qty"
+                      // Blank saves as 1 (migration 031), so the placeholder says so.
+                      placeholder="1"
                       className={`${inputClass} w-24`}
                     />
                     <select

@@ -61,13 +61,13 @@ it("edits only product fields and preserves category when omitted", async () => 
   expect(fake.tables.grocery_items![0]).toMatchObject({ name: "Oat milk", category: "dairy" });
   expect(fake.tables.grocery_lots![0]).toMatchObject({ quantity: 2, expires_on: "2026-09-12" });
 });
-it("extends only the chosen batch date", async () => {
+it("extends only the stock date", async () => {
   await actions.extendLot({ lotId: LOT, expiresOn: "2026-09-20" });
   expect(rpc).toHaveBeenCalledWith("grocery_lot_extend", { p_lot: LOT, p_expires_on: "2026-09-20", p_estimate: true });
 });
-it("edits or clears one batch's count and expiry", async () => {
-  await actions.editLot({ lotId: LOT, quantity: null, expiresOn: null, expiryIsEstimate: true });
-  expect(rpc).toHaveBeenCalledWith("grocery_lot_edit", { p_lot: LOT, p_quantity: null, p_expires_on: null, p_estimate: false });
+it("edits the stock count and clears its expiry", async () => {
+  await actions.editLot({ lotId: LOT, quantity: 4, expiresOn: null, expiryIsEstimate: true });
+  expect(rpc).toHaveBeenCalledWith("grocery_lot_edit", { p_lot: LOT, p_quantity: 4, p_expires_on: null, p_estimate: false });
 });
 it("forwards discard, finish, step, need and forget intentions", async () => {
   await actions.discardLot({ lotId: LOT, keepOnList: true });
@@ -81,7 +81,7 @@ it("forwards discard, finish, step, need and forget intentions", async () => {
   await actions.forgetItem({ itemId: ITEM });
   expect(rpc).toHaveBeenLastCalledWith("grocery_forget", { p_id: ITEM });
 });
-it.each(["edit", "extend", "discard"])("refuses to %s a batch in another workspace", async (operation) => {
+it.each(["edit", "extend", "discard"])("refuses to %s stock in another workspace", async (operation) => {
   fake.tables.grocery_items![0].workspace_id = OTHER;
   const result = operation === "edit" ? await actions.editLot({ lotId: LOT, quantity: 1, expiresOn: null })
     : operation === "extend" ? await actions.extendLot({ lotId: LOT, expiresOn: "2026-09-20" })
@@ -100,7 +100,7 @@ it("rejects unauthorized item and workspace writes", async () => {
   ]) expect(result).toMatchObject({ ok: false, error: expect.stringContaining("Forbidden") });
   expect(rpc).not.toHaveBeenCalled();
 });
-it("rejects malformed batch input without writing", async () => {
+it("rejects malformed stock input without writing", async () => {
   expect((await actions.editLot({ lotId: LOT, quantity: 0, expiresOn: null })).ok).toBe(false);
   expect((await actions.extendLot({ lotId: "invalid", expiresOn: "2026-09-20" })).ok).toBe(false);
   expect(rpc).not.toHaveBeenCalled();

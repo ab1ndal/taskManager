@@ -26,13 +26,13 @@ import type { GroceryItem } from "./types";
 
 const items: GroceryItem[] = [
   { id: "g1", name: "Rice", category: "pantry", inStock: true, needed: false,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 4 , lots: []},
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 4, lotId: null },
   { id: "g2", name: "Milk", category: "dairy", inStock: false, needed: true,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 9 , lots: []},
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 9, lotId: null },
   { id: "g3", name: "Spinach", category: "produce", inStock: true, needed: true,
-    quantity: null, expiresOn: "2026-09-07", expiryIsEstimate: true, timesAdded: 2 , lots: []},
+    quantity: null, expiresOn: "2026-09-07", expiryIsEstimate: true, timesAdded: 2, lotId: null },
   { id: "g4", name: "Old thing", category: "pantry", inStock: false, needed: false,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 1 , lots: []},
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 1, lotId: null },
 ];
 
 const props = { workspaceId: "11111111-1111-4111-8111-111111111111", items, today: "2026-09-06" };
@@ -79,7 +79,7 @@ describe("GroceriesClient", () => {
       quantity: null,
       expiresOn: null,
       expiryIsEstimate: false,
-      timesAdded: 1, lots: [],
+      timesAdded: 1, lotId: null,
     }));
 
     render(<GroceriesClient {...props} items={many} view="stock" />);
@@ -137,4 +137,61 @@ it("shopping ignores a pantry category filter and shows no category controls", (
   expect(screen.queryByRole("group", { name: /filter/i })).not.toBeInTheDocument();
   expect(screen.queryByRole("combobox", { name: "Category" })).not.toBeInTheDocument();
   expect(screen.getAllByText(/^Product /)).toHaveLength(20);
+});
+
+describe("pantry search", () => {
+  const stocked = (id: string, name: string, extra: Partial<GroceryItem> = {}): GroceryItem => ({
+    id, name, category: "pantry", inStock: true, needed: false, quantity: 1, expiresOn: null,
+    expiryIsEstimate: false, timesAdded: 1, lotId: `lot-${id}`, ...extra,
+  });
+  const pantry = [stocked("p1", "Paneer", { category: "dairy" }), stocked("p2", "Spinach"), stocked("p3", "Pan masala")];
+  const search = () => screen.getByRole("searchbox", { name: "Search pantry" });
+
+  it("shows only items whose name contains the text, case-insensitively", () => {
+    render(<GroceriesClient {...props} items={pantry} view="stock" />);
+    fireEvent.change(search(), { target: { value: "PAN" } });
+    expect(screen.getByText("Paneer")).toBeInTheDocument();
+    expect(screen.getByText("Pan masala")).toBeInTheDocument();
+    expect(screen.queryByText("Spinach")).not.toBeInTheDocument();
+    expect(screen.getByText("2 matching items")).toBeInTheDocument();
+  });
+
+  it("lists typo matches under Similar", () => {
+    render(<GroceriesClient {...props} items={pantry} view="stock" />);
+    fireEvent.change(search(), { target: { value: "panner" } });
+    expect(screen.getByRole("heading", { name: "Similar" })).toBeInTheDocument();
+    expect(screen.getByText("Paneer")).toBeInTheDocument();
+    expect(screen.queryByText("Spinach")).not.toBeInTheDocument();
+  });
+
+  it("says so when nothing matches, and clearing brings everything back", () => {
+    render(<GroceriesClient {...props} items={pantry} view="stock" />);
+    fireEvent.change(search(), { target: { value: "xyz" } });
+    expect(screen.getByText(/No items match/)).toHaveTextContent("No items match “xyz”.");
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(search()).toHaveValue("");
+    expect(screen.getByText("Spinach")).toBeInTheDocument();
+  });
+
+  it("drops category headers while searching", () => {
+    render(<GroceriesClient {...props} items={pantry} view="stock" />);
+    fireEvent.click(screen.getByRole("button", { name: "By name" }));
+    fireEvent.change(search(), { target: { value: "pan" } });
+    expect(screen.queryAllByRole("heading", { level: 3 })).toHaveLength(0);
+  });
+
+  it("is not offered on the shopping list", () => {
+    render(<GroceriesClient {...props} items={pantry} view="buy" />);
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+});
+
+// Regression: expired stock used to render in a "Check expired stock" section and again in the
+// list, and once per expired batch inside that section.
+it("shows an expired item exactly once", () => {
+  const expired: GroceryItem = { id: "e1", name: "Curd", category: "dairy", inStock: true, needed: false,
+    quantity: 2, expiresOn: "2026-09-01", expiryIsEstimate: false, timesAdded: 1, lotId: "lot-e1" };
+  render(<GroceriesClient {...props} items={[expired]} view="stock" />);
+  expect(screen.getAllByText("Curd")).toHaveLength(1);
+  expect(screen.queryByText("Check expired stock")).not.toBeInTheDocument();
 });

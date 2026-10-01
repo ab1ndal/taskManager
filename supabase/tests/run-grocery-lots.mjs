@@ -21,7 +21,7 @@ function sql(source) {
   });
 }
 await sql(`begin;\n${readFileSync('supabase/tests/grocery_lots.sql', 'utf8')}\nrollback;`);
-console.log('Batch SQL assertions and RLS passed (rolled back).');
+console.log('Stock SQL assertions and RLS passed (rolled back).');
 
 // A committed, uniquely identified fixture lets two real connections race. Cleanup is scoped
 // to this generated workspace and runs even if an assertion fails.

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { cleanupUiWrites } from "./fixtures";
 
 // Seeded names carry the E2E marker so the scoped teardown can find them: the dev project is
@@ -13,14 +13,25 @@ test.afterEach(async () => {
   await cleanupUiWrites();
 });
 
+/** Pantry adds open a dialog for the amount; Add there commits with whatever it holds. */
+async function addToPantry(page: Page, name: string, quantity?: string) {
+  const input = page.getByRole("textbox", { name: /add an item/i });
+  await input.fill(name);
+  await input.press("Enter");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Quantity")).toHaveValue("1");
+  if (quantity) await dialog.getByLabel("Quantity").fill(quantity);
+  await dialog.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(dialog).toBeHidden();
+}
+
 test.describe("grocery list", () => {
   test("walks a full loop: add, need, bought, finish, re-add", async ({ page }) => {
     const ITEM = "E2E Bananas loop";
     await page.goto("/groceries?view=stock");
 
-    // Add to the pantry. One field, Enter commits.
-    await page.getByRole("textbox", { name: /add an item/i }).fill(ITEM);
-    await page.getByRole("textbox", { name: /add an item/i }).press("Enter");
+    // Add to the pantry: Enter asks for the amount, Add commits.
+    await addToPantry(page, ITEM);
     await expect(page.getByText(ITEM)).toBeVisible();
 
     // Low stock: one tap puts it on the list while it stays in the pantry.
@@ -55,8 +66,6 @@ test.describe("grocery list", () => {
   }) => {
     const ITEM = "E2E Bananas readd";
     await page.goto("/groceries?view=stock");
-    const input = page.getByRole("textbox", { name: /add an item/i });
-
     // Scoped to an <li> that carries a row's own Actions menu, so a plain `hasText` match can
     // never be satisfied by the add row's suggestion chip — that chip is a <li> too, and it
     // repeats the item's name with no menu of its own. Without this, the final assertion below
@@ -70,8 +79,7 @@ test.describe("grocery list", () => {
         .filter({ has: page.getByRole("button", { name: /actions/i }) })
         .filter({ hasText: new RegExp(name, "i") });
 
-    await input.fill(ITEM);
-    await input.press("Enter");
+    await addToPantry(page, ITEM);
     await expect(row(ITEM)).toBeVisible();
 
     await row(ITEM).getByRole("button", { name: /actions/i }).click();
@@ -79,8 +87,7 @@ test.describe("grocery list", () => {
     await expect(row(ITEM)).toBeHidden();
 
     // Different case and trailing space: the unique index is on lower(btrim(name)).
-    await input.fill(`${ITEM.toLowerCase()} `);
-    await input.press("Enter");
+    await addToPantry(page, `${ITEM.toLowerCase()} `);
     await expect(row(ITEM)).toHaveCount(1);
   });
 
@@ -101,19 +108,14 @@ test.describe("grocery list", () => {
 test("edits pantry details and retains workspace between views", async ({ page }) => {
   const name = "E2E Milk edit";
   await page.goto("/groceries?view=stock");
-  await page.getByRole("textbox", { name: "Add an item" }).fill(name);
-  await page.getByRole("textbox", { name: "Add an item" }).press("Enter");
+  await addToPantry(page, name);
   const row = page.locator("li").filter({ has: page.getByRole("button", { name: `Actions for ${name}` }) });
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: /actions/i }).click();
   await page.getByRole("menuitem", { name: "Edit item" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Category").selectOption("dairy");
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(dialog).toBeHidden();
-  await row.getByRole("button", { name: /^\d+ batch/ }).click();
-  await row.getByRole("button", { name: "Edit batch" }).click();
-  await dialog.getByLabel("Quantity (optional)").fill("3");
+  await dialog.getByRole("combobox", { name: /^Category/ }).selectOption("dairy");
+  await dialog.getByLabel("Quantity").fill("3");
   await dialog.getByRole("combobox", { name: "Expiry", exact: true }).selectOption("date");
   await dialog.getByLabel("Expiry date", { exact: true }).fill("2020-01-01");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
@@ -134,51 +136,67 @@ test("edits pantry details and retains workspace between views", async ({ page }
   expect(new URL(page.url()).searchParams.get("workspace")).toBe(workspace);
 });
 
-test("keeps repeat purchases independent and clears only the expired batch", async ({ page }) => {
-  const name = "E2E Milk batches";
+test("merges repeat purchases into one row and shows expired stock once", async ({ page }) => {
+  const name = "E2E Milk merge";
   await page.goto("/groceries?view=buy");
   await expect(page.getByRole("combobox", { name: "Category" })).toHaveCount(0);
   await page.getByRole("textbox", { name: "Add an item" }).fill(name);
   await page.getByRole("textbox", { name: "Add an item" }).press("Enter");
   await page.getByRole("button", { name: `Bought ${name}` }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Quantity (optional)").fill("2");
+  await expect(dialog.getByRole("button", { name: /another batch/ })).toHaveCount(0);
+  await dialog.getByLabel("Quantity").fill("2");
   await dialog.getByRole("combobox", { name: "Expiry", exact: true }).selectOption("date");
   await dialog.getByLabel("Expiry date", { exact: true }).fill("2020-01-01");
-  await dialog.getByRole("button", { name: "Save and add another batch" }).click();
-  await expect(dialog.getByRole("status")).toContainText("Batch saved");
-  // The shopping row disappears after purchase, but the dialog must remain mounted.
-  await dialog.getByLabel("Quantity (optional)").fill("3");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole("link", { name: "Pantry", exact: true }).click();
+  const row = page.locator("li").filter({ has: page.getByRole("button", { name: `Actions for ${name}` }) });
+  await expect(row.getByText("2", { exact: true })).toBeVisible();
+
+  // A later trip with a later date adds to the count and keeps the earlier, expired date.
+  await row.getByRole("button", { name: /actions/i }).click();
+  await page.getByRole("menuitem", { name: "Record purchase" }).click();
+  await dialog.getByLabel("Quantity").fill("3");
   await dialog.getByRole("combobox", { name: "Expiry", exact: true }).selectOption("date");
   await dialog.getByLabel("Expiry date", { exact: true }).fill("2100-01-01");
   await dialog.getByRole("button", { name: "Save", exact: true }).click();
   await expect(dialog).toBeHidden();
-  await page.getByRole("link", { name: "Pantry", exact: true }).click();
-  const row = page.locator("li").filter({ has: page.getByRole("button", { name: `Actions for ${name}` }) });
   await expect(row.getByText("5", { exact: true })).toBeVisible();
-  await row.getByRole("button", { name: /^\d+ batch/ }).click();
-  await expect(row.locator("[data-lot-id]")).toHaveCount(2);
-  await expect(row.getByText("Jan 1, 2020", { exact: true })).toBeVisible();
-  await expect(row.getByText("Jan 1, 2100", { exact: true })).toBeVisible();
-  const sweep = page.getByRole("region", { name: "Expired batches" });
-  await expect(sweep.getByText(name, { exact: true })).toBeVisible();
+  await expect(row.getByText("expired", { exact: true })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toHaveCount(1);
+  await expect(row.getByRole("button", { name: /batch/ })).toHaveCount(0);
+
   const tooSmall = await page.locator('button, input, select, summary').evaluateAll((els) => els
     .filter((el) => el.getClientRects().length > 0 && el.getBoundingClientRect().height < 44)
     .map((el) => ({ text: el.textContent, height: el.getBoundingClientRect().height })));
   expect(tooSmall).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await sweep.getByRole("button", { name: "Gone", exact: true }).click();
-  await expect(sweep).toBeHidden();
-  await expect(row.locator("[data-lot-id]")).toHaveCount(1);
-  await expect(row.getByText("3", { exact: true })).toBeVisible();
-  await expect(row.getByRole("button", { name: "Need", exact: true })).toHaveAttribute("aria-pressed", "false");
-  // A later trip with no date must preserve the remaining printed date and make the total unknown.
-  await row.getByRole("button", { name: /actions/i }).click();
-  await page.getByRole("menuitem", { name: "Record purchase" }).click();
-  await dialog.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(dialog).toBeHidden();
-  await expect(row.locator("[data-lot-id]")).toHaveCount(2);
-  await expect(row.getByRole("button", { name: /one fewer/i })).toHaveCount(0);
-  await expect(row.getByText("Quantity unknown")).toBeVisible();
-  await expect(row.getByText("Jan 1, 2100", { exact: true }).last()).toBeVisible();
+
+  // Gone clears the stock and puts it back on the list.
+  await row.getByRole("button", { name: "Gone", exact: true }).click();
+  await expect(row).toBeHidden();
+  await page.getByRole("link", { name: "Shopping list", exact: true }).click();
+  await expect(page.getByRole("button", { name: `Bought ${name}` })).toBeVisible();
+});
+
+test("searches the pantry by part of a name, with typo matches under Similar", async ({ page }) => {
+  await page.goto("/groceries?view=stock");
+  await addToPantry(page, "E2E Search paneer");
+  await addToPantry(page, "E2E Search spinach");
+  const search = page.getByRole("searchbox", { name: "Search pantry" });
+
+  await search.fill("search pan");
+  await expect(page.getByText("E2E Search paneer", { exact: true })).toBeVisible();
+  await expect(page.getByText("E2E Search spinach", { exact: true })).toBeHidden();
+
+  await search.fill("spinnach");
+  await expect(page.getByRole("heading", { name: "Similar" })).toBeVisible();
+  await expect(page.getByText("E2E Search spinach", { exact: true })).toBeVisible();
+  await expect(page.getByText("E2E Search paneer", { exact: true })).toBeHidden();
+
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(page.getByText("E2E Search paneer", { exact: true })).toBeVisible();
+  await expect(page.getByText("E2E Search spinach", { exact: true })).toBeVisible();
 });
