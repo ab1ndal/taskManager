@@ -51,6 +51,12 @@ export function ResumeRefresh() {
 
     async function check() {
       if (document.visibilityState !== "visible") return;
+      // A refresh whose RSC fetch fails on a network error makes Next fall back to a full-page
+      // navigation, which swaps the app for the browser's offline error page. Skipping it here,
+      // before the throttle stamp, leaves the `online` listener free to check as soon as the
+      // connection returns. iOS can report `onLine` as true on a captive portal or a zero-bar
+      // connection, so this narrows the problem rather than closing it.
+      if (!navigator.onLine) return;
 
       const now = Date.now();
       if (now - lastCheck.current < MIN_INTERVAL_MS) return;
@@ -82,6 +88,8 @@ export function ResumeRefresh() {
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("pageshow", onPageShow);
+    // Refreshes are skipped while offline, so reconnecting is the moment the data is most stale.
+    window.addEventListener("online", onVisible);
     // Resumes alone leave a window: an app left open across a deploy keeps calling Server Actions
     // that fail, because their arguments are encrypted with a build-derived key. Skew Protection
     // would absorb that, but it needs a Pro plan. A slow poll shrinks the window instead — it
@@ -92,6 +100,7 @@ export function ResumeRefresh() {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", onVisible);
     };
   }, [router]);
 

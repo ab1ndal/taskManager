@@ -16,7 +16,12 @@ beforeEach(() => {
     configurable: true,
     get: () => "visible",
   });
+  setOnline(true);
 });
+
+function setOnline(online: boolean) {
+  Object.defineProperty(navigator, "onLine", { value: online, configurable: true });
+}
 
 function answerWith(buildId: string, ok = true) {
   global.fetch = jest.fn().mockResolvedValue({
@@ -165,4 +170,33 @@ it("ignores an ordinary page load, whose data is already fresh", async () => {
 
   await new Promise(resolve => setTimeout(resolve, 20));
   expect(refresh).not.toHaveBeenCalled();
+});
+
+// A refresh that cannot reach the server makes Next fall back to a full-page navigation, which
+// replaces the app with the browser's offline error page.
+it("does not refresh on resume while offline", async () => {
+  answerWith("development");
+  setOnline(false);
+  render(<ResumeRefresh />);
+
+  resume();
+
+  await new Promise(resolve => setTimeout(resolve, 20));
+  expect(refresh).not.toHaveBeenCalled();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+it("refreshes once when the connection comes back", async () => {
+  answerWith("development");
+  setOnline(false);
+  render(<ResumeRefresh />);
+  resume();
+  expect(refresh).not.toHaveBeenCalled();
+
+  setOnline(true);
+  window.dispatchEvent(new Event("online"));
+
+  await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+  await new Promise(resolve => setTimeout(resolve, 20));
+  expect(refresh).toHaveBeenCalledTimes(1);
 });
