@@ -120,11 +120,18 @@ it("parses with gpt-6-luna at low reasoning effort", async () => {
 });
 
 it("passes a spoken expiry through to the review row", async () => {
+  // Pinned clock: an expiry before today is dropped, so a bare future date here would rot.
+  jest.useFakeTimers({ now: new Date("2026-09-28T19:00:00Z") });
   mockModelReply([
     { name: "Milk", quantity: null, category: "dairy", confidence: 0.9, sourceText: "milk expiring friday", expiresOn: "2026-10-02" },
   ]);
 
-  const result = await dictateActions.parseGroceryDictation({ workspaceId: WORKSPACE, transcript: "milk expiring friday" });
+  let result;
+  try {
+    result = await dictateActions.parseGroceryDictation({ workspaceId: WORKSPACE, transcript: "milk expiring friday" });
+  } finally {
+    jest.useRealTimers();
+  }
 
   expect(result).toMatchObject({ ok: true, items: [{ name: "Milk", expiresOn: "2026-10-02" }] });
 });
@@ -142,4 +149,35 @@ it("gives the model today's date and weekday in the app timezone so relative exp
 
   const { prompt } = generateObject.mock.calls[0][0] as { prompt: string };
   expect(prompt).toContain("Today is Sunday, 2026-09-27");
+});
+
+it("drops a model expiry earlier than today so stock is never born expired", async () => {
+  jest.useFakeTimers({ now: new Date("2026-09-28T19:00:00Z") });
+  mockModelReply([
+    { name: "Milk", quantity: null, category: "dairy", confidence: 0.9, sourceText: "milk", expiresOn: "2026-09-27" },
+    { name: "Bread", quantity: null, category: "baked", confidence: 0.9, sourceText: "bread", expiresOn: "2026-09-28" },
+  ]);
+
+  let result;
+  try {
+    result = await dictateActions.parseGroceryDictation({ workspaceId: WORKSPACE, transcript: "milk, bread" });
+  } finally {
+    jest.useRealTimers();
+  }
+
+  expect(result).toMatchObject({ ok: true, items: [{ expiresOn: null }, { expiresOn: "2026-09-28" }] });
+});
+
+it("keeps the rest of the list when one model item's name or fragment is oversized", async () => {
+  mockModelReply([
+    { name: "x".repeat(150), quantity: null, category: "pantry", confidence: 0.4, sourceText: "y".repeat(300), expiresOn: null },
+    { name: "Milk", quantity: null, category: "dairy", confidence: 0.9, sourceText: "milk", expiresOn: null },
+  ]);
+
+  const result = await dictateActions.parseGroceryDictation({ workspaceId: WORKSPACE, transcript: "milk" });
+
+  expect(result).toMatchObject({
+    ok: true,
+    items: [{ name: "x".repeat(100), sourceText: "y".repeat(200) }, { name: "Milk" }],
+  });
 });

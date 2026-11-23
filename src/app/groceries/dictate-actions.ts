@@ -39,6 +39,7 @@ export async function parseGroceryDictation(
     await assertWorkspaceMember(workspaceId, user.id);
     await assertHouseholdWorkspace(workspaceId);
 
+    const today = localToday();
     const { object } = await generateObject({
       model: openai("gpt-6-luna"),
       providerOptions: { openai: { reasoningEffort: "low" } },
@@ -46,10 +47,10 @@ export async function parseGroceryDictation(
       output: "array",
       schemaName: "GroceryDictationItems",
       schemaDescription: "Grocery items extracted from one dictated shopping list.",
-      prompt: buildPrompt(transcript, localToday()),
+      prompt: buildPrompt(transcript, today),
     });
 
-    return { items: object.map(toReviewItem) };
+    return { items: object.map((item) => toReviewItem(item, today)) };
   });
 }
 

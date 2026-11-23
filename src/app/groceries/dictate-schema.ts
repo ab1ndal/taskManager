@@ -21,16 +21,27 @@ import { expiresOn as expiryDate } from "./schemas";
 /** Below this the row is flagged for review, never dropped. */
 export const LOW_CONFIDENCE_THRESHOLD = 0.6;
 
-/** One item as the model returns it: not yet trusted to be a real category or a bounded number. */
+/** `addGroceryItemSchema`'s name limit (schemas.ts); a longer model name is cut to fit. */
+const MAX_ITEM_NAME_LENGTH = 100;
+
+/** Enough of the transcript to show why a row was flagged; a longer fragment is cut to fit. */
+const MAX_SOURCE_TEXT_LENGTH = 200;
+
+/**
+ * One item as the model returns it: not yet trusted to be a real category or a bounded number.
+ *
+ * `name` and `sourceText` have no maximum here: a schema failure fails the whole list, so one
+ * rambling item would lose every other item with it. `toReviewItem` cuts them to length instead.
+ */
 export const rawDictatedItemSchema = z.object({
-  name: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1),
   quantity: z.number().int().positive().max(999).nullable(),
   /** The model's best guess at a category label — free text, mapped to a slug afterward. */
   category: z.string(),
   /** How sure the model is this item and quantity were actually said, 0 (guess) to 1 (certain). */
   confidence: z.number().min(0).max(1),
   /** The transcript fragment this item came from, shown alongside a low-confidence flag. */
-  sourceText: z.string().trim().min(1).max(200),
+  sourceText: z.string().trim().min(1),
   /**
    * The expiry the speaker said for this item, as the model resolved it to `YYYY-MM-DD`, or null.
    * A bare string here rather than a date schema: one misresolved date must drop just that date in
@@ -70,16 +81,33 @@ export type ReviewGroceryItem = {
  * A category the model invents that isn't one of `CATEGORY_SLUGS` falls back to the keyword guess
  * a typed add would get (category-suggest.ts), then to "pantry" — rather than inventing a new
  * category or rejecting the row outright. An expiry that is not a real date in the range `addGroceryItem`
- * accepts is dropped to null for the same reason: the row survives with the category estimate.
+ * accepts, or that is before `today`, is dropped to null for the same reason: the row survives with
+ * the category estimate, and stock is never added already expired. An oversized name or fragment
+ * is cut to length rather than dropped; the review screen is where a bad name gets fixed.
+ *
+ * `today` is a `YYYY-MM-DD` date in the app's timezone (categories.ts `localToday`), passed in so
+ * this stays a pure function.
  */
-export function toReviewItem(raw: RawDictatedItem): ReviewGroceryItem {
+export function toReviewItem(raw: RawDictatedItem, today: string): ReviewGroceryItem {
+  const name = truncate(raw.name, MAX_ITEM_NAME_LENGTH);
+  const expiryValid =
+    expiryDate.safeParse(raw.expiresOn).success && raw.expiresOn !== null && raw.expiresOn >= today;
   return {
-    name: raw.name,
+    name,
     quantity: raw.quantity,
-    category: isCategorySlug(raw.category) ? raw.category : suggestCategory(raw.name) ?? "pantry",
+    category: isCategorySlug(raw.category) ? raw.category : suggestCategory(name) ?? "pantry",
     confidence: raw.confidence,
     lowConfidence: raw.confidence < LOW_CONFIDENCE_THRESHOLD,
-    sourceText: raw.sourceText,
-    expiresOn: expiryDate.safeParse(raw.expiresOn).success ? raw.expiresOn : null,
+    sourceText: truncate(raw.sourceText, MAX_SOURCE_TEXT_LENGTH),
+    expiresOn: expiryValid ? raw.expiresOn : null,
   };
+}
+
+/**
+ * Cuts to at most `max` UTF-16 units — the unit zod's `.max()` counts — without leaving the first
+ * half of a surrogate pair (an emoji, say) dangling at the end.
+ */
+function truncate(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return value.slice(0, max).replace(/[\uD800-\uDBFF]$/, "").trimEnd();
 }
