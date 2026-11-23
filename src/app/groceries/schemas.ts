@@ -45,6 +45,8 @@ export const addGroceryItemSchema = z.object({
   expiresOn: expiresOn.nullish(),
 });
 
+export const suggestGroceryCategorySchema = z.object({ workspaceId: uuid, name });
+
 export const setNeededSchema = z.object({ itemId: uuid, needed: z.boolean() });
 
 export const markBoughtSchema = z.object({
@@ -90,6 +92,7 @@ export const editItemSchema = z.object({
 export const forgetItemSchema = z.object({ itemId: uuid });
 
 export type AddGroceryItemInput = z.input<typeof addGroceryItemSchema>;
+export type SuggestGroceryCategoryInput = z.input<typeof suggestGroceryCategorySchema>;
 export type SetNeededInput = z.input<typeof setNeededSchema>;
 export type MarkBoughtInput = z.input<typeof markBoughtSchema>;
 export type ExtendLotInput = z.input<typeof extendLotSchema>;

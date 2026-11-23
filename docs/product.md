@@ -204,8 +204,10 @@ Record purchase open the same quantity and expiry fields. Shopping-list adds sav
 
 A new name nobody has categorised gets a silent keyword guess (category-suggest.ts) instead of
 defaulting to pantry: it prefills the pantry dialog's selector and is stored for a shopping-list add.
-The vocabulary covers a vegetarian Indian household in the US, Hindi and English names alike. A
-known product always keeps its stored category, and an unrecognised name still falls back to pantry.
+The vocabulary covers a vegetarian Indian household in the US, Hindi and English names alike. When
+no keyword matches, OpenAI's Decisions API chooses from the same 13 slugs; the normalized name and
+answer are cached per household so it is never asked twice. A known product always keeps its stored
+category, and an unavailable or invalid model answer still falls back to pantry without blocking Add.
 The 13 categories are Fruits & vegetables, Dairy, eggs & tofu, Bread & bakery, Frozen, Dals, beans &
 lentils, Atta, rice & grains, Masalas & spices, Sauces, pickles & chutneys, Dry fruits, nuts & seeds,
 Snacks, namkeen & sweets, Chai, coffee & drinks, Baking & other pantry, and Household.

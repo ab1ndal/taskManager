@@ -4,6 +4,9 @@ import { AddRow } from "./add-row";
 import type { GroceryItem } from "./types";
 
 jest.mock("./actions", () => ({ addGroceryItem: jest.fn(async () => ({ ok: true, itemId: "g9" })) }));
+jest.mock("./category-decision-action", () => ({
+  suggestGroceryCategory: jest.fn(async () => ({ ok: true, category: "household" })),
+}));
 // AddRow mounts DictateSheet, which imports dictate-actions.ts, which imports the "ai" package —
 // an ESM-only build jest cannot transform. Mocking the boundary these tests actually cross (same
 // pattern as "./actions" above) avoids pulling that dependency in at all.
@@ -163,6 +166,20 @@ it("sends the category the user picks in the pantry add dialog", async () => {
       expect.objectContaining({ name: "Peas", category: "frozen" }),
     ),
   );
+});
+
+it("prefills an unknown pantry item from the Decisions fallback", async () => {
+  const { suggestGroceryCategory } = await import("./category-decision-action");
+  render(<AddRow {...props} target="stock" />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: "C3s" } });
+  fireEvent.submit(input.closest("form")!);
+
+  await waitFor(() => expect(suggestGroceryCategory).toHaveBeenCalledWith({
+    workspaceId: props.workspaceId,
+    name: "C3s",
+  }));
+  await waitFor(() => expect(screen.getByRole("combobox", { name: "Category" })).toHaveValue("household"));
 });
 
 it("sends no category on a typed shopping add", async () => {
