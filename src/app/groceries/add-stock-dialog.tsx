@@ -55,7 +55,7 @@ export function AddStockDialog({ workspaceId, name, category: knownCategory, onC
     });
   }
 
-  return <Dialog open onClose={onClose} ariaLabelledBy={titleId} initialFocusSelector="input">
+  return <Dialog open onClose={onClose} dismissible={!pending} ariaLabelledBy={titleId} initialFocusSelector="input">
     <h2 id={titleId} className="text-lg font-semibold mb-4">Add to pantry · {name}</h2>
     <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); save(); }}>
       <fieldset disabled={pending} className="space-y-3 min-w-0">

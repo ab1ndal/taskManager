@@ -8,6 +8,9 @@ interface DialogProps {
   initialFocusSelector?: string;
   ariaLabelledBy?: string;
   className?: string;
+  /** False while a save is in flight: backdrop clicks and Escape / the iOS dismiss gesture are
+   *  ignored, so the dialog stays mounted to show the save's error or run its success path. */
+  dismissible?: boolean;
   children: React.ReactNode;
 }
 
@@ -16,6 +19,7 @@ export function Dialog({
   initialFocusSelector,
   ariaLabelledBy,
   className,
+  dismissible = true,
   children,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -47,15 +51,21 @@ export function Dialog({
   const handleBackdropClick = (event: React.MouseEvent<HTMLDialogElement>) => {
     const startedOnDialog = pressTarget.current === dialogRef.current;
     pressTarget.current = null;
-    if (event.target === dialogRef.current && startedOnDialog) {
+    if (dismissible && event.target === dialogRef.current && startedOnDialog) {
       onClose();
     }
+  };
+
+  // Escape and the iOS dismiss gesture fire a cancelable `cancel` before the native close.
+  const handleCancel = (event: React.SyntheticEvent<HTMLDialogElement>) => {
+    if (!dismissible) event.preventDefault();
   };
 
   return (
     <dialog
       ref={dialogRef}
       onClose={onClose}
+      onCancel={handleCancel}
       onMouseDown={handleMouseDown}
       onClick={handleBackdropClick}
       aria-labelledby={ariaLabelledBy}

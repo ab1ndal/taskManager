@@ -113,6 +113,61 @@ describe("Dialog", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  // A save in flight: closing would unmount the dialog, so a failure had nowhere to show its error
+  // and a success ran its follow-up against state the user had already left.
+  it("ignores a backdrop click while not dismissible", () => {
+    const onClose = jest.fn();
+    render(
+      <Dialog open onClose={onClose} ariaLabelledBy="dialog-title" dismissible={false}>
+        <h3 id="dialog-title">Title</h3>
+      </Dialog>
+    );
+    const dialogEl = screen.getByRole("dialog", { hidden: true });
+    fireEvent.mouseDown(dialogEl);
+    fireEvent.click(dialogEl);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("cancels the native cancel event (Escape, iOS dismiss) while not dismissible", () => {
+    render(
+      <Dialog open onClose={jest.fn()} ariaLabelledBy="dialog-title" dismissible={false}>
+        <h3 id="dialog-title">Title</h3>
+      </Dialog>
+    );
+    const cancel = new Event("cancel", { cancelable: true });
+    fireEvent(screen.getByRole("dialog", { hidden: true }), cancel);
+    expect(cancel.defaultPrevented).toBe(true);
+  });
+
+  it("lets the native cancel event through by default", () => {
+    render(
+      <Dialog open onClose={jest.fn()} ariaLabelledBy="dialog-title">
+        <h3 id="dialog-title">Title</h3>
+      </Dialog>
+    );
+    const cancel = new Event("cancel", { cancelable: true });
+    fireEvent(screen.getByRole("dialog", { hidden: true }), cancel);
+    expect(cancel.defaultPrevented).toBe(false);
+  });
+
+  it("closes on a backdrop click again once dismissible", () => {
+    const onClose = jest.fn();
+    const { rerender } = render(
+      <Dialog open onClose={onClose} ariaLabelledBy="dialog-title" dismissible={false}>
+        <h3 id="dialog-title">Title</h3>
+      </Dialog>
+    );
+    rerender(
+      <Dialog open onClose={onClose} ariaLabelledBy="dialog-title" dismissible>
+        <h3 id="dialog-title">Title</h3>
+      </Dialog>
+    );
+    const dialogEl = screen.getByRole("dialog", { hidden: true });
+    fireEvent.mouseDown(dialogEl);
+    fireEvent.click(dialogEl);
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("has no axe violations for a minimal labelled render", async () => {
     const { container } = render(
       <Dialog open onClose={jest.fn()} ariaLabelledBy="dialog-title">

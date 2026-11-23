@@ -23,7 +23,7 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
   const control = "block w-full min-w-0 h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base";
 
   return (
-    <Dialog open onClose={onClose} ariaLabelledBy={titleId} initialFocusSelector="input">
+    <Dialog open onClose={onClose} dismissible={!pending} ariaLabelledBy={titleId} initialFocusSelector="input">
       <h2 id={titleId} className="text-lg font-semibold mb-4">Edit grocery item</h2>
       <form className="space-y-4" onSubmit={(event) => {
         event.preventDefault();
