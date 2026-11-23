@@ -28,6 +28,13 @@ it("sends no quantity when the field is cleared, which the database counts as 1"
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(markBought).toHaveBeenCalledWith({ itemId: item.id, quantity: null, expiresOn: null }));
 });
+it("claims the shopping-list entry when opened from Bought", async () => {
+  render(<PurchaseDialog item={item} onClose={jest.fn()} onlyIfNeeded />);
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(markBought).toHaveBeenCalledWith({
+    itemId: item.id, quantity: 1, expiresOn: null, onlyIfNeeded: true,
+  }));
+});
 it("no longer offers to add another batch", () => {
   render(<PurchaseDialog item={item} onClose={jest.fn()} />);
   expect(screen.queryByRole("button", { name: /another batch/ })).toBeNull();

@@ -176,7 +176,7 @@ export async function markBought(
 ): Promise<ActionResult<{ itemId: string }>> {
   return run("markBought", async () => {
     const { user } = await requireUser();
-    const { itemId, expiresOn, quantity } = parseInput(markBoughtSchema, input);
+    const { itemId, expiresOn, quantity, onlyIfNeeded } = parseInput(markBoughtSchema, input);
     const { category } = await assertItemMember(itemId, user.id);
 
     // Bought is how nearly everything enters the pantry, so the shelf-life estimate has to apply
@@ -190,6 +190,8 @@ export async function markBought(
       p_expires_on: resolvedExpiry,
       p_estimate: estimate && resolvedExpiry !== null,
       p_quantity: quantity ?? null,
+      // Sent only when set: Record purchase keeps the call shape that predates migration 034.
+      ...(onlyIfNeeded ? { p_only_if_needed: true } : {}),
     });
     assertNoRpcError("mark bought", { error });
 

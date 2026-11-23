@@ -1,4 +1,4 @@
--- Run inside BEGIN ... ROLLBACK against dev, after migration 031.
+-- Run inside BEGIN ... ROLLBACK against dev, after migration 034.
 -- Assertions raise on failure; no test data is committed.
 do $$
 declare
@@ -76,9 +76,18 @@ begin
   perform public.grocery_mark_bought(i, null, false, 1);
   perform public.grocery_forget(i);
   assert not exists(select 1 from public.grocery_lots where item_id = i), 'forget cascades';
+  -- Bought from the list claims the entry once: a second tap or a retry adds nothing.
+  row := public.grocery_upsert(w, 'Yogurt', 'dairy', 'list');
+  perform public.grocery_mark_bought(row.id, null, false, 2, true);
+  row := public.grocery_mark_bought(row.id, null, false, 2, true);
+  assert (select quantity = 2 from public.grocery_lots where item_id = row.id), 'repeat Bought adds once';
+  assert row.in_stock and not row.needed, 'a skipped Bought returns the current row';
+  perform public.grocery_mark_bought(row.id, null, false, 1);
+  assert (select quantity = 3 from public.grocery_lots where item_id = row.id),
+    'Record purchase still adds to stock that is not needed';
   row := public.grocery_upsert(w, 'Rice', null, 'stock', 2);
   perform set_config('test.grocery_item', row.id::text, true);
-  assert not has_function_privilege('authenticated', 'public.grocery_mark_bought(uuid,date,boolean,int)', 'execute');
+  assert not has_function_privilege('authenticated', 'public.grocery_mark_bought(uuid,date,boolean,int,boolean)', 'execute');
   assert not has_function_privilege('anon', 'public.grocery_lot_edit(uuid,int,date,boolean)', 'execute');
   assert not has_function_privilege('authenticated', 'private.grocery_stock_add(uuid,int,date,boolean)', 'execute');
   assert not has_table_privilege('authenticated', 'public.grocery_lots', 'insert');

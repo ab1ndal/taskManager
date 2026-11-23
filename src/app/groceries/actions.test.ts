@@ -29,6 +29,12 @@ it("records a counted purchase with an explicit expiry", async () => {
     p_id: ITEM, p_quantity: 3, p_expires_on: "2026-09-20", p_estimate: false,
   });
 });
+it("asks the RPC to add stock only while a list entry is still needed", async () => {
+  await actions.markBought({ itemId: ITEM, quantity: 1, expiresOn: null, onlyIfNeeded: true });
+  expect(rpc).toHaveBeenLastCalledWith("grocery_mark_bought", {
+    p_id: ITEM, p_quantity: 1, p_expires_on: null, p_estimate: false, p_only_if_needed: true,
+  });
+});
 it("distinguishes an omitted expiry from explicitly undated stock", async () => {
   await actions.markBought({ itemId: ITEM });
   expect(rpc).toHaveBeenLastCalledWith("grocery_mark_bought", {

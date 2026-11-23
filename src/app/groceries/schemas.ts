@@ -52,6 +52,8 @@ export const markBoughtSchema = z.object({
   quantity: quantity.nullish(),
   /** Omitted means "use the category's shelf life"; null means "no expiry at all". */
   expiresOn: expiresOn.nullish(),
+  /** Bought on the shopping list: add nothing if another tap already cleared the entry. */
+  onlyIfNeeded: z.boolean().optional(),
 });
 
 /** Date-only writes never restate quantity or product fields from stale props. */
