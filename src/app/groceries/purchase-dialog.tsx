@@ -35,7 +35,7 @@ export function PurchaseDialog({ item, onClose }: { item: GroceryItem; onClose: 
     });
   }
 
-  return <Dialog open onClose={onClose} ariaLabelledBy={titleId} initialFocusSelector="input">
+  return <Dialog open onClose={onClose} dismissible={!pending} ariaLabelledBy={titleId} initialFocusSelector="input">
     <h2 id={titleId} className="text-lg font-semibold mb-4">Record purchase · {item.name}</h2>
     <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); save(); }}>
       <fieldset disabled={pending} className="min-w-0">

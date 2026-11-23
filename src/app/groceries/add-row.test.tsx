@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { AddRow } from "./add-row";
 import type { GroceryItem } from "./types";
@@ -175,6 +175,35 @@ it("sends no category on a typed shopping add", async () => {
 
   await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
   expect(jest.mocked(addGroceryItem).mock.calls[0][0]).not.toHaveProperty("category");
+});
+
+// Regression: the field stays editable while a shopping add saves, and the save used to clear it
+// unconditionally — "Eggs" typed while "Milk" was saving vanished.
+it("keeps text typed while the previous add was saving", async () => {
+  const { addGroceryItem } = await import("./actions");
+  let finish!: () => void;
+  jest.mocked(addGroceryItem).mockImplementationOnce(
+    () => new Promise((resolve) => { finish = () => resolve({ ok: true, itemId: "g9" }); }),
+  );
+
+  render(<AddRow {...props} />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: "Milk" } });
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
+
+  fireEvent.change(input, { target: { value: "Eggs" } });
+  await act(async () => finish());
+
+  expect(input).toHaveValue("Eggs");
+});
+
+it("clears the field after a shopping add when nothing new was typed", async () => {
+  render(<AddRow {...props} />);
+  const input = screen.getByRole("textbox", { name: /add an item/i });
+  fireEvent.change(input, { target: { value: "Milk" } });
+  fireEvent.submit(input.closest("form")!);
+  await waitFor(() => expect(input).toHaveValue(""));
 });
 
 it("has no shopping category selector and suggestions do not send a category", async () => {
