@@ -97,9 +97,11 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
   function parse() {
     if (parsing || busy || transcript.trim() === "") return;
     setParseError(null);
+    const session = sessionRef.current;
     startParsing(async () => {
       try {
         const result = await parseGroceryDictation({ workspaceId, transcript });
+        if (session !== sessionRef.current) return;
         if (!result.ok) {
           setParseError(result.error);
           return;
@@ -111,7 +113,7 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
         setRows(toRows(result.items));
       } catch (error) {
         console.error("grocery dictation parse call rejected", error);
-        setParseError(GENERIC_ERROR);
+        if (session === sessionRef.current) setParseError(GENERIC_ERROR);
       }
     });
   }
@@ -191,7 +193,14 @@ export function DictateSheet({ workspaceId, target }: { workspaceId: string; tar
         <h2 id={headingId} className="text-sm font-medium">
           Dictate items
         </h2>
-        <button type="button" onClick={reset} className="min-h-11 px-2 text-sm text-(--color-text-secondary)">
+        {/* Disabled while committing: those inserts are already in flight and cannot be called
+            back, and a reset under them would let failed rows land in a closed sheet. */}
+        <button
+          type="button"
+          onClick={reset}
+          disabled={committing}
+          className="min-h-11 px-2 text-sm text-(--color-text-secondary) disabled:opacity-50"
+        >
           Cancel
         </button>
       </div>
