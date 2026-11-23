@@ -336,3 +336,46 @@ describe("recording", () => {
     expect(screen.getByLabelText(/dictated grocery list/i)).toHaveValue("");
   });
 });
+
+describe("cancel", () => {
+  it("drops a parse that returns after Cancel instead of reopening on its rows", async () => {
+    let reply: (value: Awaited<ReturnType<typeof parseGroceryDictation>>) => void = () => {};
+    jest.mocked(parseGroceryDictation).mockReturnValue(new Promise((resolve) => (reply = resolve)));
+    render(<DictateSheet workspaceId={WORKSPACE} target="list" />);
+    open();
+    fireEvent.change(screen.getByLabelText(/dictated grocery list/i), { target: { value: "milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /^parse$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+    await act(async () => {
+      reply({
+        ok: true,
+        items: [
+          { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk", expiresOn: null },
+        ],
+      });
+    });
+    open();
+    expect(screen.queryByLabelText(/item name/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/dictated grocery list/i)).toHaveValue("");
+  });
+
+  it("cannot be pressed while rows are being added, since those writes cannot be undone", async () => {
+    jest.mocked(parseGroceryDictation).mockResolvedValue({
+      ok: true,
+      items: [
+        { name: "Milk", quantity: null, category: "dairy", confidence: 0.95, lowConfidence: false, sourceText: "milk", expiresOn: null },
+      ],
+    });
+    jest.mocked(addGroceryItem).mockReturnValue(new Promise(() => {}));
+    render(<DictateSheet workspaceId={WORKSPACE} target="list" />);
+    open();
+    fireEvent.change(screen.getByLabelText(/dictated grocery list/i), { target: { value: "milk" } });
+    fireEvent.click(screen.getByRole("button", { name: /^parse$/i }));
+    await waitFor(() => expect(screen.getByLabelText(/item name/i)).toHaveValue("Milk"));
+
+    fireEvent.click(screen.getByRole("button", { name: /^add/i }));
+    await waitFor(() => expect(addGroceryItem).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: /cancel/i })).toBeDisabled();
+  });
+});
