@@ -3,7 +3,7 @@ import { PurchaseDialog } from "./purchase-dialog";
 import { markBought } from "./actions";
 import type { GroceryItem } from "./types";
 jest.mock("./actions", () => ({ markBought: jest.fn() }));
-const item: GroceryItem = { id: "33333333-3333-4333-8333-333333333333", name: "Milk", category: "dairy", inStock: true, needed: true, quantity: 2, expiresOn: "2026-09-12", expiryIsEstimate: false, timesAdded: 1, lotId: null };
+const item: GroceryItem = { id: "33333333-3333-4333-8333-333333333333", name: "Milk", category: "dairy", inStock: true, needed: true, quantity: 2, expiresOn: "2026-09-12", expiryIsEstimate: false, timesAdded: 1, lotId: null, lotVersion: null };
 beforeAll(() => { HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); }; });
 beforeEach(() => { jest.clearAllMocks(); jest.mocked(markBought).mockResolvedValue({ ok: true, itemId: item.id }); });
 it("prefills a quantity of 1", async () => {

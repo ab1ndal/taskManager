@@ -56,12 +56,18 @@ export const markBoughtSchema = z.object({
   onlyIfNeeded: z.boolean().optional(),
 });
 
+/**
+ * The stock row's version as the caller loaded it. The RPC refuses the write when the row has
+ * changed since (migration 035); omitted means write regardless.
+ */
+const expectedVersion = z.number().int().positive().nullish();
+
 /** Date-only writes never restate quantity or product fields from stale props. */
-export const extendLotSchema = z.object({ lotId: uuid, expiresOn });
-export const discardLotSchema = z.object({ lotId: uuid, keepOnList: z.boolean() });
+export const extendLotSchema = z.object({ lotId: uuid, expiresOn, expectedVersion });
+export const discardLotSchema = z.object({ lotId: uuid, keepOnList: z.boolean(), expectedVersion });
 export const editLotSchema = z.object({
   lotId: uuid, quantity, expiresOn: expiresOn.nullable(),
-  expiryIsEstimate: z.boolean().default(false),
+  expiryIsEstimate: z.boolean().default(false), expectedVersion,
 });
 
 export const finishItemSchema = z.object({ itemId: uuid, keepOnList: z.boolean() });

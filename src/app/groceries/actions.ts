@@ -253,10 +253,10 @@ async function assertLotMember(lotId: string, authUserId: string): Promise<strin
 export async function extendLot(input: ExtendLotInput): Promise<ActionResult> {
   return run("extendLot", async () => {
     const { user } = await requireUser();
-    const { lotId, expiresOn } = parseInput(extendLotSchema, input);
+    const { lotId, expiresOn, expectedVersion } = parseInput(extendLotSchema, input);
     await assertLotMember(lotId, user.id);
     const { error } = await createAdminClient().rpc("grocery_lot_extend", {
-      p_lot: lotId, p_expires_on: expiresOn, p_estimate: true,
+      p_lot: lotId, p_expires_on: expiresOn, p_estimate: true, p_expected_version: expectedVersion ?? null,
     });
     assertNoRpcError("extend stock", { error });
     revalidatePath("/groceries");
@@ -267,11 +267,11 @@ export async function extendLot(input: ExtendLotInput): Promise<ActionResult> {
 export async function editLot(input: EditLotInput): Promise<ActionResult> {
   return run("editLot", async () => {
     const { user } = await requireUser();
-    const { lotId, quantity, expiresOn, expiryIsEstimate } = parseInput(editLotSchema, input);
+    const { lotId, quantity, expiresOn, expiryIsEstimate, expectedVersion } = parseInput(editLotSchema, input);
     await assertLotMember(lotId, user.id);
     const { error } = await createAdminClient().rpc("grocery_lot_edit", {
       p_lot: lotId, p_quantity: quantity, p_expires_on: expiresOn,
-      p_estimate: expiresOn !== null && expiryIsEstimate,
+      p_estimate: expiresOn !== null && expiryIsEstimate, p_expected_version: expectedVersion ?? null,
     });
     assertNoRpcError("edit stock", { error });
     revalidatePath("/groceries");
@@ -282,10 +282,10 @@ export async function editLot(input: EditLotInput): Promise<ActionResult> {
 export async function discardLot(input: DiscardLotInput): Promise<ActionResult> {
   return run("discardLot", async () => {
     const { user } = await requireUser();
-    const { lotId, keepOnList } = parseInput(discardLotSchema, input);
+    const { lotId, keepOnList, expectedVersion } = parseInput(discardLotSchema, input);
     await assertLotMember(lotId, user.id);
     const { error } = await createAdminClient().rpc("grocery_lot_discard", {
-      p_lot: lotId, p_keep_on_list: keepOnList,
+      p_lot: lotId, p_keep_on_list: keepOnList, p_expected_version: expectedVersion ?? null,
     });
     assertNoRpcError("discard stock", { error });
     revalidatePath("/groceries");

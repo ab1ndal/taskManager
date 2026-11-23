@@ -20,6 +20,7 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
     quantity: item.quantity?.toString() ?? "1",
     date: item.expiresOn ?? "",
     mode: (item.expiresOn ? "date" : "none") as ExpiryMode,
+    version: item.lotVersion,
   }));
   const [quantity, setQuantity] = useState(opened.quantity);
   const [date, setDate] = useState(opened.date);
@@ -48,6 +49,8 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
             : mode === "date" ? date : null,
           // An untouched estimated date stays an estimate; a re-typed one is printed.
           expiryIsEstimate: mode === "estimate" || (item.expiryIsEstimate && mode === "date" && date === item.expiresOn),
+          // The version these fields were read at: if the other phone wrote since, the save is refused.
+          expectedVersion: opened.version,
         });
         if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
         if (stock && !stock.success) { setError(stock.error.issues[0].message); return; }

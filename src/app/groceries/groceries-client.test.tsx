@@ -26,13 +26,13 @@ import type { GroceryItem } from "./types";
 
 const items: GroceryItem[] = [
   { id: "g1", name: "Rice", category: "pantry", inStock: true, needed: false,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 4, lotId: null },
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 4, lotId: null, lotVersion: null },
   { id: "g2", name: "Milk", category: "dairy", inStock: false, needed: true,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 9, lotId: null },
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 9, lotId: null, lotVersion: null },
   { id: "g3", name: "Spinach", category: "produce", inStock: true, needed: true,
-    quantity: null, expiresOn: "2026-09-07", expiryIsEstimate: true, timesAdded: 2, lotId: null },
+    quantity: null, expiresOn: "2026-09-07", expiryIsEstimate: true, timesAdded: 2, lotId: null, lotVersion: null },
   { id: "g4", name: "Old thing", category: "pantry", inStock: false, needed: false,
-    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 1, lotId: null },
+    quantity: null, expiresOn: null, expiryIsEstimate: false, timesAdded: 1, lotId: null, lotVersion: null },
 ];
 
 const props = { workspaceId: "11111111-1111-4111-8111-111111111111", items, today: "2026-09-06" };
@@ -79,7 +79,7 @@ describe("GroceriesClient", () => {
       quantity: null,
       expiresOn: null,
       expiryIsEstimate: false,
-      timesAdded: 1, lotId: null,
+      timesAdded: 1, lotId: null, lotVersion: null,
     }));
 
     render(<GroceriesClient {...props} items={many} view="stock" />);
@@ -142,7 +142,7 @@ it("shopping ignores a pantry category filter and shows no category controls", (
 describe("pantry search", () => {
   const stocked = (id: string, name: string, extra: Partial<GroceryItem> = {}): GroceryItem => ({
     id, name, category: "pantry", inStock: true, needed: false, quantity: 1, expiresOn: null,
-    expiryIsEstimate: false, timesAdded: 1, lotId: `lot-${id}`, ...extra,
+    expiryIsEstimate: false, timesAdded: 1, lotId: `lot-${id}`, lotVersion: 1, ...extra,
   });
   const pantry = [stocked("p1", "Paneer", { category: "dairy" }), stocked("p2", "Spinach"), stocked("p3", "Pan masala")];
   const search = () => screen.getByRole("searchbox", { name: "Search pantry" });
@@ -202,7 +202,7 @@ it("Bought on the shopping list adds stock only while the item is still needed",
 
 it("shows an expired item exactly once", () => {
   const expired: GroceryItem = { id: "e1", name: "Curd", category: "dairy", inStock: true, needed: false,
-    quantity: 2, expiresOn: "2026-09-01", expiryIsEstimate: false, timesAdded: 1, lotId: "lot-e1" };
+    quantity: 2, expiresOn: "2026-09-01", expiryIsEstimate: false, timesAdded: 1, lotId: "lot-e1", lotVersion: 1 };
   render(<GroceriesClient {...props} items={[expired]} view="stock" />);
   expect(screen.getAllByText("Curd")).toHaveLength(1);
   expect(screen.queryByText("Check expired stock")).not.toBeInTheDocument();

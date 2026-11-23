@@ -37,6 +37,7 @@ const base: GroceryItem = {
   expiryIsEstimate: true,
   timesAdded: 1,
   lotId: "l1",
+  lotVersion: 2,
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -70,7 +71,7 @@ describe("PantryRow", () => {
   it("gone removes the stock and puts the item on the list", async () => {
     render(<PantryRow item={expired} today="2026-09-06" />);
     fireEvent.click(screen.getByRole("button", { name: "Gone" }));
-    await waitFor(() => expect(discardLot).toHaveBeenCalledWith({ lotId: "l1", keepOnList: true }));
+    await waitFor(() => expect(discardLot).toHaveBeenCalledWith({ lotId: "l1", keepOnList: true, expectedVersion: 2 }));
   });
 
   it("shows the stepper with the count", () => {
@@ -130,6 +131,7 @@ describe("PantryRow", () => {
     expect(jest.mocked(extendLot).mock.calls[0][0]).toEqual({
       lotId: "l1",
       expiresOn: "2026-09-13",
+      expectedVersion: 2,
     });
     expect(editItem).not.toHaveBeenCalled();
   });

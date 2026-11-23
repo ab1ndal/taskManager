@@ -83,15 +83,15 @@ it("edits only product fields and preserves category when omitted", async () => 
 });
 it("extends only the stock date", async () => {
   await actions.extendLot({ lotId: LOT, expiresOn: "2026-09-20" });
-  expect(rpc).toHaveBeenCalledWith("grocery_lot_extend", { p_lot: LOT, p_expires_on: "2026-09-20", p_estimate: true });
+  expect(rpc).toHaveBeenCalledWith("grocery_lot_extend", { p_lot: LOT, p_expires_on: "2026-09-20", p_estimate: true, p_expected_version: null });
 });
 it("edits the stock count and clears its expiry", async () => {
   await actions.editLot({ lotId: LOT, quantity: 4, expiresOn: null, expiryIsEstimate: true });
-  expect(rpc).toHaveBeenCalledWith("grocery_lot_edit", { p_lot: LOT, p_quantity: 4, p_expires_on: null, p_estimate: false });
+  expect(rpc).toHaveBeenCalledWith("grocery_lot_edit", { p_lot: LOT, p_quantity: 4, p_expires_on: null, p_estimate: false, p_expected_version: null });
 });
 it("forwards discard, finish, step, need and forget intentions", async () => {
   await actions.discardLot({ lotId: LOT, keepOnList: true });
-  expect(rpc).toHaveBeenLastCalledWith("grocery_lot_discard", { p_lot: LOT, p_keep_on_list: true });
+  expect(rpc).toHaveBeenLastCalledWith("grocery_lot_discard", { p_lot: LOT, p_keep_on_list: true, p_expected_version: null });
   await actions.finishItem({ itemId: ITEM, keepOnList: false });
   expect(rpc).toHaveBeenLastCalledWith("grocery_finish", { p_id: ITEM, p_keep_on_list: false });
   await actions.adjustQuantity({ itemId: ITEM, delta: -2 });
@@ -128,6 +128,20 @@ it("rejects malformed stock input without writing", async () => {
 it("surfaces authored RPC failures", async () => {
   rpc.mockResolvedValue({ data: null, error: { message: "grocery lot not found" } });
   expect(await actions.discardLot({ lotId: LOT, keepOnList: true })).toMatchObject({ ok: false, error: "grocery lot not found" });
+});
+it("passes the loaded stock version so a stale write is refused", async () => {
+  await actions.editLot({ lotId: LOT, quantity: 1, expiresOn: null, expectedVersion: 3 });
+  expect(rpc).toHaveBeenLastCalledWith("grocery_lot_edit", expect.objectContaining({ p_expected_version: 3 }));
+  await actions.extendLot({ lotId: LOT, expiresOn: "2026-09-20", expectedVersion: 4 });
+  expect(rpc).toHaveBeenLastCalledWith("grocery_lot_extend", expect.objectContaining({ p_expected_version: 4 }));
+  await actions.discardLot({ lotId: LOT, keepOnList: false, expectedVersion: 5 });
+  expect(rpc).toHaveBeenLastCalledWith("grocery_lot_discard", expect.objectContaining({ p_expected_version: 5 }));
+});
+it("explains a stale-version refusal in words the user can act on", async () => {
+  rpc.mockResolvedValue({ data: null, error: { message: `grocery_conflict: lot ${LOT} is at version 6, caller loaded 5` } });
+  expect(await actions.discardLot({ lotId: LOT, keepOnList: true, expectedVersion: 5 })).toMatchObject({
+    ok: false, error: "Changed on the other phone — reopen to see the latest.",
+  });
 });
 it("reports a name collision as a field error", async () => {
   rpc.mockResolvedValue({ data: null, error: { code: "23505", message: "duplicate" } });
