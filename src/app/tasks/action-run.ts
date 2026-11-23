@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { ValidationError } from "./schemas";
 import type { Recurrence } from "./schemas";
 import { ForbiddenError, UnauthorizedError } from "@/lib/auth";
@@ -6,12 +8,49 @@ import type { ActionResult } from "./action-result";
 import type { createAdminClient } from "@/lib/supabase/admin";
 
 /**
+ * A third-party service failed in a way the person can act on ("busy, try again in a minute").
+ *
+ * `message` is the internal detail and is only logged; `userMessage` is what `run` returns. `code`
+ * is a stable machine-readable tag (e.g. `openai_auth`) so the failure can be searched for in the
+ * Vercel logs, which a free-text message cannot be reliably. Construct it with nothing the person
+ * said or recorded and no credential in `detail`, since `detail` is logged verbatim.
+ */
+export class ExternalServiceError extends Error {
+  readonly code: string;
+  readonly userMessage: string;
+  readonly status?: number;
+
+  constructor({
+    code,
+    userMessage,
+    detail,
+    status,
+    cause,
+  }: {
+    code: string;
+    userMessage: string;
+    detail: string;
+    status?: number;
+    cause?: unknown;
+  }) {
+    super(detail, { cause });
+    this.name = "ExternalServiceError";
+    this.code = code;
+    this.userMessage = userMessage;
+    this.status = status;
+  }
+}
+
+/**
  * Runs an action body and converts a thrown failure into `{ ok: false, error }`.
  *
  * Validation and authorization messages are meant for the person who triggered the action, so they
  * are passed through. Anything else — a database error, a bug — is logged with the action name and
  * replaced with a generic message, because those carry schema detail the client has no business
- * seeing.
+ * seeing. An `ExternalServiceError` is logged the same way but returns its own safe message.
+ *
+ * Each logged failure gets a short request id so one occurrence can be told apart from the next in
+ * the logs; the original `{ level, action, message }` fields are unchanged for existing searches.
  */
 export async function run<T extends object>(
   action: string,
@@ -35,10 +74,36 @@ export async function run<T extends object>(
         level: "error",
         action,
         message: error instanceof Error ? error.message : String(error),
+        requestId: randomUUID().slice(0, 8),
+        ...errorDetail(error),
       })
     );
-    return { ok: false, error: GENERIC_ERROR };
+    return {
+      ok: false,
+      error: error instanceof ExternalServiceError ? error.userMessage : GENERIC_ERROR,
+    };
   }
+}
+
+/** The structured fields a failure carries, if any. Undefined fields drop out of the JSON line. */
+function errorDetail(error: unknown) {
+  if (!(error instanceof Error)) return {};
+  const external = error instanceof ExternalServiceError ? error : null;
+  return {
+    errorName: error.name,
+    code: external?.code,
+    status: external?.status,
+    pgCode: databaseCode(error.cause),
+  };
+}
+
+/**
+ * The SQLSTATE (or PostgREST `PGRST…`) code of a Supabase error attached as `cause`, which is how
+ * `assertNoError` and the pages hand one on.
+ */
+function databaseCode(cause: unknown): string | undefined {
+  if (typeof cause !== "object" || cause === null || !("code" in cause)) return undefined;
+  return typeof cause.code === "string" ? cause.code : undefined;
 }
 
 /** Throws on a Supabase error so `run` can turn it into a failed result instead of losing it. */
@@ -46,7 +111,7 @@ export function assertNoError(
   step: string,
   { error }: { error: { message: string } | null }
 ): void {
-  if (error) throw new Error(`${step}: ${error.message}`);
+  if (error) throw new Error(`${step}: ${error.message}`, { cause: error });
 }
 
 /**
