@@ -8,10 +8,10 @@ import { useEffect } from "react";
  */
 export default function BoardError({
   error,
-  reset,
+  unstable_retry,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  unstable_retry: () => void;
 }) {
   useEffect(() => {
     console.error(
@@ -26,7 +26,7 @@ export default function BoardError({
         Something went wrong while loading this page. Trying again usually helps.
       </p>
       <button
-        onClick={reset}
+        onClick={unstable_retry}
         className="min-h-11 rounded-sm bg-(--color-accent) px-4 py-2 text-sm font-medium text-(--color-text-on-accent) transition-colors hover:bg-(--color-accent-hover)"
       >
         Try again

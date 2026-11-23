@@ -155,6 +155,9 @@ Category slugs remain duplicated in `categories.ts` and the SQL check constraint
 constraint and fails on drift. Slugs are only ever added — renaming one would break the deployed app
 and stored rows during the window a migration auto-applies. Migration 033 is a one-time data fix that
 moved existing household items out of the pantry default; it changes categories only, never stock.
+`grocery_category_suggestions` (036) caches a Decisions API category by household and normalized
+name. It has no authenticated policy: only membership-checked server actions use the service role
+to read or insert, and the primary key makes concurrent suggestions converge on one saved row.
 
 ### tasks
 

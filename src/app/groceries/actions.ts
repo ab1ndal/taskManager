@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { assertWorkspaceMember, requireUser } from "@/lib/auth";
+import { assertHouseholdWorkspace, assertWorkspaceMember, requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { assertNoError, run } from "@/app/tasks/action-run";
 import { parseInput, ValidationError } from "@/app/tasks/schemas";
 import { estimatedExpiry } from "./categories";
+import { categoryForUnknownName } from "./category-decision";
 import { suggestCategory } from "./category-suggest";
 import { knownGroceryRpcFailure } from "./rpc-errors";
 import {
@@ -130,9 +131,19 @@ export async function addGroceryItem(
     }
     // Only a product nobody has categorised gets the keyword guess; a known one keeps what it has.
     // Without this a list add stored the column default, 'pantry', for milk and spinach alike.
-    const guessedCategory = category === undefined && storedCategory === undefined
+    let guessedCategory = category === undefined && storedCategory === undefined
       ? suggestCategory(name) ?? undefined
       : undefined;
+    if (category === undefined && storedCategory === undefined && guessedCategory === undefined) {
+      await assertHouseholdWorkspace(workspaceId);
+      // Classification is an enhancement, never a reason an item cannot be added. `run` gives a
+      // failed OpenAI/cache request the same request-id logging as every other action, then the
+      // database's pantry default remains the final fallback.
+      const decision = await run("decideGroceryCategory", async () => ({
+        category: await categoryForUnknownName(workspaceId, name),
+      }));
+      if (decision.ok) guessedCategory = decision.category ?? undefined;
+    }
     const resolvedExpiry = target === "list" ? null : estimate
       ? estimatedExpiry(category ?? storedCategory ?? guessedCategory ?? "pantry") : (expiresOn ?? null);
 

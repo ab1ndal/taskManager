@@ -1,9 +1,10 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Dialog } from "@/components/dialog";
 import { GENERIC_ERROR } from "@/app/tasks/action-result";
 import { addGroceryItem } from "./actions";
+import { suggestGroceryCategory } from "./category-decision-action";
 import { GROCERY_CATEGORIES, isCategorySlug, type CategorySlug } from "./categories";
 import { suggestCategory } from "./category-suggest";
 import { addGroceryItemSchema } from "./schemas";
@@ -26,8 +27,22 @@ export function AddStockDialog({ workspaceId, name, category: knownCategory, onC
   const [quantity, setQuantity] = useState("1");
   const [date, setDate] = useState("");
   const [mode, setMode] = useState<ExpiryMode>("none");
-  // A new product starts on the keyword guess, shown in the selector so a wrong one is one tap away.
-  const [category, setCategory] = useState<CategorySlug>(knownCategory ?? suggestCategory(name) ?? "pantry");
+  const localCategory = knownCategory ?? suggestCategory(name);
+  // A new product starts on the keyword guess. Only a true miss asks Decisions, and it updates the
+  // selector only if the person has not already made their own choice while the request was live.
+  const [category, setCategory] = useState<CategorySlug>(localCategory ?? "pantry");
+  const categoryTouched = useRef(false);
+  useEffect(() => {
+    if (localCategory) return;
+    let active = true;
+    void suggestGroceryCategory({ workspaceId, name }).then((result) => {
+      if (active && result.ok && !categoryTouched.current) setCategory(result.category);
+    }).catch((error: unknown) => {
+      // The action already maps and logs service failures; this catches a dropped action request.
+      console.error("grocery category suggestion rejected", error);
+    });
+    return () => { active = false; };
+  }, [localCategory, name, workspaceId]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const control = "block w-full min-w-0 h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base";
@@ -63,7 +78,10 @@ export function AddStockDialog({ workspaceId, name, category: knownCategory, onC
         <StockFields quantity={quantity} setQuantity={setQuantity} date={date} setDate={setDate} mode={mode} setMode={setMode} />
         <label className="block text-sm">Category
           <select className={control} value={category}
-            onChange={(event) => { if (isCategorySlug(event.target.value)) setCategory(event.target.value); }}>
+            onChange={(event) => {
+              categoryTouched.current = true;
+              if (isCategorySlug(event.target.value)) setCategory(event.target.value);
+            }}>
             {GROCERY_CATEGORIES.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
           </select>
         </label>

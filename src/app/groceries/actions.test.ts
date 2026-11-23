@@ -8,6 +8,9 @@ let rpc: jest.SpyInstance;
 jest.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => fake }));
 jest.mock("@/lib/supabase/server", () => ({ createClient: async () => fake }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
+jest.mock("./category-decision", () => ({
+  categoryForUnknownName: jest.fn(async () => "pantry"),
+}));
 import * as actions from "./actions";
 
 beforeEach(() => {
@@ -68,9 +71,12 @@ it("estimates new uncategorised stock from the keyword category", async () => {
     p_category: "dairy", p_expires_on: "2026-09-17", p_estimate: true,
   }));
 });
-it("leaves an unrecognised new name to the database default", async () => {
+it("uses the saved Decisions fallback for an unrecognised new name", async () => {
+  const { categoryForUnknownName } = await import("./category-decision");
+  jest.mocked(categoryForUnknownName).mockResolvedValueOnce("household");
+  fake.tables.workspaces = [{ id: WORKSPACE, kind: "household" }];
   await actions.addGroceryItem({ workspaceId: WORKSPACE, name: "C3s", target: "list" });
-  expect(rpc).toHaveBeenCalledWith("grocery_upsert", expect.objectContaining({ p_category: null }));
+  expect(rpc).toHaveBeenCalledWith("grocery_upsert", expect.objectContaining({ p_category: "household" }));
 });
 it("adds explicit undated stock without estimating", async () => {
   await actions.addGroceryItem({ workspaceId: WORKSPACE, name: "Milk", target: "stock", quantity: 2, expiresOn: null });
