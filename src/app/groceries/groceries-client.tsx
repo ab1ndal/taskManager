@@ -8,6 +8,7 @@ import { ICON_SECONDARY, ICON_STROKE } from "@/components/icon";
 import { PurchaseDialog } from "./purchase-dialog";
 import { AddRow } from "./add-row";
 import { categoryLabel } from "./categories";
+import { OfflineBanner } from "./offline-banner";
 import { PantryRow, ShoppingRow } from "./item-row";
 import { searchPantry } from "./search";
 import { groupByCategory, sortPantry, sortShopping, type SortMode } from "./sort";
@@ -88,6 +89,8 @@ export function GroceriesClient({
         <TabPill href={`/groceries?${new URLSearchParams({ view: "buy", workspace: workspaceId })}`} label="Shopping list" matchKey="view" matchValue="buy" />
         <TabPill href={`/groceries?${new URLSearchParams({ view: "stock", workspace: workspaceId })}`} label="Pantry" matchKey="view" matchValue="stock" />
       </div>
+
+      <OfflineBanner />
 
       <AddRow workspaceId={workspaceId} items={items} target={view === "stock" ? "stock" : "list"} />
 
