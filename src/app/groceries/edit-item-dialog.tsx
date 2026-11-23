@@ -13,9 +13,17 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
   const titleId = useId();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState<string>(item.category);
-  const [quantity, setQuantity] = useState(item.quantity?.toString() ?? "1");
-  const [date, setDate] = useState(item.expiresOn ?? "");
-  const [mode, setMode] = useState<ExpiryMode>(item.expiresOn ? "date" : "none");
+  // The stock fields as they were when the dialog opened. A save that leaves them as they were
+  // must not write them back: the other phone may have stepped the count since, and restating
+  // these would quietly undo it.
+  const [opened] = useState(() => ({
+    quantity: item.quantity?.toString() ?? "1",
+    date: item.expiresOn ?? "",
+    mode: (item.expiresOn ? "date" : "none") as ExpiryMode,
+  }));
+  const [quantity, setQuantity] = useState(opened.quantity);
+  const [date, setDate] = useState(opened.date);
+  const [mode, setMode] = useState<ExpiryMode>(opened.mode);
   // Stock fields only exist for pantry rows: the shopping list never edits stock.
   const lotId = shopping ? null : item.lotId;
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +39,8 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
         const parsed = editItemSchema.safeParse({
           itemId: item.id, name, ...(shopping ? {} : { category }),
         });
-        const stock = lotId === null ? null : editLotSchema.safeParse({
+        const stockChanged = quantity !== opened.quantity || date !== opened.date || mode !== opened.mode;
+        const stock = lotId === null || !stockChanged ? null : editLotSchema.safeParse({
           lotId,
           quantity: quantity === "" ? 1 : Number(quantity),
           expiresOn: mode === "estimate"

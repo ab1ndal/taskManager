@@ -26,8 +26,26 @@ it("edits quantity and expiry of a pantry item's stock", async () => {
 });
 it("keeps an untouched estimated date an estimate", async () => {
   render(<EditItemDialog item={stocked} onClose={jest.fn()} />);
+  fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "3" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  await waitFor(() => expect(editLot).toHaveBeenCalledWith({ lotId: stocked.lotId, quantity: 2, expiresOn: "2026-09-13", expiryIsEstimate: true }));
+  await waitFor(() => expect(editLot).toHaveBeenCalledWith({ lotId: stocked.lotId, quantity: 3, expiresOn: "2026-09-13", expiryIsEstimate: true }));
+});
+it("a rename leaves stock alone, so it cannot undo the other phone's count", async () => {
+  const close = jest.fn();
+  const { rerender } = render(<EditItemDialog item={stocked} onClose={close} />);
+  // The partner steps the count while this dialog is open; the page refresh re-renders it.
+  rerender(<EditItemDialog item={{ ...stocked, quantity: 3 }} onClose={close} />);
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Oat milk" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(close).toHaveBeenCalled());
+  expect(editItem).toHaveBeenCalledWith({ itemId: item.id, name: "Oat milk", category: "dairy" });
+  expect(editLot).not.toHaveBeenCalled();
+});
+it("saves stock when only the expiry mode changes", async () => {
+  render(<EditItemDialog item={stocked} onClose={jest.fn()} />);
+  fireEvent.change(screen.getByLabelText("Expiry"), { target: { value: "estimate" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(editLot).toHaveBeenCalledWith(expect.objectContaining({ quantity: 2, expiryIsEstimate: true })));
 });
 it("clears expiry, and saves a blank quantity as 1", async () => {
   render(<EditItemDialog item={stocked} onClose={jest.fn()} />);
