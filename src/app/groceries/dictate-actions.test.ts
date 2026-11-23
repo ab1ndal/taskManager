@@ -2,6 +2,7 @@ import { createFakeSupabase } from "@/test/supabase-fake";
 
 const WORKSPACE = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
+const WORK = "33333333-3333-4333-8333-333333333333";
 
 let fake: ReturnType<typeof createFakeSupabase>;
 const generateObject = jest.fn();
@@ -16,7 +17,17 @@ import * as dictateActions from "./dictate-actions";
 beforeEach(() => {
   jest.clearAllMocks();
   fake = createFakeSupabase({
-    tables: { workspace_members: [{ id: "member", workspace_id: WORKSPACE, auth_user_id: "auth-user-1" }] },
+    tables: {
+      workspaces: [
+        { id: WORKSPACE, kind: "household" },
+        { id: OTHER, kind: "household" },
+        { id: WORK, kind: "work" },
+      ],
+      workspace_members: [
+        { id: "member", workspace_id: WORKSPACE, auth_user_id: "auth-user-1" },
+        { id: "work-member", workspace_id: WORK, auth_user_id: "auth-user-1" },
+      ],
+    },
   });
 });
 
@@ -88,6 +99,13 @@ it("refuses a workspace the caller does not belong to", async () => {
   const result = await dictateActions.parseGroceryDictation({ workspaceId: OTHER, transcript: "milk" });
 
   expect(result).toMatchObject({ ok: false, error: expect.stringContaining("Forbidden") });
+  expect(generateObject).not.toHaveBeenCalled();
+});
+
+it("refuses a work workspace the caller belongs to without calling the model", async () => {
+  const result = await dictateActions.parseGroceryDictation({ workspaceId: WORK, transcript: "milk" });
+
+  expect(result).toMatchObject({ ok: false, error: expect.stringContaining("not a household") });
   expect(generateObject).not.toHaveBeenCalled();
 });
 

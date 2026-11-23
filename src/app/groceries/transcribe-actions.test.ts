@@ -5,6 +5,7 @@ import { createFakeSupabase } from "@/test/supabase-fake";
 
 const WORKSPACE = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
+const WORK = "33333333-3333-4333-8333-333333333333";
 
 let fake: ReturnType<typeof createFakeSupabase>;
 const fetchMock = jest.fn();
@@ -23,7 +24,15 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = "test-key";
   fake = createFakeSupabase({
     tables: {
-      workspace_members: [{ id: "member", workspace_id: WORKSPACE, auth_user_id: "auth-user-1" }],
+      workspaces: [
+        { id: WORKSPACE, kind: "household" },
+        { id: OTHER, kind: "household" },
+        { id: WORK, kind: "work" },
+      ],
+      workspace_members: [
+        { id: "member", workspace_id: WORKSPACE, auth_user_id: "auth-user-1" },
+        { id: "work-member", workspace_id: WORK, auth_user_id: "auth-user-1" },
+      ],
       grocery_items: [
         { id: "g1", workspace_id: WORKSPACE, name: "Paneer", times_added: 9 },
         { id: "g2", workspace_id: WORKSPACE, name: "Atta", times_added: 4 },
@@ -135,6 +144,13 @@ it("rejects a non-member without calling OpenAI", async () => {
   const result = await transcribeGroceryAudio(upload({ workspaceId: OTHER }));
 
   expect(result.ok).toBe(false);
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it("rejects a work workspace the caller belongs to without calling OpenAI", async () => {
+  const result = await transcribeGroceryAudio(upload({ workspaceId: WORK }));
+
+  expect(result).toMatchObject({ ok: false, error: expect.stringContaining("not a household") });
   expect(fetchMock).not.toHaveBeenCalled();
 });
 

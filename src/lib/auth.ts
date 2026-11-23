@@ -91,6 +91,26 @@ export async function assertWorkspaceMember(
 }
 
 /**
+ * Throws unless this workspace is a household. Groceries live only in household workspaces
+ * (docs/product.md); /groceries enforces that on the page, and actions need it again because they
+ * are public endpoints (tasks/lessons.md L4). Call it after `assertWorkspaceMember`, so a
+ * non-member learns nothing about a workspace's kind.
+ */
+export async function assertHouseholdWorkspace(workspaceId: string): Promise<void> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("workspaces")
+    .select("kind")
+    .eq("id", workspaceId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to verify workspace kind: ${error.message}`, { cause: error });
+  if (data?.kind !== "household") {
+    throw new ForbiddenError(`workspace ${workspaceId} is not a household`);
+  }
+}
+
+/**
  * Throws unless every member id belongs to this workspace. Without this check a caller can name an
  * arbitrary workspace_members row and assign a task to someone in a workspace they have nothing to
  * do with.

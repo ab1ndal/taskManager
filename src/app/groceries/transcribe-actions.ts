@@ -1,6 +1,6 @@
 "use server";
 
-import { assertWorkspaceMember, requireUser } from "@/lib/auth";
+import { assertHouseholdWorkspace, assertWorkspaceMember, requireUser } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { assertNoError, run } from "@/app/tasks/action-run";
@@ -49,6 +49,7 @@ export async function transcribeGroceryAudio(formData: FormData): Promise<Action
       audio: formData.get("audio"),
     });
     await assertWorkspaceMember(workspaceId, user.id);
+    await assertHouseholdWorkspace(workspaceId);
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("OPENAI_API_KEY is not set");

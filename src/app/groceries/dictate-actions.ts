@@ -3,7 +3,7 @@
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 
-import { assertWorkspaceMember, requireUser } from "@/lib/auth";
+import { assertHouseholdWorkspace, assertWorkspaceMember, requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { run } from "@/app/tasks/action-run";
 import { parseInput } from "@/app/tasks/schemas";
@@ -37,6 +37,7 @@ export async function parseGroceryDictation(
     const { user } = await requireUser();
     const { workspaceId, transcript } = parseInput(dictateInputSchema, input);
     await assertWorkspaceMember(workspaceId, user.id);
+    await assertHouseholdWorkspace(workspaceId);
 
     const { object } = await generateObject({
       model: openai("gpt-6-luna"),
