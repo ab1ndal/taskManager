@@ -18,9 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned, not "latest": on 2026-11-23 a new major CLI made `db push` target a local Docker
+      # stack unless given --remote, so an unrelated release silently stopped production
+      # migrations. 2.98.2 is the version used locally; bump deliberately and read its changelog.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.98.2
 
       - name: Link project
         run: supabase link --project-ref xamdgvxziobpptcfymug
