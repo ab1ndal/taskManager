@@ -140,6 +140,11 @@ days for abuse monitoring unless the account has zero data retention — the pro
 this app not storing audio. The text lands in the editable textarea and nothing is parsed until the
 user taps Parse. Recordings stop at two minutes.
 
+When transcribing or parsing fails, the sheet says why rather than "Something went wrong": dictation
+is unavailable (key missing or rejected, quota exhausted — type items instead), busy (rate limited —
+try again in a minute), or took too long (each OpenAI call gives up after 30 seconds). Dictation is
+only offered in household workspaces, and both actions refuse any other workspace.
+
 When adding to the pantry, an expiry said for an item ("milk expiring Friday", "paneer good till
 the 5th", "bread lasts three more days") is resolved to a date against today in the app's timezone
 and prefilled in that item's review row, where it can be changed or cleared. An item with no spoken

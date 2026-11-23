@@ -1,9 +1,9 @@
 "use server";
 
-import { generateObject } from "ai";
+import { APICallError, generateObject, RetryError } from "ai";
 import { openai } from "@ai-sdk/openai";
 
-import { assertWorkspaceMember, requireUser } from "@/lib/auth";
+import { assertHouseholdWorkspace, assertWorkspaceMember, requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { run } from "@/app/tasks/action-run";
 import { parseInput } from "@/app/tasks/schemas";
@@ -15,6 +15,7 @@ import {
   type DictateInput,
   type ReviewGroceryItem,
 } from "./dictate-schema";
+import { mapOpenAiTimeout, openAiHttpError, OPENAI_TIMEOUT_MS, requireOpenAiKey } from "./openai-errors";
 
 /**
  * Turns one dictated transcript into structured, reviewable grocery rows.
@@ -37,7 +38,12 @@ export async function parseGroceryDictation(
     const { user } = await requireUser();
     const { workspaceId, transcript } = parseInput(dictateInputSchema, input);
     await assertWorkspaceMember(workspaceId, user.id);
+    await assertHouseholdWorkspace(workspaceId);
+    // The provider reads the key itself; checked here so a missing one fails honestly, up front.
+    requireOpenAiKey();
 
+    const today = localToday();
+    const timeout = AbortSignal.timeout(OPENAI_TIMEOUT_MS);
     const { object } = await generateObject({
       model: openai("gpt-6-luna"),
       providerOptions: { openai: { reasoningEffort: "low" } },
@@ -45,11 +51,30 @@ export async function parseGroceryDictation(
       output: "array",
       schemaName: "GroceryDictationItems",
       schemaDescription: "Grocery items extracted from one dictated shopping list.",
-      prompt: buildPrompt(transcript, localToday()),
+      prompt: buildPrompt(transcript, today),
+      // One retry absorbs a blip; the timeout bounds both attempts together, since the person is
+      // watching a spinner.
+      maxRetries: 1,
+      abortSignal: timeout,
+    }).catch((error: unknown) => {
+      throw mapSdkError(error, timeout);
     });
 
-    return { items: object.map(toReviewItem) };
+    return { items: object.map((item) => toReviewItem(item, today)) };
   });
+}
+
+/**
+ * The AI SDK's failures as the shared OpenAI failures. After `maxRetries` the SDK wraps the
+ * attempts in a `RetryError`; the last attempt says why it finally failed.
+ */
+function mapSdkError(error: unknown, timeout: AbortSignal): unknown {
+  const last = RetryError.isInstance(error) ? error.lastError : error;
+  if (APICallError.isInstance(last) && last.statusCode !== undefined) {
+    return openAiHttpError("parse", last.statusCode, last.responseBody, last);
+  }
+  // The SDK never retries an abort, so a timeout always arrives unwrapped.
+  return mapOpenAiTimeout("parse", error, timeout);
 }
 
 /** "Sunday, 2026-09-27": the weekday is what lets the model resolve "expires Friday". */
