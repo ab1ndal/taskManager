@@ -103,7 +103,7 @@ describe("GroceriesClient", () => {
     fireEvent.click(screen.getByRole("button", { name: "By name" }));
 
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(["Produce", "Pantry & dry goods"]);
+    expect(headings).toEqual(["Fruits & vegetables", "Baking & other pantry"]);
     expect(screen.getByText("Rice")).toBeInTheDocument();
   });
 

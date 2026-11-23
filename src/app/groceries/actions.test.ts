@@ -52,6 +52,20 @@ it("shopping additions never change category or stock details", async () => {
     p_category: null, p_quantity: null, p_expires_on: null, p_estimate: false,
   }));
 });
+it("gives a new shopping item the keyword category instead of the pantry default", async () => {
+  await actions.addGroceryItem({ workspaceId: WORKSPACE, name: "Palak", target: "list" });
+  expect(rpc).toHaveBeenCalledWith("grocery_upsert", expect.objectContaining({ p_category: "produce" }));
+});
+it("estimates new uncategorised stock from the keyword category", async () => {
+  await actions.addGroceryItem({ workspaceId: WORKSPACE, name: "Paneer", target: "stock" });
+  expect(rpc).toHaveBeenCalledWith("grocery_upsert", expect.objectContaining({
+    p_category: "dairy", p_expires_on: "2026-09-17", p_estimate: true,
+  }));
+});
+it("leaves an unrecognised new name to the database default", async () => {
+  await actions.addGroceryItem({ workspaceId: WORKSPACE, name: "C3s", target: "list" });
+  expect(rpc).toHaveBeenCalledWith("grocery_upsert", expect.objectContaining({ p_category: null }));
+});
 it("adds explicit undated stock without estimating", async () => {
   await actions.addGroceryItem({ workspaceId: WORKSPACE, name: "Milk", target: "stock", quantity: 2, expiresOn: null });
   expect(rpc).toHaveBeenCalledWith("grocery_upsert", expect.objectContaining({ p_quantity: 2, p_expires_on: null, p_estimate: false }));

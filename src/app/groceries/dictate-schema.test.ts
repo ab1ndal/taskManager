@@ -38,9 +38,9 @@ describe("toReviewItem", () => {
     expect(toReviewItem(raw({ category: "produce" })).category).toBe("produce");
   });
 
-  it("falls back to pantry for a category the model invented", () => {
-    expect(toReviewItem(raw({ category: "meat" })).category).toBe("pantry");
-    expect(toReviewItem(raw({ category: "" })).category).toBe("pantry");
+  it("falls back to the keyword guess, then pantry, for a category the model invented", () => {
+    expect(toReviewItem(raw({ category: "meat" })).category).toBe("dairy");
+    expect(toReviewItem(raw({ name: "C3s", category: "" })).category).toBe("pantry");
   });
 
   it("flags a row below the confidence threshold and keeps the raw fragment", () => {

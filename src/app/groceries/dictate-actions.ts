@@ -7,7 +7,7 @@ import { assertWorkspaceMember, requireUser } from "@/lib/auth";
 import type { ActionResult } from "@/app/tasks/action-result";
 import { run } from "@/app/tasks/action-run";
 import { parseInput } from "@/app/tasks/schemas";
-import { CATEGORY_SLUGS, localToday } from "./categories";
+import { GROCERY_CATEGORIES, localToday } from "./categories";
 import {
   dictateInputSchema,
   rawDictatedItemSchema,
@@ -70,7 +70,7 @@ function buildPrompt(transcript: string, today: string): string {
     "- name: the plain product name, singular, no quantity or expiry words in it",
     "- quantity: a whole number if a count was said or clearly implied (e.g. 'a dozen eggs' -> 12,",
     "  'a couple lemons' -> 2), otherwise null — never guess a number nobody implied",
-    `- category: your best guess, one of: ${CATEGORY_SLUGS.join(", ")}`,
+    `- category: your best guess, exactly one of these slugs (label in brackets): ${GROCERY_CATEGORIES.map((c) => `${c.slug} (${c.label})`).join(", ")}`,
     "- confidence: 0 to 1, how sure you are this is a real, distinct item with the right name,",
     "  quantity and category",
     "- sourceText: the exact fragment of the transcript this item came from",

@@ -5,6 +5,7 @@ import { Dialog } from "@/components/dialog";
 import { GENERIC_ERROR } from "@/app/tasks/action-result";
 import { addGroceryItem } from "./actions";
 import { GROCERY_CATEGORIES, isCategorySlug, type CategorySlug } from "./categories";
+import { suggestCategory } from "./category-suggest";
 import { addGroceryItemSchema } from "./schemas";
 import { StockFields, type ExpiryMode } from "./stock-fields";
 
@@ -25,8 +26,8 @@ export function AddStockDialog({ workspaceId, name, category: knownCategory, onC
   const [quantity, setQuantity] = useState("1");
   const [date, setDate] = useState("");
   const [mode, setMode] = useState<ExpiryMode>("none");
-  // New products default to the same category the database would give them, shown rather than implied.
-  const [category, setCategory] = useState<CategorySlug>(knownCategory ?? "pantry");
+  // A new product starts on the keyword guess, shown in the selector so a wrong one is one tap away.
+  const [category, setCategory] = useState<CategorySlug>(knownCategory ?? suggestCategory(name) ?? "pantry");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const control = "block w-full min-w-0 h-11 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 text-base";

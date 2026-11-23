@@ -197,6 +197,14 @@ Adding a name in the pantry opens a dialog asking for quantity (prefilled 1), ex
 printed date, or a category estimate) and category (the stored one for a known name). Bought and
 Record purchase open the same quantity and expiry fields. Shopping-list adds save immediately.
 
+A new name nobody has categorised gets a silent keyword guess (category-suggest.ts) instead of
+defaulting to pantry: it prefills the pantry dialog's selector and is stored for a shopping-list add.
+The vocabulary covers a vegetarian Indian household in the US, Hindi and English names alike. A
+known product always keeps its stored category, and an unrecognised name still falls back to pantry.
+The 13 categories are Fruits & vegetables, Dairy, eggs & tofu, Bread & bakery, Frozen, Dals, beans &
+lentils, Atta, rice & grains, Masalas & spices, Sauces, pickles & chutneys, Dry fruits, nuts & seeds,
+Snacks, namkeen & sweets, Chai, coffee & drinks, Baking & other pantry, and Household.
+
 Product editing changes name, category, quantity and expiry in the pantry and name only in shopping. Shopping has no
 category controls, tags, filters or category ordering; it sorts alphabetically. Pantry retains
 category filtering above 15 items, expiry/name sorting, and a search field. Search matches any part

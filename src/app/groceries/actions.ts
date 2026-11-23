@@ -8,6 +8,7 @@ import type { ActionResult } from "@/app/tasks/action-result";
 import { assertNoError, run } from "@/app/tasks/action-run";
 import { parseInput, ValidationError } from "@/app/tasks/schemas";
 import { estimatedExpiry } from "./categories";
+import { suggestCategory } from "./category-suggest";
 import { knownGroceryRpcFailure } from "./rpc-errors";
 import {
   addGroceryItemSchema,
@@ -119,23 +120,28 @@ export async function addGroceryItem(
 
     const admin = createAdminClient();
     const estimate = target === "stock" && expiresOn === undefined;
-    let estimateCategory = category;
-    if (estimate && estimateCategory === undefined) {
+    let storedCategory: string | undefined;
+    if (category === undefined) {
       const { data: products, error } = await admin.from("grocery_items")
         .select("name, category").eq("workspace_id", workspaceId);
       assertNoError("load grocery categories", { error });
-      estimateCategory = products?.find((row) =>
+      storedCategory = products?.find((row) =>
         String(row.name).trim().toLowerCase() === name.toLowerCase())?.category;
     }
+    // Only a product nobody has categorised gets the keyword guess; a known one keeps what it has.
+    // Without this a list add stored the column default, 'pantry', for milk and spinach alike.
+    const guessedCategory = category === undefined && storedCategory === undefined
+      ? suggestCategory(name) ?? undefined
+      : undefined;
     const resolvedExpiry = target === "list" ? null : estimate
-      ? estimatedExpiry(estimateCategory ?? "pantry") : (expiresOn ?? null);
+      ? estimatedExpiry(category ?? storedCategory ?? guessedCategory ?? "pantry") : (expiresOn ?? null);
 
     const { data, error } = await admin.rpc("grocery_upsert", {
       p_workspace: workspaceId,
       p_name: name,
       // Null, not "pantry": migration 029 reads a null category as "leave the stored one alone".
       // Defaulting here would put back the silent rewrite the add row used to cause.
-      p_category: target === "stock" ? category ?? null : null,
+      p_category: (target === "stock" ? category : undefined) ?? guessedCategory ?? null,
       p_target: target,
       p_quantity: target === "stock" ? (quantity ?? null) : null,
       p_expires_on: resolvedExpiry,

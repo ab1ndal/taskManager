@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import {
   CATEGORY_SLUGS,
   addDays,
@@ -10,14 +13,37 @@ import {
 } from "./categories";
 
 describe("categories", () => {
-  it("has nine slugs and no meat or seafood", () => {
-    expect(CATEGORY_SLUGS).toHaveLength(9);
+  it("has thirteen slugs and no meat or seafood", () => {
+    expect(CATEGORY_SLUGS).toHaveLength(13);
     expect(CATEGORY_SLUGS).toContain("produce");
     expect(CATEGORY_SLUGS.join(" ")).not.toMatch(/meat|seafood|fish/);
   });
 
   it("labels a slug", () => {
-    expect(categoryLabel("dairy")).toBe("Dairy & eggs");
+    expect(categoryLabel("dairy")).toBe("Dairy, eggs & tofu");
+  });
+});
+
+describe("database constraint", () => {
+  const migrations = join(__dirname, "../../../supabase/migrations");
+
+  // The slug list lives twice: here and in the grocery_items_category check constraint. A slug added
+  // in one place only either fails every insert of it or never appears in the picker.
+  it("matches the latest grocery_items_category check constraint", () => {
+    const latest = readdirSync(migrations).sort()
+      .map((file) => readFileSync(join(migrations, file), "utf8"))
+      .filter((sql) => /constraint grocery_items_category\s+check/.test(sql))
+      .at(-1);
+    const list = latest?.match(/constraint grocery_items_category\s+check\s*\(category in \(([^)]*)\)/)?.[1];
+    const slugs = [...(list ?? "").matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+    expect(slugs.sort()).toEqual([...CATEGORY_SLUGS].sort());
+  });
+
+  it("recategorises existing items only into slugs the constraint allows", () => {
+    const sql = readFileSync(join(migrations, "033_grocery_recategorize_existing.sql"), "utf8");
+    const targets = [...sql.matchAll(/\('[^']+', '([a-z]+)'\)/g)].map((m) => m[1]);
+    expect(targets.length).toBeGreaterThan(50);
+    for (const slug of targets) expect(CATEGORY_SLUGS).toContain(slug);
   });
 });
 
