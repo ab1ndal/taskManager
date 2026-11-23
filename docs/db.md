@@ -117,10 +117,11 @@ those into one stock row per product (`grocery_lots_one_per_item`, unique on `it
 | --- | --- |
 | id | uuid primary key |
 | item_id | product FK, cascade on delete; unique |
-| quantity | positive integer, not null, default 1 |
+| quantity | positive integer, not null, default 1; RPCs clamp it at 999 (035) |
 | expires_on | nullable date between 2020-01-01 and 2100-01-01 |
 | expiry_is_estimate | true requires a date |
 | created_at | timestamp the row was first created |
+| version | int, not null, default 1; every write bumps it (035) |
 
 031's backfill summed each product's batches (uncounted as 1) and kept the earliest-expiring
 batch's date and estimate flag. The table keeps its name so RLS, grants and RPCs carry over.
@@ -132,6 +133,18 @@ printed date beats an estimate. `grocery_adjust_quantity` steps the count and th
 deletes the row and sets needed. `grocery_lot_extend` touches only date/estimate;
 `grocery_lot_edit` sets quantity/date; `grocery_lot_discard` removes the row.
 `grocery_finish` deletes it; `grocery_forget` deletes the product and cascades.
+
+`grocery_mark_bought(…, p_only_if_needed boolean default false)` (034): the shopping list's Bought
+passes true, and once the item is no longer needed the call returns the row without adding stock,
+so a second phone's tap or a retry counts once. Record purchase on a pantry row passes nothing and
+always adds.
+
+Optimistic concurrency (035): the merge, the stepper, edit and extend each bump `version`.
+`grocery_lot_edit`, `grocery_lot_extend` and `grocery_lot_discard` take a trailing
+`p_expected_version int default null`; under the parent lock, a non-null value that differs from the
+row raises `grocery_conflict: …`, which the app shows as "Changed on the other phone — reopen to see
+the latest." Null skips the check. Quantities written by `private.grocery_stock_add` and
+`grocery_adjust_quantity` are clamped at 999, the form limit.
 
 Authenticated clients can read products and stock under workspace-membership RLS. Direct table
 writes are revoked; authenticated callers cannot execute the stock RPCs. Server actions independently
