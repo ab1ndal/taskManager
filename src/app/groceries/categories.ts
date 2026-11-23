@@ -8,22 +8,35 @@ import { APP_TIME_ZONE } from "@/app/tasks/recurrence-time";
  * fastest-spoiling thing in the kitchen. `null` means "this does not meaningfully expire", and
  * those items simply have no date.
  *
- * The slug list is duplicated in the `grocery_items_category` check constraint (migration 026).
- * The two must change together — the same arrangement `TAB20_SLUGS` has with
- * `board_columns_color_valid`, recorded in docs/db.md.
+ * The slug list is duplicated in the `grocery_items_category` check constraint (latest in
+ * migration 032). The two must change together — the same arrangement `TAB20_SLUGS` has with
+ * `board_columns_color_valid`, recorded in docs/db.md. categories.test.ts reads the migration and
+ * fails if they drift.
+ *
+ * The groups follow how a vegetarian Indian household in the US actually stocks a kitchen: dals,
+ * atta and rice, masalas, and dry fruits are each a shelf of their own (and an aisle at the Indian
+ * store), not one undifferentiated "pantry". Tofu and tempeh sit with dairy because they live in the
+ * fridge and spoil on a similar clock. `pantry` remains the fallback for anything unrecognised.
+ *
+ * Slugs are never renamed, only added: `baked` keeps its slug under the clearer "Bread & bakery"
+ * label, because stored rows and the deployed app both use it.
  *
  * There is deliberately no meat or seafood category: both users are vegetarian.
  */
 export const GROCERY_CATEGORIES = [
-  { slug: "produce", label: "Produce", position: 1, shelfLifeDays: 7 },
-  { slug: "dairy", label: "Dairy & eggs", position: 2, shelfLifeDays: 10 },
-  { slug: "baked", label: "Baked", position: 3, shelfLifeDays: 4 },
+  { slug: "produce", label: "Fruits & vegetables", position: 1, shelfLifeDays: 7 },
+  { slug: "dairy", label: "Dairy, eggs & tofu", position: 2, shelfLifeDays: 10 },
+  { slug: "baked", label: "Bread & bakery", position: 3, shelfLifeDays: 4 },
   { slug: "frozen", label: "Frozen", position: 4, shelfLifeDays: 180 },
-  { slug: "pantry", label: "Pantry & dry goods", position: 5, shelfLifeDays: null },
-  { slug: "spices", label: "Spices & condiments", position: 6, shelfLifeDays: null },
-  { slug: "beverages", label: "Beverages", position: 7, shelfLifeDays: null },
-  { slug: "snacks", label: "Snacks", position: 8, shelfLifeDays: null },
-  { slug: "household", label: "Household", position: 9, shelfLifeDays: null },
+  { slug: "dals", label: "Dals, beans & lentils", position: 5, shelfLifeDays: null },
+  { slug: "grains", label: "Atta, rice & grains", position: 6, shelfLifeDays: null },
+  { slug: "spices", label: "Masalas & spices", position: 7, shelfLifeDays: null },
+  { slug: "condiments", label: "Sauces, pickles & chutneys", position: 8, shelfLifeDays: null },
+  { slug: "nuts", label: "Dry fruits, nuts & seeds", position: 9, shelfLifeDays: null },
+  { slug: "snacks", label: "Snacks, namkeen & sweets", position: 10, shelfLifeDays: null },
+  { slug: "beverages", label: "Chai, coffee & drinks", position: 11, shelfLifeDays: null },
+  { slug: "pantry", label: "Baking & other pantry", position: 12, shelfLifeDays: null },
+  { slug: "household", label: "Household", position: 13, shelfLifeDays: null },
 ] as const;
 
 export type CategorySlug = (typeof GROCERY_CATEGORIES)[number]["slug"];

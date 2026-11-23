@@ -137,7 +137,11 @@ Authenticated clients can read products and stock under workspace-membership RLS
 writes are revoked; authenticated callers cannot execute the stock RPCs. Server actions independently
 authorize the stored workspace, then call service-role-only RPCs with empty search paths.
 Product name/category edits use an authorized admin table update. Shopping name edits omit category.
-Category slugs remain duplicated in `categories.ts` and the SQL check constraint.
+Category slugs remain duplicated in `categories.ts` and the SQL check constraint (latest: migration
+032, which added `dals`, `grains`, `condiments`, `nuts`); `categories.test.ts` parses the newest
+constraint and fails on drift. Slugs are only ever added — renaming one would break the deployed app
+and stored rows during the window a migration auto-applies. Migration 033 is a one-time data fix that
+moved existing household items out of the pantry default; it changes categories only, never stock.
 
 ### tasks
 

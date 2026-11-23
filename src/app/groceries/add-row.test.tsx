@@ -100,7 +100,7 @@ it("opens the pantry add dialog instead of saving at once, with quantity 1", asy
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add" }));
   await waitFor(() =>
     expect(addGroceryItem).toHaveBeenCalledWith({
-      workspaceId: props.workspaceId, name: "Peas", category: "pantry", target: "stock", quantity: 4, expiresOn: null,
+      workspaceId: props.workspaceId, name: "Peas", category: "produce", target: "stock", quantity: 4, expiresOn: null,
     }),
   );
   await waitFor(() => expect(screen.queryByRole("heading", { name: /Add to pantry/ })).toBeNull());

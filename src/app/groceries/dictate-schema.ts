@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { isCategorySlug, type CategorySlug } from "./categories";
+import { suggestCategory } from "./category-suggest";
 import { expiresOn as expiryDate } from "./schemas";
 
 /**
@@ -66,17 +67,16 @@ export type ReviewGroceryItem = {
 /**
  * Maps one raw model item onto the review-row shape.
  *
- * A category the model invents that isn't one of `CATEGORY_SLUGS` falls back to "pantry" — the
- * same fallback the rest of the pantry already uses for an unclassified product (categories.ts
- * `estimatedExpiry`, add-row.tsx's untouched selector) — rather than inventing a new category or
- * rejecting the row outright. An expiry that is not a real date in the range `addGroceryItem`
+ * A category the model invents that isn't one of `CATEGORY_SLUGS` falls back to the keyword guess
+ * a typed add would get (category-suggest.ts), then to "pantry" — rather than inventing a new
+ * category or rejecting the row outright. An expiry that is not a real date in the range `addGroceryItem`
  * accepts is dropped to null for the same reason: the row survives with the category estimate.
  */
 export function toReviewItem(raw: RawDictatedItem): ReviewGroceryItem {
   return {
     name: raw.name,
     quantity: raw.quantity,
-    category: isCategorySlug(raw.category) ? raw.category : "pantry",
+    category: isCategorySlug(raw.category) ? raw.category : suggestCategory(raw.name) ?? "pantry",
     confidence: raw.confidence,
     lowConfidence: raw.confidence < LOW_CONFIDENCE_THRESHOLD,
     sourceText: raw.sourceText,
