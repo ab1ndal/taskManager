@@ -16,11 +16,16 @@ function setVisibility(state: "visible" | "hidden") {
   document.dispatchEvent(new Event("visibilitychange"));
 }
 
+function setOnline(online: boolean) {
+  Object.defineProperty(navigator, "onLine", { value: online, configurable: true });
+}
+
 describe("useForegroundRefresh", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     refresh.mockClear();
     setVisibility("visible");
+    setOnline(true);
   });
 
   afterEach(() => jest.useRealTimers());
@@ -56,5 +61,18 @@ describe("useForegroundRefresh", () => {
     expect(jest.getTimerCount()).toBe(0);
     act(() => void jest.advanceTimersByTime(5000));
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  // A refresh that cannot reach the server makes Next fall back to a full-page navigation, which
+  // replaces the list with the browser's offline error page.
+  it("skips refreshes while the browser reports no connection", () => {
+    render(<Probe />);
+    setOnline(false);
+    act(() => void jest.advanceTimersByTime(3100));
+    expect(refresh).not.toHaveBeenCalled();
+
+    setOnline(true);
+    act(() => void jest.advanceTimersByTime(1000));
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

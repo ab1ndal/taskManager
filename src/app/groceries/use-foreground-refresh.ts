@@ -16,6 +16,14 @@ import { useRouter } from "next/navigation";
  *
  * The timer only runs while the document is visible, so a backgrounded standalone app is not
  * polling, and it is cleared on unmount so leaving the page stops the work.
+ *
+ * Ticks are skipped while the browser reports no connection. A `router.refresh()` whose RSC fetch
+ * fails on a network error makes Next fall back to a full-page navigation (`location.replace`),
+ * so a shop with no signal would swap the list for the browser's offline error page and lose
+ * whatever was being typed. ResumeRefresh refreshes once when the `online` event fires.
+ *
+ * This is a mitigation, not a guarantee: iOS can report `onLine` as true on a captive portal or a
+ * zero-bar connection, and a refresh sent then still falls back to a hard navigation.
  */
 export function useForegroundRefresh(intervalMs = 20_000): void {
   const router = useRouter();
@@ -25,7 +33,9 @@ export function useForegroundRefresh(intervalMs = 20_000): void {
 
     const start = () => {
       if (timer !== null) return;
-      timer = setInterval(() => router.refresh(), intervalMs);
+      timer = setInterval(() => {
+        if (navigator.onLine) router.refresh();
+      }, intervalMs);
     };
 
     const stop = () => {
