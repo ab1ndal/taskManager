@@ -13,6 +13,7 @@ import {
   MAX_KEYWORDS,
   transcribeInputSchema,
 } from "./transcribe-schema";
+import { mapOpenAiTimeout, openAiHttpError, OPENAI_TIMEOUT_MS, requireOpenAiKey } from "./openai-errors";
 
 const TRANSCRIPTIONS_URL = "https://api.openai.com/v1/audio/transcriptions";
 
@@ -51,8 +52,7 @@ export async function transcribeGroceryAudio(formData: FormData): Promise<Action
     await assertWorkspaceMember(workspaceId, user.id);
     await assertHouseholdWorkspace(workspaceId);
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+    const apiKey = requireOpenAiKey();
 
     const mediaType = baseMediaType(audio.type);
     // Checked by the schema already; narrowed again here so the extension lookup is typed.
@@ -67,21 +67,31 @@ export async function transcribeGroceryAudio(formData: FormData): Promise<Action
     body.append("languages[]", "en");
     for (const keyword of await loadKeywords(workspaceId)) body.append("keywords[]", keyword);
 
-    const response = await fetch(TRANSCRIPTIONS_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body,
+    // The signal also bounds reading the body, so a stalled response stream times out the same way
+    // a stalled connection does.
+    const timeout = AbortSignal.timeout(OPENAI_TIMEOUT_MS);
+    const text = await postTranscription(apiKey, body, timeout).catch((error: unknown) => {
+      throw mapOpenAiTimeout("transcription", error, timeout);
     });
-    if (!response.ok) {
-      // The error body is OpenAI's JSON error (type, message), never the audio.
-      throw new Error(`OpenAI transcription failed: ${response.status} ${(await response.text()).slice(0, 500)}`);
-    }
-
-    const { text } = (await response.json()) as { text?: unknown };
-    if (typeof text !== "string") throw new Error("OpenAI transcription response had no text");
 
     return { text: text.trim() };
   });
+}
+
+async function postTranscription(apiKey: string, body: FormData, signal: AbortSignal): Promise<string> {
+  const response = await fetch(TRANSCRIPTIONS_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body,
+    signal,
+  });
+  if (!response.ok) {
+    throw openAiHttpError("transcription", response.status, await response.text());
+  }
+
+  const { text } = (await response.json()) as { text?: unknown };
+  if (typeof text !== "string") throw new Error("OpenAI transcription response had no text");
+  return text;
 }
 
 /**

@@ -599,3 +599,17 @@ selects by role with an anchored name: `getByRole("combobox", { name: /^Category
 `browserType.launch` hangs for 180s per test (`sandbox_extension_issue_file_to_process … Operation
 not permitted`). It's the environment, not the app. Run e2e from the agent with `--project=chromium
 --project=webkit --project=iphone --project=iphone-16-pro`, and run Firefox from a normal terminal.
+
+## L28 — Classifying OpenAI failures: three traps
+
+**Learned:** 2026-11-22, grocery OpenAI error hardening.
+
+- `ai` and `@ai-sdk/provider` are ESM-only; Jest here cannot `requireActual` them. Tests that need
+  `APICallError`/`RetryError` stand them in via `jest.mock("ai", …)` (dictate-actions.test.ts).
+  Real-class behaviour was checked once with a plain `node` script.
+- After `maxRetries`, the SDK throws `RetryError`; the status lives on `.lastError`. A 401 is not
+  retryable and arrives as a bare `APICallError`.
+- A timeout is not always named `TimeoutError`: if it fires during the SDK's retry backoff, the
+  rejection is a plain `AbortError`. Check `signal.aborted` on your own signal. Also, a
+  `DOMException` is not `instanceof Error` inside Jest's realm — check both, as the SDK does.
+- OpenAI's 401 message echoes part of the key. Log only the body's `error.type`/`error.code`.

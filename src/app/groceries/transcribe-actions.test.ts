@@ -15,6 +15,13 @@ jest.mock("@/lib/supabase/server", () => ({ createClient: async () => fake }));
 
 import { transcribeGroceryAudio } from "./transcribe-actions";
 import { COMMON_KEYWORDS, MAX_AUDIO_BYTES, MAX_KEYWORDS } from "./transcribe-schema";
+import {
+  DICTATION_BUSY,
+  DICTATION_TIMED_OUT,
+  DICTATION_UNAVAILABLE,
+  OPENAI_TIMEOUT_MS,
+} from "./openai-errors";
+import { GENERIC_ERROR } from "@/app/tasks/action-result";
 
 const originalKey = process.env.OPENAI_API_KEY;
 
@@ -41,6 +48,10 @@ beforeEach(() => {
     },
   });
   jest.spyOn(console, "error").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -147,13 +158,6 @@ it("rejects a non-member without calling OpenAI", async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-it("rejects a work workspace the caller belongs to without calling OpenAI", async () => {
-  const result = await transcribeGroceryAudio(upload({ workspaceId: WORK }));
-
-  expect(result).toMatchObject({ ok: false, error: expect.stringContaining("not a household") });
-  expect(fetchMock).not.toHaveBeenCalled();
-});
-
 it("rejects a recording over the size cap without calling OpenAI", async () => {
   const tooBig = new Blob([new Uint8Array(MAX_AUDIO_BYTES + 1)], { type: "audio/mp4" });
 
@@ -176,21 +180,95 @@ it("rejects a missing or empty recording", async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-it("returns the generic error when OpenAI fails, logging the status but not the audio", async () => {
-  mockOpenAiReply({ error: { message: "Incorrect API key provided" } }, 401);
+function loggedLine(): Record<string, unknown> {
+  const calls = (console.error as jest.Mock).mock.calls;
+  expect(calls).toHaveLength(1);
+  return JSON.parse(calls[0][0] as string);
+}
+
+it("rejects a work workspace the caller belongs to without calling OpenAI", async () => {
+  const result = await transcribeGroceryAudio(upload({ workspaceId: WORK }));
+
+  expect(result).toMatchObject({ ok: false, error: expect.stringContaining("not a household") });
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it.each([401, 403])("says dictation is unavailable when OpenAI answers %i, logging openai_auth", async (status) => {
+  mockOpenAiReply(
+    { error: { message: "Incorrect API key provided: sk-abc***xyz", type: "invalid_request_error", code: "invalid_api_key" } },
+    status,
+  );
 
   const result = await transcribeGroceryAudio(upload());
 
-  expect(result).toEqual({ ok: false, error: expect.not.stringMatching(/401|API key/) });
-  expect(console.error).toHaveBeenCalledWith(expect.stringContaining("401"));
+  expect(result).toEqual({ ok: false, error: DICTATION_UNAVAILABLE });
+  const line = loggedLine();
+  expect(line).toMatchObject({ code: "openai_auth", status, errorName: "ExternalServiceError" });
+  // OpenAI echoes part of the key in its message; only the machine-readable code is logged.
+  expect(JSON.stringify(line)).not.toMatch(/sk-|Incorrect API key/);
+  expect(line.message).toContain("invalid_api_key");
 });
 
-it("fails without calling OpenAI when the key is not configured", async () => {
+it("says dictation is busy when OpenAI rate-limits, logging openai_rate_limit", async () => {
+  mockOpenAiReply({ error: { message: "Rate limit reached", type: "requests", code: "rate_limit_exceeded" } }, 429);
+
+  const result = await transcribeGroceryAudio(upload());
+
+  expect(result).toEqual({ ok: false, error: DICTATION_BUSY });
+  expect(loggedLine()).toMatchObject({ code: "openai_rate_limit", status: 429 });
+});
+
+it("says dictation is unavailable, not busy, when the account is out of quota", async () => {
+  mockOpenAiReply({ error: { message: "You exceeded your current quota", type: "insufficient_quota", code: "insufficient_quota" } }, 429);
+
+  const result = await transcribeGroceryAudio(upload());
+
+  expect(result).toEqual({ ok: false, error: DICTATION_UNAVAILABLE });
+  expect(loggedLine()).toMatchObject({ code: "openai_quota", status: 429 });
+});
+
+it("keeps the generic message for an OpenAI server error but logs its status", async () => {
+  mockOpenAiReply("<html>bad gateway</html>", 502);
+
+  const result = await transcribeGroceryAudio(upload());
+
+  expect(result).toEqual({ ok: false, error: GENERIC_ERROR });
+  expect(loggedLine()).toMatchObject({ code: "openai_http_error", status: 502 });
+});
+
+it("gives up on a hung request after the timeout and says it took too long", async () => {
+  const realTimeout = AbortSignal.timeout.bind(AbortSignal);
+  const timeoutSpy = jest.spyOn(AbortSignal, "timeout").mockImplementation(() => realTimeout(5));
+  fetchMock.mockImplementation(
+    (_url: string, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      }),
+  );
+
+  const result = await transcribeGroceryAudio(upload());
+
+  expect(timeoutSpy).toHaveBeenCalledWith(OPENAI_TIMEOUT_MS);
+  expect(OPENAI_TIMEOUT_MS).toBe(30_000);
+  expect(result).toEqual({ ok: false, error: DICTATION_TIMED_OUT });
+  expect(loggedLine()).toMatchObject({ code: "openai_timeout" });
+});
+
+it("says dictation is unavailable without calling OpenAI when the key is not configured", async () => {
   delete process.env.OPENAI_API_KEY;
 
   const result = await transcribeGroceryAudio(upload());
 
-  expect(result.ok).toBe(false);
+  expect(result).toEqual({ ok: false, error: DICTATION_UNAVAILABLE });
   expect(fetchMock).not.toHaveBeenCalled();
-  expect(console.error).toHaveBeenCalledWith(expect.stringContaining("OPENAI_API_KEY"));
+  expect(loggedLine()).toMatchObject({ code: "openai_key_missing", message: expect.stringContaining("OPENAI_API_KEY") });
+});
+
+it("treats an empty key the way Vercel pulls a Sensitive variable, as not configured", async () => {
+  process.env.OPENAI_API_KEY = "";
+
+  const result = await transcribeGroceryAudio(upload());
+
+  expect(result).toEqual({ ok: false, error: DICTATION_UNAVAILABLE });
+  expect(fetchMock).not.toHaveBeenCalled();
 });
