@@ -8,8 +8,13 @@ import { markBoughtSchema } from "./schemas";
 import { StockFields, type ExpiryMode } from "./stock-fields";
 import type { GroceryItem } from "./types";
 
-/** Bought and Record purchase. The amount merges into the item's one stock row (migration 031). */
-export function PurchaseDialog({ item, onClose }: { item: GroceryItem; onClose: () => void }) {
+/**
+ * Bought and Record purchase. The amount merges into the item's one stock row (migration 031).
+ * Bought passes onlyIfNeeded so a second phone's tap, or a retry, cannot add the stock twice.
+ */
+export function PurchaseDialog({ item, onClose, onlyIfNeeded = false }: {
+  item: GroceryItem; onClose: () => void; onlyIfNeeded?: boolean;
+}) {
   const titleId = useId();
   const [quantity, setQuantity] = useState("1");
   const [date, setDate] = useState("");
@@ -23,6 +28,7 @@ export function PurchaseDialog({ item, onClose }: { item: GroceryItem; onClose: 
       itemId: item.id,
       quantity: quantity === "" ? null : Number(quantity),
       expiresOn: mode === "date" ? date : mode === "none" ? null : undefined,
+      ...(onlyIfNeeded ? { onlyIfNeeded } : {}),
     });
     if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
     setError(null);

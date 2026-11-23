@@ -20,4 +20,6 @@ export type GroceryItem = {
   timesAdded: number;
   /** The item's one stock row (migration 031), or null when it is not in the pantry. */
   lotId: string | null;
+  /** That row's write counter (migration 035), sent back so a stale edit is refused, not applied. */
+  lotVersion: number | null;
 };

@@ -13,9 +13,18 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
   const titleId = useId();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState<string>(item.category);
-  const [quantity, setQuantity] = useState(item.quantity?.toString() ?? "1");
-  const [date, setDate] = useState(item.expiresOn ?? "");
-  const [mode, setMode] = useState<ExpiryMode>(item.expiresOn ? "date" : "none");
+  // The stock fields as they were when the dialog opened. A save that leaves them as they were
+  // must not write them back: the other phone may have stepped the count since, and restating
+  // these would quietly undo it.
+  const [opened] = useState(() => ({
+    quantity: item.quantity?.toString() ?? "1",
+    date: item.expiresOn ?? "",
+    mode: (item.expiresOn ? "date" : "none") as ExpiryMode,
+    version: item.lotVersion,
+  }));
+  const [quantity, setQuantity] = useState(opened.quantity);
+  const [date, setDate] = useState(opened.date);
+  const [mode, setMode] = useState<ExpiryMode>(opened.mode);
   // Stock fields only exist for pantry rows: the shopping list never edits stock.
   const lotId = shopping ? null : item.lotId;
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +40,8 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
         const parsed = editItemSchema.safeParse({
           itemId: item.id, name, ...(shopping ? {} : { category }),
         });
-        const stock = lotId === null ? null : editLotSchema.safeParse({
+        const stockChanged = quantity !== opened.quantity || date !== opened.date || mode !== opened.mode;
+        const stock = lotId === null || !stockChanged ? null : editLotSchema.safeParse({
           lotId,
           quantity: quantity === "" ? 1 : Number(quantity),
           expiresOn: mode === "estimate"
@@ -39,6 +49,8 @@ export function EditItemDialog({ item, onClose, shopping = false }: { item: Groc
             : mode === "date" ? date : null,
           // An untouched estimated date stays an estimate; a re-typed one is printed.
           expiryIsEstimate: mode === "estimate" || (item.expiryIsEstimate && mode === "date" && date === item.expiresOn),
+          // The version these fields were read at: if the other phone wrote since, the save is refused.
+          expectedVersion: opened.version,
         });
         if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
         if (stock && !stock.success) { setError(stock.error.issues[0].message); return; }

@@ -142,6 +142,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
                 onClick={() => call(() => extendLot({
                   lotId,
                   expiresOn: addDays(today, shelfLifeDays(item.category) ?? 7),
+                  expectedVersion: item.lotVersion,
                 }))}
                 className="inline-flex items-center min-h-11 px-2 text-xs text-(--color-accent-text)"
               >
@@ -150,7 +151,7 @@ export function PantryRow({ item, today }: { item: GroceryItem; today: string })
               <button
                 type="button"
                 disabled={pending}
-                onClick={() => call(() => discardLot({ lotId, keepOnList: true }))}
+                onClick={() => call(() => discardLot({ lotId, keepOnList: true, expectedVersion: item.lotVersion }))}
                 className="inline-flex items-center min-h-11 px-2 text-xs text-(--color-text-secondary)"
               >
                 Gone

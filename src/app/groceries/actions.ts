@@ -176,7 +176,7 @@ export async function markBought(
 ): Promise<ActionResult<{ itemId: string }>> {
   return run("markBought", async () => {
     const { user } = await requireUser();
-    const { itemId, expiresOn, quantity } = parseInput(markBoughtSchema, input);
+    const { itemId, expiresOn, quantity, onlyIfNeeded } = parseInput(markBoughtSchema, input);
     const { category } = await assertItemMember(itemId, user.id);
 
     // Bought is how nearly everything enters the pantry, so the shelf-life estimate has to apply
@@ -190,6 +190,8 @@ export async function markBought(
       p_expires_on: resolvedExpiry,
       p_estimate: estimate && resolvedExpiry !== null,
       p_quantity: quantity ?? null,
+      // Sent only when set: Record purchase keeps the call shape that predates migration 034.
+      ...(onlyIfNeeded ? { p_only_if_needed: true } : {}),
     });
     assertNoRpcError("mark bought", { error });
 
@@ -251,10 +253,10 @@ async function assertLotMember(lotId: string, authUserId: string): Promise<strin
 export async function extendLot(input: ExtendLotInput): Promise<ActionResult> {
   return run("extendLot", async () => {
     const { user } = await requireUser();
-    const { lotId, expiresOn } = parseInput(extendLotSchema, input);
+    const { lotId, expiresOn, expectedVersion } = parseInput(extendLotSchema, input);
     await assertLotMember(lotId, user.id);
     const { error } = await createAdminClient().rpc("grocery_lot_extend", {
-      p_lot: lotId, p_expires_on: expiresOn, p_estimate: true,
+      p_lot: lotId, p_expires_on: expiresOn, p_estimate: true, p_expected_version: expectedVersion ?? null,
     });
     assertNoRpcError("extend stock", { error });
     revalidatePath("/groceries");
@@ -265,11 +267,11 @@ export async function extendLot(input: ExtendLotInput): Promise<ActionResult> {
 export async function editLot(input: EditLotInput): Promise<ActionResult> {
   return run("editLot", async () => {
     const { user } = await requireUser();
-    const { lotId, quantity, expiresOn, expiryIsEstimate } = parseInput(editLotSchema, input);
+    const { lotId, quantity, expiresOn, expiryIsEstimate, expectedVersion } = parseInput(editLotSchema, input);
     await assertLotMember(lotId, user.id);
     const { error } = await createAdminClient().rpc("grocery_lot_edit", {
       p_lot: lotId, p_quantity: quantity, p_expires_on: expiresOn,
-      p_estimate: expiresOn !== null && expiryIsEstimate,
+      p_estimate: expiresOn !== null && expiryIsEstimate, p_expected_version: expectedVersion ?? null,
     });
     assertNoRpcError("edit stock", { error });
     revalidatePath("/groceries");
@@ -280,10 +282,10 @@ export async function editLot(input: EditLotInput): Promise<ActionResult> {
 export async function discardLot(input: DiscardLotInput): Promise<ActionResult> {
   return run("discardLot", async () => {
     const { user } = await requireUser();
-    const { lotId, keepOnList } = parseInput(discardLotSchema, input);
+    const { lotId, keepOnList, expectedVersion } = parseInput(discardLotSchema, input);
     await assertLotMember(lotId, user.id);
     const { error } = await createAdminClient().rpc("grocery_lot_discard", {
-      p_lot: lotId, p_keep_on_list: keepOnList,
+      p_lot: lotId, p_keep_on_list: keepOnList, p_expected_version: expectedVersion ?? null,
     });
     assertNoRpcError("discard stock", { error });
     revalidatePath("/groceries");

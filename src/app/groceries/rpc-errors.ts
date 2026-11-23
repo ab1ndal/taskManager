@@ -20,8 +20,18 @@ const KNOWN_GROCERY_RPC_FAILURES = [
   // not shown to the user, so falls through to the generic message.
 ] as const;
 
+/**
+ * Authored failures whose raw text means nothing to the user. The stale-version refusal (035) names
+ * lot ids and version numbers; what the user needs is to look again before deciding.
+ */
+const REPHRASED_GROCERY_RPC_FAILURES = [
+  ["grocery_conflict", "Changed on the other phone — reopen to see the latest."],
+] as const;
+
 /** The message to show the user, or null when this is not a condition we authored. */
 export function knownGroceryRpcFailure(message: string): string | null {
+  const rephrased = REPHRASED_GROCERY_RPC_FAILURES.find(([fragment]) => message.includes(fragment));
+  if (rephrased) return rephrased[1];
   return KNOWN_GROCERY_RPC_FAILURES.some((fragment) => message.includes(fragment))
     ? message
     : null;

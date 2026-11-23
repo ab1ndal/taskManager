@@ -7,6 +7,11 @@ it("forwards a message the migration raises", () => {
   expect(knownGroceryRpcFailure("p_target must be stock or list")).toBeNull();
 });
 
+it("replaces a stale-version conflict with an instruction instead of the raw message", () => {
+  expect(knownGroceryRpcFailure("grocery_conflict: lot abc is at version 3, caller loaded 2"))
+    .toBe("Changed on the other phone — reopen to see the latest.");
+});
+
 it("withholds anything we did not author", () => {
   expect(knownGroceryRpcFailure('relation "grocery_items" does not exist')).toBeNull();
   expect(knownGroceryRpcFailure("permission denied for schema private")).toBeNull();

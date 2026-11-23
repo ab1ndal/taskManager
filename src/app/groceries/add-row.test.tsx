@@ -34,7 +34,7 @@ const items: GroceryItem[] = [
     quantity: null,
     expiresOn: null,
     expiryIsEstimate: false,
-    timesAdded: 12, lotId: null,
+    timesAdded: 12, lotId: null, lotVersion: null,
   },
 ];
 

@@ -168,7 +168,7 @@ export function GroceriesClient({
         </div>
       )}
 
-      {purchase && <PurchaseDialog item={purchase} onClose={() => setPurchase(null)} />}
+      {purchase && <PurchaseDialog item={purchase} onClose={() => setPurchase(null)} onlyIfNeeded />}
 
       {results && (
         <p aria-live="polite" className="sr-only">

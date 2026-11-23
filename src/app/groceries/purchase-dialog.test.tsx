@@ -3,7 +3,7 @@ import { PurchaseDialog } from "./purchase-dialog";
 import { markBought } from "./actions";
 import type { GroceryItem } from "./types";
 jest.mock("./actions", () => ({ markBought: jest.fn() }));
-const item: GroceryItem = { id: "33333333-3333-4333-8333-333333333333", name: "Milk", category: "dairy", inStock: true, needed: true, quantity: 2, expiresOn: "2026-09-12", expiryIsEstimate: false, timesAdded: 1, lotId: null };
+const item: GroceryItem = { id: "33333333-3333-4333-8333-333333333333", name: "Milk", category: "dairy", inStock: true, needed: true, quantity: 2, expiresOn: "2026-09-12", expiryIsEstimate: false, timesAdded: 1, lotId: null, lotVersion: null };
 beforeAll(() => { HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); }; });
 beforeEach(() => { jest.clearAllMocks(); jest.mocked(markBought).mockResolvedValue({ ok: true, itemId: item.id }); });
 it("prefills a quantity of 1", async () => {
@@ -27,6 +27,13 @@ it("sends no quantity when the field is cleared, which the database counts as 1"
   fireEvent.change(screen.getByLabelText("Quantity"), { target: { value: "" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(markBought).toHaveBeenCalledWith({ itemId: item.id, quantity: null, expiresOn: null }));
+});
+it("claims the shopping-list entry when opened from Bought", async () => {
+  render(<PurchaseDialog item={item} onClose={jest.fn()} onlyIfNeeded />);
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(markBought).toHaveBeenCalledWith({
+    itemId: item.id, quantity: 1, expiresOn: null, onlyIfNeeded: true,
+  }));
 });
 it("no longer offers to add another batch", () => {
   render(<PurchaseDialog item={item} onClose={jest.fn()} />);

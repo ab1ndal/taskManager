@@ -81,7 +81,7 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
   const itemIds = (rows ?? []).map((row) => row.id as string);
   const { data: lotRows, error: lotsError } = itemIds.length
     ? await supabase.from("grocery_lots")
-      .select("id, item_id, quantity, expires_on, expiry_is_estimate")
+      .select("id, item_id, quantity, expires_on, expiry_is_estimate, version")
       .in("item_id", itemIds)
     : { data: [], error: null };
   if (lotsError) throw new Error("Could not load grocery stock", { cause: lotsError });
@@ -97,6 +97,7 @@ export default async function GroceriesPage({ searchParams }: { searchParams: Se
       needed: row.needed as boolean,
       inStock: lot !== undefined,
       lotId: (lot?.id as string | undefined) ?? null,
+      lotVersion: (lot?.version as number | undefined) ?? null,
       quantity: (lot?.quantity as number | undefined) ?? null,
       expiresOn: (lot?.expires_on as string | null | undefined) ?? null,
       expiryIsEstimate: (lot?.expiry_is_estimate as boolean | undefined) ?? false,

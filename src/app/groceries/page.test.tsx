@@ -60,12 +60,12 @@ it("maps each item's stock row onto it, and items without one to out of stock", 
     { id: "salt", name: "Salt", category: "pantry", needed: true, times_added: 1 },
   ], error: null });
   query.in.mockResolvedValueOnce({ data: [
-    { id: "lot", item_id: "milk", quantity: 2, expires_on: "2026-09-12", expiry_is_estimate: true },
+    { id: "lot", item_id: "milk", quantity: 2, expires_on: "2026-09-12", expiry_is_estimate: true, version: 4 },
   ], error: null });
   const page = await GroceriesPage({ searchParams: Promise.resolve({ view: "stock" }) });
   expect(page.props.children.props.items).toEqual([
-    expect.objectContaining({ id: "milk", inStock: true, lotId: "lot", quantity: 2, expiresOn: "2026-09-12", expiryIsEstimate: true }),
-    expect.objectContaining({ id: "salt", inStock: false, lotId: null, quantity: null, expiresOn: null, expiryIsEstimate: false }),
+    expect.objectContaining({ id: "milk", inStock: true, lotId: "lot", lotVersion: 4, quantity: 2, expiresOn: "2026-09-12", expiryIsEstimate: true }),
+    expect.objectContaining({ id: "salt", inStock: false, lotId: null, lotVersion: null, quantity: null, expiresOn: null, expiryIsEstimate: false }),
   ]);
 });
 it("surfaces stock query failures instead of pretending the pantry is empty", async () => {

@@ -1,4 +1,4 @@
--- Run inside BEGIN ... ROLLBACK against dev, after migration 031.
+-- Run inside BEGIN ... ROLLBACK against dev, after migration 035.
 -- Assertions raise on failure; no test data is committed.
 do $$
 declare
@@ -76,10 +76,68 @@ begin
   perform public.grocery_mark_bought(i, null, false, 1);
   perform public.grocery_forget(i);
   assert not exists(select 1 from public.grocery_lots where item_id = i), 'forget cascades';
+  -- Bought from the list claims the entry once: a second tap or a retry adds nothing.
+  row := public.grocery_upsert(w, 'Yogurt', 'dairy', 'list');
+  perform public.grocery_mark_bought(row.id, null, false, 2, true);
+  row := public.grocery_mark_bought(row.id, null, false, 2, true);
+  assert (select quantity = 2 from public.grocery_lots where item_id = row.id), 'repeat Bought adds once';
+  assert row.in_stock and not row.needed, 'a skipped Bought returns the current row';
+  perform public.grocery_mark_bought(row.id, null, false, 1);
+  assert (select quantity = 3 from public.grocery_lots where item_id = row.id),
+    'Record purchase still adds to stock that is not needed';
+  -- Every write bumps the version; a stale expected version refuses to write.
+  select id into a from public.grocery_lots where item_id = row.id;
+  assert (select version = 2 from public.grocery_lots where id = a), 'a merge bumps the version';
+  perform public.grocery_adjust_quantity(row.id, 1);
+  assert (select version = 3 from public.grocery_lots where id = a), 'a step bumps the version';
+  perform public.grocery_adjust_quantity(row.id, -1);
+  assert (select version = 4 from public.grocery_lots where id = a), 'a decrement bumps the version';
+  perform public.grocery_lot_extend(a, '2026-10-01', true, 4);
+  perform public.grocery_lot_edit(a, 5, null, false, 5);
+  assert (select version = 6 and quantity = 5 from public.grocery_lots where id = a),
+    'edit and extend with the current version write and bump';
+  begin
+    perform public.grocery_lot_discard(a, true, 5);
+    raise exception 'expected grocery_conflict on discard';
+  exception when raise_exception then
+    if sqlerrm not like 'grocery_conflict%' then raise; end if;
+  end;
+  begin
+    perform public.grocery_lot_edit(a, 1, null, false, 5);
+    raise exception 'expected grocery_conflict on edit';
+  exception when raise_exception then
+    if sqlerrm not like 'grocery_conflict%' then raise; end if;
+  end;
+  begin
+    perform public.grocery_lot_extend(a, '2026-10-02', true, 5);
+    raise exception 'expected grocery_conflict on extend';
+  exception when raise_exception then
+    if sqlerrm not like 'grocery_conflict%' then raise; end if;
+  end;
+  assert (select version = 6 and quantity = 5 and expires_on is null from public.grocery_lots where id = a),
+    'stale writes change nothing';
+  -- The deployed app's named-argument calls omit the version and keep the old behaviour.
+  perform public.grocery_lot_edit(p_lot => a, p_quantity => 998, p_expires_on => null, p_estimate => false);
+  perform public.grocery_lot_extend(p_lot => a, p_expires_on => '2026-10-03', p_estimate => true);
+  assert (select version = 8 and quantity = 998 from public.grocery_lots where id = a), 'null version writes';
+  -- Counts stop at 999, the limit the forms can save back.
+  perform public.grocery_adjust_quantity(row.id, 5);
+  assert (select quantity = 999 from public.grocery_lots where id = a), 'step clamps at 999';
+  perform public.grocery_mark_bought(row.id, null, false, 50);
+  assert (select quantity = 999 from public.grocery_lots where id = a), 'merge clamps at 999';
+  perform public.grocery_upsert(w, 'Flour', null, 'stock', 5000);
+  assert (select quantity = 999 from public.grocery_lots l join public.grocery_items i on i.id = l.item_id
+    where i.workspace_id = w and i.name = 'Flour'), 'a new row clamps at 999';
+  perform public.grocery_lot_discard(p_lot => a, p_keep_on_list => false);
+  assert not exists(select 1 from public.grocery_lots where id = a), 'null-version discard deletes';
   row := public.grocery_upsert(w, 'Rice', null, 'stock', 2);
   perform set_config('test.grocery_item', row.id::text, true);
-  assert not has_function_privilege('authenticated', 'public.grocery_mark_bought(uuid,date,boolean,int)', 'execute');
-  assert not has_function_privilege('anon', 'public.grocery_lot_edit(uuid,int,date,boolean)', 'execute');
+  assert not has_function_privilege('authenticated', 'public.grocery_mark_bought(uuid,date,boolean,int,boolean)', 'execute');
+  assert not has_function_privilege('anon', 'public.grocery_lot_edit(uuid,int,date,boolean,int)', 'execute');
+  assert not has_function_privilege('authenticated', 'public.grocery_lot_discard(uuid,boolean,int)', 'execute');
+  assert not has_function_privilege('authenticated', 'public.grocery_lot_extend(uuid,date,boolean,int)', 'execute');
+  assert not has_function_privilege('authenticated', 'private.lock_grocery_lot(uuid,int)', 'execute');
+  assert has_function_privilege('service_role', 'public.grocery_lot_discard(uuid,boolean,int)', 'execute');
   assert not has_function_privilege('authenticated', 'private.grocery_stock_add(uuid,int,date,boolean)', 'execute');
   assert not has_table_privilege('authenticated', 'public.grocery_lots', 'insert');
   assert not has_table_privilege('authenticated', 'public.grocery_items', 'update');
