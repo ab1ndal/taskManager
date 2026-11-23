@@ -22,11 +22,17 @@ export function AddRow({
   target: "stock" | "list";
 }) {
   const [name, setName] = useState("");
-  const [stocking, setStocking] = useState<{ name: string; category: CategorySlug | null } | null>(null);
+  const [stocking, setStocking] = useState<{ name: string; category: CategorySlug | null; typed: string } | null>(null);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const suggestions = suggestNames(items, name);
+
+  // The field stays editable while an add saves. Clear it only if it still holds what was there at
+  // submit, so the next item typed during the save survives.
+  function clearIfUnchanged(typed: string) {
+    setName((current) => (current === typed ? "" : current));
+  }
 
   // A suggestion passes its own category; a typed name is matched against every loaded product,
   // archived ones included, so a re-add shows the category it will keep.
@@ -36,10 +42,11 @@ export function AddRow({
 
     if (target === "stock") {
       const match = items.find((item) => item.name.trim().toLowerCase() === trimmed.toLowerCase());
-      setStocking({ name: match?.name ?? trimmed, category: knownCategory ?? match?.category ?? null });
+      setStocking({ name: match?.name ?? trimmed, category: knownCategory ?? match?.category ?? null, typed: name });
       return;
     }
 
+    const typed = name;
     startTransition(async () => {
       try {
         const result = await addGroceryItem({ workspaceId, name: trimmed, target });
@@ -49,7 +56,7 @@ export function AddRow({
           return;
         }
 
-        setName("");
+        clearIfUnchanged(typed);
         inputRef.current?.focus();
       } catch (error) {
         // A rejected call (dropped connection, mid-flight navigation) used to vanish silently.
@@ -122,7 +129,7 @@ export function AddRow({
           onClose={() => setStocking(null)}
           onAdded={() => {
             setStocking(null);
-            setName("");
+            clearIfUnchanged(stocking.typed);
             inputRef.current?.focus();
           }}
         />
